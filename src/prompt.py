@@ -16,6 +16,88 @@ def safe_format(template: str, **kwargs: Any) -> str:
 def get_current_date():
     return datetime.now().strftime("%B %d, %Y")
 
+
+
+#======================================
+web_search_validation_instructions = """Evaluate search results in relation to a query".
+
+Instructions:
+- You are provided with a search result consisting of a link and a snippet of information that is present at the link address.
+- Look at the snippet and keeping in mind the {query} and the {current_date}, answer whether the search result is relevant or not.
+- If relevant, answer with a simple message "yes", else "no'.
+- Do not add any further text to your response.
+
+QUERY:
+{query}
+"""
+
+#=======================================
+reflection_instructions = """You are an expert research assistant analyzing answers about "{research_topic}".
+
+Instructions:
+- Identify knowledge gaps or areas that need deeper exploration and generate a follow-up query. (1 or multiple).
+- If provided answers are sufficient to answer the user's question, don't generate a follow-up query.
+- If there is a knowledge gap, generate a follow-up query that would help expand your understanding.
+- Focus on technical details, implementation specifics, or emerging trends that weren't fully covered.
+
+Requirements:
+- Ensure the follow-up query is self-contained and includes necessary context for web search.
+
+Output Format:
+- Format your response as a JSON object with these exact keys:
+   - "is_sufficient": true or false
+   - "knowledge_gap": Describe what information is missing or needs clarification
+   - "follow_up_queries": Write a specific question to address this gap
+
+Example:
+```json
+{{
+    "is_sufficient": true, // or false
+    "knowledge_gap": "The summary lacks information about performance metrics and benchmarks", // "" if is_sufficient is true
+    "follow_up_queries": ["What are typical performance benchmarks and metrics used to evaluate [specific technology]?"] // [] if is_sufficient is true
+}}
+```
+
+Reflect carefully on the Summaries to identify knowledge gaps and produce a follow-up query. Then, produce your output following this JSON format:
+
+Answers:
+{summaries}
+"""
+
+#================================================
+reflection_instructions_modified = """You are an expert research assistant analyzing extracted information about "{research_topic}".
+
+    Instructions:
+    - Evaluate the provided extracted information to determine if it is sufficient to answer the original user question.
+    - If the extracted information is sufficient, set "is_sufficient" to true and leave "knowledge_gap" and "follow_up_queries" as empty/null.
+    - If the extracted information is NOT sufficient, identify knowledge gaps or areas that need deeper exploration based on the original user question and the provided extracted information.
+    - For each identified knowledge gap, generate 1 or multiple specific follow-up queries that would help expand your understanding to fully answer the original user question.
+    - Focus on technical details, implementation specifics, or emerging trends that weren't fully covered in the extracted information.
+
+    Requirements:
+    - Ensure any follow-up query is self-contained and includes necessary context for web search.
+
+    Output Format:
+    - Format your response as a JSON object with these exact keys:
+       - "is_sufficient": true or false
+       - "knowledge_gap": Describe what information is missing or needs clarification (empty string if is_sufficient is true)
+       - "follow_up_queries": Write a list of specific questions to address this gap (empty array if is_sufficient is true)
+
+    Example:
+    ```json
+    {{
+        "is_sufficient": true, // or false
+        "knowledge_gap": "The summary lacks information about performance metrics and benchmarks", // "" if is_sufficient is true
+        "follow_up_queries": ["What are typical performance benchmarks and metrics used to evaluate [specific technology]?"]
+    }}
+    ```
+
+    Reflect carefully on the Extracted Information to identify knowledge gaps and produce a follow-up query if necessary. Then, produce your output following this JSON format:
+
+    Extracted Information:
+    {extracted_info_json}
+    """
+
 #=====================================
 
 query_writer_instructions_legal = """
@@ -143,111 +225,6 @@ Output:
 Research Topic: {topic}
 """
 
-#======================================
-web_search_validation_instructions = """Evaluate search results in relation to a query".
-
-Instructions:
-- You are provided with a search result consisting of a link and a snippet of information that is present at the link address.
-- Look at the snippet and keeping in mind the {query} and the {current_date}, answer whether the search result is relevant or not.
-- If relevant, answer with a simple message "yes", else "no'.
-- Do not add any further text to your response.
-
-QUERY:
-{query}
-"""
-
-#=======================================
-reflection_instructions = """You are an expert research assistant analyzing answers about "{research_topic}".
-
-Instructions:
-- Identify knowledge gaps or areas that need deeper exploration and generate a follow-up query. (1 or multiple).
-- If provided answers are sufficient to answer the user's question, don't generate a follow-up query.
-- If there is a knowledge gap, generate a follow-up query that would help expand your understanding.
-- Focus on technical details, implementation specifics, or emerging trends that weren't fully covered.
-
-Requirements:
-- Ensure the follow-up query is self-contained and includes necessary context for web search.
-
-Output Format:
-- Format your response as a JSON object with these exact keys:
-   - "is_sufficient": true or false
-   - "knowledge_gap": Describe what information is missing or needs clarification
-   - "follow_up_queries": Write a specific question to address this gap
-
-Example:
-```json
-{{
-    "is_sufficient": true, // or false
-    "knowledge_gap": "The summary lacks information about performance metrics and benchmarks", // "" if is_sufficient is true
-    "follow_up_queries": ["What are typical performance benchmarks and metrics used to evaluate [specific technology]?"] // [] if is_sufficient is true
-}}
-```
-
-Reflect carefully on the Summaries to identify knowledge gaps and produce a follow-up query. Then, produce your output following this JSON format:
-
-Answers:
-{summaries}
-"""
-
-#================================================
-reflection_instructions_modified = """You are an expert research assistant analyzing extracted information about "{research_topic}".
-
-    Instructions:
-    - Evaluate the provided extracted information to determine if it is sufficient to answer the original user question.
-    - If the extracted information is sufficient, set "is_sufficient" to true and leave "knowledge_gap" and "follow_up_queries" as empty/null.
-    - If the extracted information is NOT sufficient, identify knowledge gaps or areas that need deeper exploration based on the original user question and the provided extracted information.
-    - For each identified knowledge gap, generate 1 or multiple specific follow-up queries that would help expand your understanding to fully answer the original user question.
-    - Focus on technical details, implementation specifics, or emerging trends that weren't fully covered in the extracted information.
-
-    Requirements:
-    - Ensure any follow-up query is self-contained and includes necessary context for web search.
-
-    Output Format:
-    - Format your response as a JSON object with these exact keys:
-       - "is_sufficient": true or false
-       - "knowledge_gap": Describe what information is missing or needs clarification (empty string if is_sufficient is true)
-       - "follow_up_queries": Write a list of specific questions to address this gap (empty array if is_sufficient is true)
-
-    Example:
-    ```json
-    {{
-        "is_sufficient": true, // or false
-        "knowledge_gap": "The summary lacks information about performance metrics and benchmarks", // "" if is_sufficient is true
-        "follow_up_queries": ["What are typical performance benchmarks and metrics used to evaluate [specific technology]?"]
-    }}
-    ```
-
-    Reflect carefully on the Extracted Information to identify knowledge gaps and produce a follow-up query if necessary. Then, produce your output following this JSON format:
-
-    Extracted Information:
-    {extracted_info_json}
-    """
-#=================================================
-
-report_writer_instructions_legal = """
-# Legal & Financial Risk Report: {research_topic}
-
-## Date: {current_date}
-
-Write a comprehensive report analyzing legal and financial developments affecting the company. Focus on actionable insights for decision-makers.
-
-**Structure:**
-- **Company Profile**: Business model, sector, recent performance
-- **Legal Landscape**: Regulatory actions, litigation, governance issues
-- **Financial Impact**: Revenue effects, compliance costs, investor perception
-- **Strategic Response**: Company actions and mitigation strategies  
-- **Risk Outlook**: Short-term (0-6 months) and medium-term (6-18 months) threats
-- **Benchmarks**: Peer comparisons and industry trends
-
-**Requirements:**
-- Use markdown formatting with clear headings and structure
-- Cite all claims from summaries using [1], [2] notation
-- Include reference list at end
-- Start directly with content, no introductory sections
-- Use full token capacity for thorough analysis
-
-**Data Source:** {summaries}
-"""
 
 #======================================
 
@@ -361,60 +338,6 @@ Output:
 
 Research Topic: {topic}
 """
-#======================================
-
-report_writer_instructions_general = """
-# Research Report: {research_topic}
-
-## Date
-{current_date}
-
-## Objective
-Produce a detailed and structured report addressing the user's research topic. The report must be fact-rich, well-organized, and suitable for informed decision-makers, stakeholders, or analysts across industries.
-
----
-
-## Contextual Overview
-- Begin with an in-depth analysis of the current all relevant aspects relevant to {research_topic}, and list precise facts if available.
-- Highlight recent developments, key players, policy updates, technological shifts, or public sentiment where applicable.
-- Include supportive examples and cite factual content from the provided data summaries.
-
----
-
-## Thematic Analysis
-- Identify 3-5 major themes or areas of discussion emerging from the research topic.
-- For each theme, include:
-  - Historical context or origin
-  - Current implications
-  - Future possibilities or concerns
-  - Supporting evidence and citations from provided content
-
----
-
-## Data Insights
-- Use any quantifiable information (statistics, trends, financials, projections) extracted from summaries.
-- Present using bullet points, tables, or code blocks for clarity.
-- Visual structure should enhance readability and insight.
-
----
-
-## Risks & Uncertainties
-- Analyze unknowns, open questions, and potential risk factors.
-- Discuss what is missing from public discourse, data gaps, or controversial viewpoints.
-- Use markdown callouts (e.g., blockquotes or bolded statements) to make this section stand out.
-
----
-
-## Citations & References
-- All claims derived from summaries must be cited using [1], [2], etc.
-- Provide a reference list at the end, matching the bracketed numbers throughout the text.
-
----
-
-## Writing Guidelines
-- Begin directly with the # Title. Avoid generic preambles like “Introduction” or “Executive Summary.”
-- Use markdown features: headings (`#`, `##`, `###`), bold, italics, horizontal rules
-"""
 
 #======================================
 
@@ -475,6 +398,71 @@ Output:
 }}```
 
 Research Topic: {topic}
+"""
+
+
+
+#=================================================
+
+report_writer_instructions_legal = """
+# Legal & Financial Risk Report: {research_topic}
+
+## Date: {current_date}
+
+Write a comprehensive report analyzing legal and financial developments affecting the company. Focus on actionable insights for decision-makers.
+
+**Structure:**
+- **Company Profile**: Business model, sector, recent performance
+- **Legal Landscape**: Regulatory actions, litigation, governance issues
+- **Financial Impact**: Revenue effects, compliance costs, investor perception
+- **Strategic Response**: Company actions and mitigation strategies  
+- **Risk Outlook**: Short-term (0-6 months) and medium-term (6-18 months) threats
+- **Benchmarks**: Peer comparisons and industry trends
+
+**Requirements:**
+- Use markdown formatting with clear headings and structure
+- Cite all claims from summaries using [1], [2] notation
+- Include reference list at end
+- Start directly with content, no introductory sections
+- Use full token capacity for thorough analysis
+
+**Data Source:** {summaries}
+"""
+
+#======================================
+
+report_writer_instructions_general = """
+# Research Report: {research_topic}
+
+## Date
+{current_date}
+
+## Objective
+Streamlined structure for research reports.
+
+## Contextual Overview
+- Current relevant aspects & recent developments
+- Key players, policy updates & technological shifts
+- Public sentiment & supporting examples
+
+## Thematic Analysis
+- 3-5 major themes with:
+  - Historical context & current implications
+  - Future possibilities & concerns
+  - Supporting evidence & citations
+
+## Data Insights
+- Quantifiable information (statistics, trends, projections)
+- Visual structure for enhanced readability
+
+## Risks & Uncertainties
+- Unknowns, open questions & risk factors
+- Data gaps & controversial viewpoints
+
+Cite all claims [1], [2], etc. Use markdown formatting.
+
+**Research Topic:** {research_topic}
+**Data:** {summaries}
 """
 
 #======================================
