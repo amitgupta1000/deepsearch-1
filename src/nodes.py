@@ -34,11 +34,11 @@ except ImportError:
     LANGCHAIN_DOCS_AVAILABLE = False
 
 try:
-    from langchain_community.document_loaders import PyMuPDFLoader, PyPDFLoader, RecursiveUrlLoader, CSVLoader
+    from langchain_community.document_loaders import PyMuPDFLoader, RecursiveUrlLoader, CSVLoader
     LANGCHAIN_LOADERS_AVAILABLE = True
 except ImportError:
     logging.warning("langchain_community.document_loaders not available. Some features may be limited.")
-    PyMuPDFLoader = PyPDFLoader = RecursiveUrlLoader = CSVLoader = None
+    PyMuPDFLoader = RecursiveUrlLoader = CSVLoader = None
     LANGCHAIN_LOADERS_AVAILABLE = False
 
 try:
@@ -162,6 +162,11 @@ except ImportError:
     DEFAULT_REFERER = "https://example.com"
     URL_TIMEOUT = 10
     SKIP_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mp3', '.zip', '.exe']
+    BLOCKED_DOMAINS = []
+    # Retrieval configuration fallbacks
+    USE_RERANKING = True
+    RERANKER_CANDIDATES_MULTIPLIER = 3
+    RERANK_TOP_K = 20
     # Simple ANSI color fallbacks
     YELLOW = '\033[93m'
     ENDC = '\033[0m'
@@ -213,11 +218,10 @@ except ImportError:
 try:
     from langchain_text_splitters import RecursiveCharacterTextSplitter
     from langchain_community.vectorstores import FAISS # Assuming using FAISS
-    from langchain_community.document_loaders import PyPDFLoader # Import PyPDFLoader
 
 except ImportError:
-    logging.error("Could not import necessary LangChain components. Embedding and indexing or PDF loading may fail.")
-    RecursiveCharacterTextSplitter, FAISS, PyPDFLoader = None, None, None
+    logging.error("Could not import necessary LangChain components. Embedding and indexing may fail.")
+    RecursiveCharacterTextSplitter, FAISS = None, None
 
 from typing import TypedDict, Union
 class AgentState(TypedDict):
@@ -869,10 +873,10 @@ async def extract_content(state: AgentState) -> AgentState:
 
                  # Handle PDF URLs separately
                  if target_url.lower().endswith('.pdf') and PyMuPDFLoader:
-                     logging.info("Attempting to load PDF from: %s using PyPDFLoader", target_url)
+                     logging.info("Attempting to load PDF from: %s using PyMuPDFLoader", target_url)
                      try:
-                         # PyPDFLoader can be synchronous, run in thread pool
-                         loader = PyPDFLoader(target_url)
+                         # PyMuPDFLoader can be synchronous, run in thread pool
+                         loader = PyMuPDFLoader(target_url)
                          # Use asyncio.wait_for to apply the timeout to the synchronous load operation
                          documents = await asyncio.wait_for(
                              asyncio.to_thread(loader.load),
@@ -1188,24 +1192,34 @@ async def embed_index_and_extract(state: AgentState) -> AgentState:
             logging.info("Retrieved %d relevant chunks for query '%s' using FAISS with score threshold.", len(relevant_chunks), retrieval_query)
             
         elif vector_db and isinstance(vector_db, dict) and vector_db.get('type') == 'fallback':
-            # Fallback mode - simple text matching
-            docs = vector_db.get('docs', [])
+            # Fallback mode - enhanced text matching with optional reranking
+            docs = vector_db.get('documents', [])
             query_words = retrieval_query.lower().split()
             
             # Score documents based on keyword overlap
             scored_docs = []
             for doc in docs:
-                content = doc.get('page_content', '').lower()
-                score = sum(1 for word in query_words if word in content)
+                content = getattr(doc, 'page_content', '') or str(doc)
+                content_lower = content.lower()
+                score = sum(1 for word in query_words if word in content_lower)
                 if score > 0:
                     scored_docs.append((score, doc))
             
-            # Sort by score and take top N_CHUNKS
+            # Sort by score and get candidates
             scored_docs.sort(key=lambda x: x[0], reverse=True)
-            relevant_chunks = [doc for score, doc in scored_docs[:N_CHUNKS]]
+            candidate_count = N_CHUNKS * CANDIDATES_MULTIPLIER if USE_RERANKING else N_CHUNKS
+            candidate_chunks = [doc for score, doc in scored_docs[:candidate_count]]
             
-            logging.info("Retrieved %d relevant chunks for query '%s' using fallback text search.", 
-                        len(relevant_chunks), retrieval_query)
+            # Apply reranking if enabled and we have enough chunks
+            if USE_RERANKING and len(candidate_chunks) > N_CHUNKS:
+                relevant_chunks = rerank_chunks(retrieval_query, candidate_chunks, target_count=N_CHUNKS)
+                logging.info("Retrieved %d fallback candidates, reranked to %d relevant chunks for query '%s'.", 
+                           len(candidate_chunks), len(relevant_chunks), retrieval_query)
+            else:
+                relevant_chunks = candidate_chunks[:N_CHUNKS]
+                logging.info("Retrieved %d relevant chunks for query '%s' using fallback text search%s.", 
+                           len(relevant_chunks), retrieval_query,
+                           " (reranking disabled)" if not USE_RERANKING else "")
         else:
             # No vector_db available at all
             logging.warning("No vector database or fallback store available for chunk retrieval.")

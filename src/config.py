@@ -79,6 +79,11 @@ GOOGLE_MODEL = os.getenv("GOOGLE_MODEL", "gemini-2.0-flash")
 EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "google")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "models/text-embedding-005")
 
+# Retrieval Configuration
+USE_RERANKING = get_env_bool("USE_RERANKING", True)  # Enable reranking by default
+RERANKER_CANDIDATES_MULTIPLIER = get_env_int("RERANKER_CANDIDATES_MULTIPLIER", 3)  # Retrieve 3x more candidates
+RERANK_TOP_K = get_env_int("RERANK_TOP_K", 20)  # Final number of chunks after reranking
+
 # LLM Settings
 LLM_TEMPERATURE = get_env_float("LLM_TEMPERATURE", 0.1)  # Low temperature for factual research
 MAX_TOKENS = get_env_int("MAX_TOKENS", 30000)  # High token limit for comprehensive reports
