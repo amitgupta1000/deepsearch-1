@@ -184,7 +184,8 @@ export const ResearchProvider: React.FC<{ children: ReactNode }> = ({ children }
               sources: result.sources || [],
               wordCount: result.report_content ? result.report_content.split(' ').length : 0,
               citations: result.citations || [],
-              timestamp: result.completed_at || new Date().toISOString()
+              timestamp: result.completed_at || new Date().toISOString(),
+              sessionId: sessionId // Add session ID for download functionality
             };
           } else if (status.status === 'failed') {
             addLog('error', 'Research failed', status.error_message);

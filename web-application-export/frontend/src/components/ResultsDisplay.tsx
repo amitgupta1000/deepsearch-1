@@ -95,6 +95,40 @@ const ResultsDisplay: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const downloadReportAs = async (format: 'txt' | 'pdf') => {
+    if (!result.sessionId) {
+      // Fallback to local download for results without session ID
+      downloadReport();
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/research/${result.sessionId}/download?format=${format}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to download ${format.toUpperCase()} file`);
+      }
+      
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `intellisearch-report-${new Date().toISOString().split('T')[0]}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(`Error downloading ${format.toUpperCase()} file:`, error);
+      // Fallback to local text download
+      if (format === 'txt') {
+        downloadReport();
+      } else {
+        alert(`Failed to download ${format.toUpperCase()} file. Please try again.`);
+      }
+    }
+  };
+
   return (
     <div className="space-y-8">
       {/* Success Header */}
@@ -161,13 +195,22 @@ const ResultsDisplay: React.FC = () => {
                 <span>Share</span>
               </button>
             )}
-            <button
-              onClick={downloadReport}
-              className="btn-secondary flex items-center space-x-1"
-            >
-              <Download className="w-4 h-4" />
-              <span>Download</span>
-            </button>
+            <div className="flex items-center space-x-1">
+              <button
+                onClick={() => downloadReportAs('txt')}
+                className="btn-secondary flex items-center space-x-1"
+              >
+                <FileText className="w-4 h-4" />
+                <span>Download TXT</span>
+              </button>
+              <button
+                onClick={() => downloadReportAs('pdf')}
+                className="btn-secondary flex items-center space-x-1"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download PDF</span>
+              </button>
+            </div>
             <button
               onClick={clearResults}
               className="btn-primary"

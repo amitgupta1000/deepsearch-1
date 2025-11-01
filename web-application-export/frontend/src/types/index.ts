@@ -13,6 +13,7 @@ export interface ResearchResult {
   wordCount: number;
   citations: string[];
   timestamp: string;
+  sessionId?: string; // Optional session ID for server-side downloads
 }
 
 export interface ResearchState {

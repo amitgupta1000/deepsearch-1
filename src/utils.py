@@ -116,12 +116,21 @@ def fetch_pdf_content(url: str) -> str:
 # Helper function to rank URLs
 from rank_bm25 import BM25Okapi # Assuming rank_bm25 is installed
 
-def rank_urls(query: str, urls: List[str], relevant_contexts: Dict[str, str]) -> List[str]:
+def rank_urls(query: str, urls: List[str], relevant_contexts: Dict[str, Dict[str, str]]) -> List[str]:
     """Ranks URLs based on their relevance to the query using BM25."""
     if not urls or not relevant_contexts or not query:
         return urls # Return original order if ranking not possible
 
-    corpus = [relevant_contexts.get(url, "") for url in urls]  # Use relevant_contexts to get content
+    # Extract content from the new dictionary structure
+    corpus = []
+    for url in urls:
+        context_data = relevant_contexts.get(url, {})
+        if isinstance(context_data, dict):
+            content = context_data.get('content', '')
+        else:
+            # Handle backward compatibility with old string format
+            content = context_data if isinstance(context_data, str) else ''
+        corpus.append(content)
     tokenized_corpus = [doc.split(" ") for doc in corpus]
 
     if not any(tokenized_corpus): # Check if corpus is empty after tokenization

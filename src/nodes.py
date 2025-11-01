@@ -164,7 +164,7 @@ except ImportError:
     SKIP_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mp3', '.zip', '.exe']
     BLOCKED_DOMAINS = []
     # Retrieval configuration fallbacks
-    USE_RERANKING = True
+    USE_RERANKING = False  # Temporarily disabled until rerank_chunks function is implemented
     RERANKER_CANDIDATES_MULTIPLIER = 3
     RERANK_TOP_K = 20
     # Simple ANSI color fallbacks
@@ -231,7 +231,7 @@ class AgentState(TypedDict):
     search_queries: Optional[List[str]] # The primary list of queries
     rationale: Optional[str]
     data: Optional[List[SearchResult]] # List of SearchResult objects after evaluation
-    relevant_contexts: Optional[Dict[str, str]] # Extracted content from relevant URLs
+    relevant_contexts: Optional[Dict[str, Dict[str, str]]] # Extracted content and metadata from relevant URLs
     relevant_chunks: Optional[List[Document]] # Relevant chunks extracted from contexts per query
     proceed: Optional[bool] # Flag for conditional transitions (e.g., proceed to next stage or loop)
     visited_urls: Optional[List[str]] # List of URLs that have been visited/processed
@@ -887,8 +887,22 @@ async def extract_content(state: AgentState) -> AgentState:
                              # Concatenate page content from all documents (pages)
                              pdf_text = "\n".join([doc.page_content for doc in documents])
                              extracted_content = clean_extracted_text(pdf_text) # Clean the extracted text
+                             
+                             # Try to extract title from metadata or use filename
+                             pdf_title = "Untitled"
+                             if documents[0].metadata and 'title' in documents[0].metadata:
+                                 pdf_title = documents[0].metadata['title']
+                             elif documents[0].metadata and 'source' in documents[0].metadata:
+                                 # Extract filename from source as fallback
+                                 import os
+                                 pdf_title = os.path.basename(documents[0].metadata['source']).replace('.pdf', '').replace('_', ' ').title()
+                             else:
+                                 # Use URL as last resort
+                                 import os
+                                 pdf_title = os.path.basename(target_url).replace('.pdf', '').replace('_', ' ').title()
+                             
                              logging.info("Successfully extracted content from PDF: %s", target_url)
-                             return target_url, extracted_content[:10000] # Return URL and truncated content
+                             return target_url, {"content": extracted_content[:10000], "title": pdf_title} # Return URL and content/title dict
                          else:
                              # If loader returned no documents or empty content
                              error_msg = f"PyMuPDFLoader returned no documents or empty content for {target_url}."
@@ -897,7 +911,8 @@ async def extract_content(state: AgentState) -> AgentState:
                              original_result = url_to_search_result.get(target_url)
                              if original_result and original_result.snippet:
                                   logging.info("Using snippet as fallback for PDF %s after loading failure.", target_url)
-                                  return target_url, original_result.snippet[:10000] # Use truncated snippet
+                                  fallback_title = original_result.title if hasattr(original_result, 'title') and original_result.title else "Untitled"
+                                  return target_url, {"content": original_result.snippet[:10000], "title": fallback_title} # Use truncated snippet with title
                              else:
                                   logging.warning("No snippet available for fallback for PDF %s", target_url)
                                   return target_url, None # No content if PDF loading fails and no snippet fallback
@@ -923,8 +938,9 @@ async def extract_content(state: AgentState) -> AgentState:
                      if scraped_content.is_successful():
                          # Truncate content if it's excessively long
                          extracted_content = scraped_content.text[:10000] if scraped_content.text else "" # Limit to 10k characters
+                         extracted_title = scraped_content.title if scraped_content.title else "Untitled"
                          logging.info("Successfully extracted content from %s", target_url)
-                         return target_url, extracted_content # Return URL and content tuple
+                         return target_url, {"content": extracted_content, "title": extracted_title} # Return URL and content/title dict
                      else:
                           # If scraping failed but didn't timeout, log the error and use snippet if available
                           error_msg = f"Scraping failed for {target_url}: {scraped_content.error}"
@@ -933,7 +949,8 @@ async def extract_content(state: AgentState) -> AgentState:
                           original_result = url_to_search_result.get(target_url)
                           if original_result and original_result.snippet:
                                logging.info("Using snippet as fallback for %s after scraping failure.", target_url)
-                               return target_url, original_result.snippet[:10000] # Use truncated snippet
+                               fallback_title = original_result.title if hasattr(original_result, 'title') and original_result.title else "Untitled"
+                               return target_url, {"content": original_result.snippet[:10000], "title": fallback_title} # Use truncated snippet with title
                           else:
                                # If no snippet, return None for content
                                logging.warning("No snippet available for fallback for %s", target_url)
@@ -949,7 +966,8 @@ async def extract_content(state: AgentState) -> AgentState:
                       original_result = url_to_search_result[target_url]
                       if original_result.snippet:
                            logging.info("Using snippet as fallback for %s after timeout.", target_url)
-                           return target_url, original_result.snippet[:10000] # Use truncated snippet
+                           fallback_title = original_result.title if hasattr(original_result, 'title') and original_result.title else "Untitled"
+                           return target_url, {"content": original_result.snippet[:10000], "title": fallback_title} # Use truncated snippet with title
                       else:
                           # If no snippet, return None for content
                           logging.warning("No snippet available for fallback after timeout for %s", target_url)
@@ -990,11 +1008,11 @@ async def extract_content(state: AgentState) -> AgentState:
     new_failed_urls = []
 
     # Process the results from the gathered tasks
-    for url, content in processed_results:
-        if content:
-            relevant_contexts[url] = content # Add successfully extracted content (or snippet fallback)
+    for url, content_data in processed_results:
+        if content_data:
+            relevant_contexts[url] = content_data # Add successfully extracted content and title (or snippet fallback)
         else:
-             # If content is None, it means extraction/fallback failed or was skipped
+             # If content_data is None, it means extraction/fallback failed or was skipped
              # Add this URL to the failed URLs list to avoid revisiting it
              new_failed_urls.append(url)
              logging.info(f"Adding URL to failed list: {url}")
@@ -1101,8 +1119,11 @@ async def embed_index_and_extract(state: AgentState) -> AgentState:
             separators=["\n\n", "\n", ". ", "! ", "? ", " ", ""]  # Better separators for semantic chunks
         )
 
-        for url, content in relevant_contexts.items():
-            if content:
+        for url, content_data in relevant_contexts.items():
+            if content_data and isinstance(content_data, dict) and content_data.get('content'):
+                content = content_data['content']
+                title = content_data.get('title', 'Untitled')
+                
                 # Filter out very short or low-quality content
                 if len(content.strip()) < 100:  # Skip very short content
                     continue
@@ -1119,6 +1140,7 @@ async def embed_index_and_extract(state: AgentState) -> AgentState:
                     documents_content.append(chunk_text)
                     document_metadatas.append({
                         "source": url, 
+                        "title": title,  # Add the title to metadata
                         "chunk_index": i,
                         "chunk_length": len(chunk_text),
                         "word_count": len(chunk_text.split())
@@ -1207,13 +1229,15 @@ async def embed_index_and_extract(state: AgentState) -> AgentState:
             
             # Sort by score and get candidates
             scored_docs.sort(key=lambda x: x[0], reverse=True)
-            candidate_count = N_CHUNKS * CANDIDATES_MULTIPLIER if USE_RERANKING else N_CHUNKS
+            candidate_count = N_CHUNKS * RERANKER_CANDIDATES_MULTIPLIER if USE_RERANKING else N_CHUNKS
             candidate_chunks = [doc for score, doc in scored_docs[:candidate_count]]
             
             # Apply reranking if enabled and we have enough chunks
             if USE_RERANKING and len(candidate_chunks) > N_CHUNKS:
-                relevant_chunks = rerank_chunks(retrieval_query, candidate_chunks, target_count=N_CHUNKS)
-                logging.info("Retrieved %d fallback candidates, reranked to %d relevant chunks for query '%s'.", 
+                # TODO: Implement rerank_chunks function for advanced reranking
+                # relevant_chunks = rerank_chunks(retrieval_query, candidate_chunks, target_count=N_CHUNKS)
+                relevant_chunks = candidate_chunks[:N_CHUNKS]  # Fallback to simple truncation
+                logging.info("Retrieved %d fallback candidates, truncated to %d relevant chunks for query '%s' (reranking disabled).", 
                            len(candidate_chunks), len(relevant_chunks), retrieval_query)
             else:
                 relevant_chunks = candidate_chunks[:N_CHUNKS]

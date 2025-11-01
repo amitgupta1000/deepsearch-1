@@ -223,8 +223,8 @@ async def get_research_result(session_id: str):
 
 # Download report as file
 @app.get("/api/research/{session_id}/download")
-async def download_report(session_id: str):
-    """Download the research report as a text file"""
+async def download_report(session_id: str, format: str = "txt"):
+    """Download the research report as a text or PDF file"""
     if session_id not in research_sessions:
         raise HTTPException(status_code=404, detail="Research session not found")
     
@@ -233,16 +233,33 @@ async def download_report(session_id: str):
     if session["status"] != "completed" or not session["report_filename"]:
         raise HTTPException(status_code=400, detail="Report not available for download")
     
-    report_path = os.path.join("..", "..", session["report_filename"])
+    # Validate format parameter
+    if format not in ["txt", "pdf"]:
+        raise HTTPException(status_code=400, detail="Format must be either 'txt' or 'pdf'")
     
-    if os.path.exists(report_path):
+    # Determine file path and media type based on format
+    if format == "pdf":
+        # Look for PDF file (replace .txt extension with .pdf)
+        text_path = os.path.join("..", "..", session["report_filename"])
+        pdf_path = text_path.replace(".txt", ".pdf")
+        file_path = pdf_path
+        media_type = "application/pdf"
+        filename = f"intellisearch-report-{session_id[:8]}.pdf"
+    else:
+        # Default to text file
+        file_path = os.path.join("..", "..", session["report_filename"])
+        media_type = "text/plain"
+        filename = f"intellisearch-report-{session_id[:8]}.txt"
+    
+    if os.path.exists(file_path):
         return FileResponse(
-            path=report_path,
-            filename=f"intellisearch-report-{session_id[:8]}.txt",
-            media_type="text/plain"
+            path=file_path,
+            filename=filename,
+            media_type=media_type
         )
     else:
-        raise HTTPException(status_code=404, detail="Report file not found")
+        format_name = "PDF" if format == "pdf" else "text"
+        raise HTTPException(status_code=404, detail=f"Report {format_name} file not found")
 
 # List all research sessions
 @app.get("/api/research/sessions")
