@@ -1384,17 +1384,24 @@ async def AI_evaluate(state: AgentState) -> AgentState:
 
 #=============================================================================================
 reasoning_instruction = (
-    "Generate a detailed report answering the research question using provided content chunks. "
-    "Extract specific data, values, and facts. Use direct quotes and citations. "
-    "Focus on the exact information requested."
-    "Use logical reasoning to connect ideas and present a coherent narrative."
-    "Be thorough and precise."
+    "Generate an analytical report with your expert opinions and interpretations about the research question. "
+    "Provide your analysis, insights, and reasoned conclusions based on the data. "
+    "Make connections between ideas, offer interpretations of trends and patterns. "
+    "Present your professional judgment on implications, significance, and potential outcomes. "
+    "Use phrases like 'This suggests...', 'The evidence indicates...', 'It appears that...', 'This could mean...'. "
+    "Give your expert opinion on what the data reveals and what it might mean for the future. "
+    "Be analytical and interpretive while supporting your views with citations."
 )
 
 researcher_instruction = (
-    "Generate a factual report addressing the research question using provided content chunks. "
-    "Locate and present specific data requested. Use bullet points for key information. "
-    "Attribute facts to source URLs. Be concise and targeted."
+    "Generate a strictly factual report presenting only the relevant data found in the sources. "
+    "Do NOT provide opinions, interpretations, analysis, or conclusions. "
+    "Present only verified facts, statistics, quotes, and documented information. "
+    "Use neutral language and avoid any subjective commentary or speculation. "
+    "Structure the information clearly but let the data speak for itself. "
+    "Use phrases like 'According to...', 'The data shows...', 'Sources indicate...', 'Reports state...'. "
+    "Focus exclusively on documenting what is known without adding interpretation. "
+    "Be comprehensive in presenting all relevant factual information found."
 )
 #=============================================================================================
 

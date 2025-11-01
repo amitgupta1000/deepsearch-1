@@ -277,8 +277,8 @@ def interactive_mode():
 
     # Get reasoning mode from user
     print("\nSelect reasoning mode:")
-    print("1: Reasoning (interpretive, analytical)")
-    print("2: Research (factual, coverage-focused)")
+    print("1: Reasoning (AI provides opinions, analysis, and expert conclusions)")
+    print("2: Research (No opinions - just facts and data only)")
     reasoning_mode_choice = input("Enter the number for your desired reasoning mode: ")
 
     reasoning_mode_flag = True if reasoning_mode_choice == "1" else False
@@ -318,7 +318,7 @@ def command_line_mode():
     parser = argparse.ArgumentParser(description="INTELLISEARCH Research Tool")
     parser.add_argument("query", nargs='?', help="Research query to process")
     parser.add_argument("--reasoning-mode", choices=["reasoning", "research"], 
-                       default="reasoning", help="Reasoning mode (default: reasoning)")
+                       default="reasoning", help="reasoning: AI gives opinions/analysis, research: facts only (default: reasoning)")
     parser.add_argument("--prompt-type", 
                        choices=["legal", "general", "macro", "deepsearch", "person_search", "investment"],
                        default="general", help="Prompt type (default: general)")

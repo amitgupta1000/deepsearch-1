@@ -187,9 +187,10 @@ const ResearchForm: React.FC = () => {
                     <div className="font-semibold text-lg">Reasoning Mode</div>
                   </div>
                   <div className="text-sm text-gray-600 space-y-1">
-                    <div>• Interpretive analysis</div>
-                    <div>• Context and insights</div>
-                    <div>• Logical connections</div>
+                    <div>• AI provides opinions & analysis</div>
+                    <div>• Interpretive insights</div>
+                    <div>• Expert conclusions</div>
+                    <div>• "What this means" perspective</div>
                   </div>
                 </div>
               </label>
@@ -213,9 +214,10 @@ const ResearchForm: React.FC = () => {
                     <div className="font-semibold text-lg">Research Mode</div>
                   </div>
                   <div className="text-sm text-gray-600 space-y-1">
-                    <div>• Factual coverage</div>
-                    <div>• Data collection focus</div>
-                    <div>• Comprehensive scope</div>
+                    <div>• No opinions or analysis</div>
+                    <div>• Pure facts and data only</div>
+                    <div>• Objective information</div>
+                    <div>• "Just the facts" approach</div>
                   </div>
                 </div>
               </label>
