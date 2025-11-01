@@ -103,6 +103,7 @@ class ResearchRequest(BaseModel):
     report_type: str = Field(default="detailed", description="'concise' or 'detailed'")
     prompt_type: str = Field(default="general", description="Prompt type: general, legal, macro, etc.")
     automation_level: str = Field(default="full", description="Automation level for the research")
+    reasoning_mode: bool = Field(default=True, description="True for reasoning mode, False for research mode")
 
 class ResearchSession(BaseModel):
     session_id: str
@@ -338,7 +339,7 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
             "prompt_type": getattr(request, 'prompt_type', 'general'),
             "non_interactive": True,  # Disable interactive prompts
             "auto_report_type": request.report_type,
-            "reasoning_mode": True,
+            "reasoning_mode": request.reasoning_mode,  # Use reasoning mode from request
             "auto_approve": True,  # Auto-approve queries in web mode
             "approval_choice": "yes",
             "report_type_choice": request.report_type,

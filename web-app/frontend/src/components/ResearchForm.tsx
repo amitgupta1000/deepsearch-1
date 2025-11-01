@@ -8,6 +8,7 @@ const ResearchForm: React.FC = () => {
   const [query, setQuery] = useState('');
   const [reportType, setReportType] = useState<'concise' | 'detailed'>('concise');
   const [promptType, setPromptType] = useState('general');
+  const [reasoningMode, setReasoningMode] = useState(true);
   const [showApiKeys, setShowApiKeys] = useState(false);
   const [apiKeys, setApiKeys] = useState({
     gemini: '',
@@ -31,6 +32,7 @@ const ResearchForm: React.FC = () => {
       query: query.trim(),
       reportType,
       promptType,
+      reasoningMode,
       apiKeys,
     };
 
@@ -154,6 +156,66 @@ const ResearchForm: React.FC = () => {
                     <div>• Comprehensive analysis</div>
                     <div>• Multiple perspectives</div>
                     <div>• 5-7 minutes read</div>
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {/* Reasoning Mode Selection */}
+          <div className="space-y-4">
+            <label className="block text-lg font-semibold text-gray-800">
+              Choose Analysis Mode
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label className="cursor-pointer">
+                <input
+                  type="radio"
+                  value="reasoning"
+                  checked={reasoningMode === true}
+                  onChange={(e) => setReasoningMode(true)}
+                  className="sr-only"
+                  disabled={state.isLoading}
+                />
+                <div className={`p-6 rounded-xl border-2 transition-all duration-200 ${
+                  reasoningMode === true
+                    ? 'border-primary-500 bg-primary-50 shadow-md'
+                    : 'border-gray-300 bg-white hover:border-gray-400 hover:shadow-sm'
+                }`}>
+                  <div className="flex items-center space-x-3 mb-3">
+                    <SparklesIcon className={`w-5 h-5 ${reasoningMode === true ? 'text-primary-600' : 'text-gray-500'}`} />
+                    <div className="font-semibold text-lg">Reasoning Mode</div>
+                  </div>
+                  <div className="text-sm text-gray-600 space-y-1">
+                    <div>• Interpretive analysis</div>
+                    <div>• Context and insights</div>
+                    <div>• Logical connections</div>
+                  </div>
+                </div>
+              </label>
+              
+              <label className="cursor-pointer">
+                <input
+                  type="radio"
+                  value="research"
+                  checked={reasoningMode === false}
+                  onChange={(e) => setReasoningMode(false)}
+                  className="sr-only"
+                  disabled={state.isLoading}
+                />
+                <div className={`p-6 rounded-xl border-2 transition-all duration-200 ${
+                  reasoningMode === false
+                    ? 'border-primary-500 bg-primary-50 shadow-md'
+                    : 'border-gray-300 bg-white hover:border-gray-400 hover:shadow-sm'
+                }`}>
+                  <div className="flex items-center space-x-3 mb-3">
+                    <DocumentTextIcon className={`w-5 h-5 ${reasoningMode === false ? 'text-primary-600' : 'text-gray-500'}`} />
+                    <div className="font-semibold text-lg">Research Mode</div>
+                  </div>
+                  <div className="text-sm text-gray-600 space-y-1">
+                    <div>• Factual coverage</div>
+                    <div>• Data collection focus</div>
+                    <div>• Comprehensive scope</div>
                   </div>
                 </div>
               </label>

@@ -2,6 +2,7 @@ export interface ResearchRequest {
   query: string;
   reportType: 'concise' | 'detailed';
   promptType?: string;
+  reasoningMode?: boolean;
   apiKeys: {
     gemini?: string;
     serper?: string;
