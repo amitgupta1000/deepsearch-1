@@ -480,392 +480,132 @@ Research Topic: {topic}
 #======================================
 report_writer_instructions_macro = """
 # Commodity Macro Report: {research_topic}
-
-## Date
-{current_date}
-
-## Purpose
-Produce a comprehensive macroeconomic report focused on the commodity mentioned in the user's research topic. This report is intended for professional economic analysts and investment decision-makers.
-
----
+Date: {current_date}
 
 ## Recent Developments
-- Begin with an in-depth overview of recent price trends, geopolitical shifts, regulatory updates, and macroeconomic conditions impacting {research_topic}.
-- Include relevant global events, policy announcements, and institutional positions.
-- Use paragraph form with examples and cite supporting data from the summaries.
-
----
+- Price trends & geopolitical shifts
+- Regulatory updates & policy announcements
+- Global events & institutional positions
 
 ## Market Dynamics
-### Supply & Demand Analysis
-- Examine seasonal effects, trade flows, inventories, and producer/consumer behavior.
-- Explore macroeconomic influences such as interest rates, inflation, and currency volatility.
-- Use tables and cited data for clarity.
-
-### Outlook
-- Short-Term (0=3 months): Provide concrete forecasts and expectations.
-- Medium-Term (3=12 months): Highlight structural trends, risks, and emerging signals.
-
----
+- Supply & Demand Analysis (seasonal effects, trade flows, inventories)
+- Macroeconomic Influences (interest rates, inflation, currency)
+- Short-Term Outlook (0-3 months)
+- Medium-Term Outlook (3-12 months)
 
 ## Risks & Uncertainties
-- Analyze potential disruptions including policy shifts, weather anomalies, supply chain instability, and political tensions.
-- Use bullet points or markdown formatting to make risks stand out.
+- Policy shifts & weather anomalies
+- Supply chain disruptions & geopolitical tensions
+- Market volatility factors
 
----
+## Theoretical Context
+- Historical trends & economic models
+- Regional case studies & comparative analysis
 
-## Theoretical Context & Applications
-- Discuss historical trends, economic models relevant to commodity pricing, and global macroeconomic theories.
-- Incorporate regional case studies and comparative analysis when possible.
+Cite all data [1], [2], etc. Use markdown formatting.
 
----
-
-## References
-- All factual claims derived from summaries must be cited using [1], [2], etc.
-- Provide a final reference list at the end using bracketed numeric citations.
-
----
-
-## Writing & Formatting Requirements
-- **Start directly with the # Title. Avoid preambles like 'Research Framework' or 'Objective'.**
-- Use markdown (`#`, `##`, `**bold**`, `_italic_`, tables, horizontal rules) for structured readability.
-- Ensure sufficient spacing and paragraph depth throughout.
-- Use the full available token budget. Prioritize insight density over brevity.
-- Maintain a confident yet analytical tone.
-
----
-
-## User Context
 **Research Topic:** {research_topic}
-
-## Summarized Inputs
-{summaries}
+**Data:** {summaries}
 """
 #================================================================================
 
 report_writer_instructions_deepsearch = """
 # Factual Summary Report: {research_topic}
-
-## Date
-{current_date}
-
-## Objective
-Present a highly detailed report providing in-depth coverage of ALL relevant information about the research topic, with priority accorded to more recent information. This report is intended for users who want direct access to verified updates without interpretation or analysis.
-
----
+Date: {current_date}
 
 ## Key Findings
-- List the ALL facts, events, or updates discovered during the search.
-- Use bullet points or short paragraphs.
-- Include dates, names, and source references where available.
-- Avoid speculation or commentary.
-
----
+- All facts, events & updates discovered
+- Dates, names & source references
+- Recent information prioritized
 
 ## Source Highlights
-- Mention the leading (top-10) informative sources (e.g., Bloomberg, Reuters, SEBI, MCA, etc.).
-- Note any discrepancies or gaps in coverage.
-- If multiple sources confirm the same fact, mention that.
+- Leading informative sources
+- Coverage gaps or discrepancies  
+- Multiple source confirmations
 
----
+Cite all facts [1], [2], etc. Maintain neutral, factual tone.
 
-## References
-- Use bracketed numeric citations [1], [2], etc. for any factual claims.
-- Provide a reference list at the end with source URLs or publication names.
-
----
-
-## Formatting Guidelines
-- Use markdown formatting: headings (`#`, `##`), bullet points, bold, horizontal rules.
-- Keep tone neutral and factual.
-- Avoid interpretation, synthesis, or opinion.
-
----
-
-## 🔎 User Context
 **Research Topic:** {research_topic}
-
-## 🧵 Extracted Inputs
-{summaries}
+**Data:** {summaries}
 """
 
 #======================================
 
 report_writer_instructions_person_search = """
 # Digital Profile Report: {research_topic}
-
-## Date
-{current_date}
-
-## Objective
-Construct a comprehensive digital profile of the individual based on publicly available information gathered from multiple online platforms, professional networks, social media, and legal databases. This report synthesizes information to create a holistic view of the person's professional background, public presence, and achievements.
-
----
+Date: {current_date}
 
 ## Personal & Professional Overview
-- Full name, current position, and primary professional affiliations
-- Educational background and qualifications
-- Career timeline and major professional milestones
-- Current role and responsibilities
-
----
+- Current position & professional affiliations
+- Educational background & qualifications
+- Career timeline & major milestones
 
 ## Professional Network Analysis
-### LinkedIn & Professional Presence
-- Professional experience and career progression
-- Skills, endorsements, and recommendations
-- Professional connections and network analysis
-- Publications, articles, and thought leadership content
+- LinkedIn presence & career progression
+- Professional achievements & recognition
+- Industry expertise & specializations
 
-### Career History (Naukri.com & other platforms)
-- Employment history and career transitions
-- Industry expertise and specializations
-- Professional achievements and recognition
-
----
-
-## Social Media Footprint
-### Twitter/X Presence
-- Professional opinions and thought leadership
-- Industry engagement and discussions
-- Public statements and viewpoints
-- Follower analysis and influence metrics
-
-### Facebook & Instagram
-- Public posts and professional content
-- Community involvement and social causes
-- Professional brand and public image
-- Notable achievements and recognition
-
----
+## Social Media & Public Presence
+- Twitter/X thought leadership & engagement
+- Facebook/Instagram professional content
+- Media mentions & interviews
 
 ## Legal & Regulatory Involvement
-### Court Cases & Legal Matters
-- Any involvement in legal cases (IndiaKanoon.org, CaseMine.com)
-- Business litigation or regulatory matters
-- Professional legal opinions or expert testimony
-- Aviation law involvement (AirLaw.com) if applicable
-
----
+- Court cases & business litigation
+- Professional legal opinions
+- Regulatory matters
 
 ## Achievements & Recognition
-- Professional awards and honors
-- Industry recognition and accolades
-- Speaking engagements and conferences
-- Media mentions and interviews
-- Published works and research
+- Awards, honors & industry recognition
+- Speaking engagements & published works
+- Digital reputation analysis
 
----
+## Verification & Analysis
+- Cross-platform information consistency
+- Network size & influence metrics
+- Information reliability assessment
 
-## Digital Reputation Analysis
-- Overall online presence and digital footprint
-- Professional brand consistency across platforms
-- Public perception and sentiment analysis
-- Potential reputation risks or concerns
+Cite all information [1], [2], etc. Maintain professional, respectful tone.
 
----
-
-## Cross-Platform Verification
-- Information consistency across multiple sources
-- Verification of claims and achievements
-- Identification of any discrepancies or inconsistencies
-- Reliability assessment of different information sources
-
----
-
-## Network & Influence Analysis
-- Professional network size and quality
-- Industry connections and relationships
-- Thought leadership and influence metrics
-- Community involvement and social impact
-
----
-
-## Citations & References
-- All information must be cited using bracketed numeric notation [1], [2], etc.
-- Include platform sources (LinkedIn, Twitter, Facebook, etc.)
-- Provide reference list with source URLs and publication dates
-
----
-
-## Ethical Considerations & Limitations
-- Note any information gaps or unavailable data
-- Highlight the distinction between public and private information
-- Acknowledge potential privacy boundaries respected
-- Mention any information that couldn't be independently verified
-
----
-
-## Formatting Guidelines
-- Use markdown formatting: headings (`#`, `##`), **bold**, _italic_, bullet points, tables
-- Maintain professional and respectful tone throughout
-- Present information objectively without judgment
-- Ensure all claims are properly sourced and verifiable
-
----
-
-## User Context
-**Person Profile Subject:** {research_topic}
-
-## Extracted Information
-{summaries}
+**Person Profile:** {research_topic}
+**Data:** {summaries}
 """
 
 #======================================
 
 report_writer_instructions_investment = """
 # Investment Research Report: {research_topic}
-
-## Date
-{current_date}
-
-## Investment Thesis Overview
-Provide a comprehensive investment analysis of the company, synthesizing financial performance, business fundamentals, growth prospects, and risk assessment to determine investment attractiveness and provide actionable recommendations.
-
----
+Date: {current_date}
 
 ## Executive Summary
-- **Investment Recommendation**: Buy/Hold/Sell with rationale
-- **Target Price**: Based on valuation analysis (if applicable)
-- **Key Investment Highlights**: Top 3-5 compelling reasons to invest or avoid
-- **Risk Rating**: High/Medium/Low with primary risk factors
-- **Investment Horizon**: Short-term vs long-term perspective
-
----
+- Investment Recommendation (Buy/Hold/Sell)
+- Target Price & Key Highlights  
+- Risk Rating & Investment Horizon
 
 ## Financial Performance Analysis
-### Revenue & Profitability
-- Revenue growth trends (YoY, QoQ) across business segments
-- Margin analysis (Gross, EBITDA, Net) and trend comparison
-- Profitability drivers and sustainability assessment
+- Revenue & Profitability Trends
+- Balance Sheet & Cash Flow Strength
+- Valuation Multiples & Peer Comparison
 
-### Balance Sheet Strength
-- Debt-to-equity ratios and leverage analysis
-- Cash flow generation and working capital management
-- Asset quality and return metrics (ROE, ROA, ROIC)
+## Business Fundamentals
+- Business Model & Competitive Advantages
+- Management Quality & Strategy
+- Market Position & Competitive Landscape
 
-### Key Financial Ratios
-- Valuation multiples (P/E, P/B, EV/EBITDA, PEG)
-- Efficiency ratios and trend analysis
-- Peer comparison and relative valuation
-
----
-
-## Business Fundamentals Assessment
-### Business Model Analysis
-- Revenue streams and business segment performance
-- Competitive advantages and economic moats
-- Market position and industry leadership
-
-### Management Quality
-- Track record of management team
-- Corporate governance practices
-- Strategic vision and execution capabilities
-- Capital allocation decisions
-
-### Competitive Landscape
-- Market share analysis and positioning
-- Key competitors and competitive threats
-- Differentiation factors and barriers to entry
-
----
-
-## Growth Prospects & Opportunities
-### Growth Drivers
-- Organic growth opportunities and market expansion
-- New product launches and innovation pipeline
-- Digital transformation and technology adoption
-- Acquisition strategy and inorganic growth
-
-### Market Opportunities
-- Total addressable market (TAM) analysis
-- Emerging market trends and positioning
-- Regulatory tailwinds and policy support
-- Export potential and international expansion
-
----
-
-## Risk Analysis
-### Business Risks
-- Industry cyclicality and market volatility
-- Competitive pressures and disruption threats
-- Regulatory and compliance risks
-- Operational and execution risks
-
-### Financial Risks
-- Debt burden and refinancing risks
-- Currency exposure and hedging
-- Interest rate sensitivity
-- Liquidity and cash flow risks
-
-### ESG Considerations
-- Environmental impact and sustainability
-- Social responsibility and labor practices
-- Governance quality and transparency
-- ESG-related investment risks and opportunities
-
----
-
-## Valuation & Price Target
-### Valuation Methodology
-- Multiple valuation approaches (DCF, comparable multiples, asset-based)
-- Key assumptions and sensitivity analysis
-- Fair value estimation and price target derivation
-
-### Peer Comparison
-- Relative valuation vs industry peers
-- Premium/discount analysis and justification
-- Sector-specific valuation metrics
-
----
+## Growth Prospects & Risks
+- Growth Drivers & Market Opportunities
+- Business & Financial Risk Assessment
+- ESG Considerations
 
 ## Investment Recommendation
-### Bull Case Scenario
-- Best-case growth assumptions and catalysts
-- Upside potential and price targets
-- Key positive developments to monitor
+- Bull Case, Bear Case & Base Case Scenarios
+- Valuation Analysis & Price Target
+- Timeline & Key Catalysts
 
-### Bear Case Scenario
-- Downside risks and negative catalysts
-- Worst-case scenario impact assessment
-- Early warning indicators to watch
+Cite all data [1], [2], etc. Use markdown formatting.
 
-### Base Case Investment Thesis
-- Most likely scenario and balanced view
-- Risk-adjusted return expectations
-- Timeline for investment thesis to play out
-
----
-
-## Data Sources & References
-- All financial data must be cited using bracketed numeric notation [1], [2], etc.
-- Include exchange filings, annual reports, analyst reports
-- Reference regulatory submissions and management commentary
-- Provide source URLs and publication dates
-
----
-
-## Investment Disclaimers
-- Note data limitations and information gaps
-- Highlight assumptions and potential changes
-- Acknowledge market volatility and risk factors
-- Mention that this is research analysis, not investment advice
-
----
-
-## Formatting Guidelines
-- Use markdown formatting: headings (`#`, `##`), **bold**, _italic_, tables, bullet points
-- Include financial tables and charts where applicable
-- Maintain objective, analytical tone throughout
-- Support all claims with proper citations and data
-
----
-
-## Investment Context
-**Company Analysis Subject:** {research_topic}
-
-## Financial & Business Data
-{summaries}
+**Analysis Subject:** {research_topic}
+**Data:** {summaries}
 """
 
 #================================================================================
