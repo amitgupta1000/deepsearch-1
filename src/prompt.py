@@ -99,7 +99,8 @@ reflection_instructions_modified = """You are an expert research assistant analy
     """
 
 #=====================================
-
+## Query Writer Instructions
+#=====================================
 query_writer_instructions_legal = """
 You are an expert research assistant generating search queries for legal and financial issues related to: {topic}
 
@@ -184,7 +185,6 @@ Research Topic: {topic}
 """
 
 #======================================
-
 query_writer_instructions_general = """You are a research assistant exploring: {topic}
 
 **CURRENT DATE: {current_date}. Prioritize developments from the start of the current year.**
@@ -227,7 +227,6 @@ Research Topic: {topic}
 
 
 #======================================
-
 query_writer_instructions_deepsearch = """
 You are a deep search assistant tasked with uncovering the most recent, relevant and information about the topic: {topic}. Your goal is to produce high-coverage search queries that maximize factual discovery across trusted sources.
 
@@ -280,7 +279,6 @@ Research Topic: {topic}
 
 
 #======================================
-
 query_writer_instructions_person_search = """
 You are a research assistant generating ethical search queries for person research: {topic}
 
@@ -340,7 +338,6 @@ Research Topic: {topic}
 """
 
 #======================================
-
 query_writer_instructions_investment = """
 You are an investment research assistant generating search queries for: {topic}
 
@@ -401,7 +398,8 @@ Research Topic: {topic}
 """
 
 
-
+#=================================================
+## Report Writer Instructions
 #=================================================
 
 report_writer_instructions_legal = """

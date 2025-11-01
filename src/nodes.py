@@ -1349,6 +1349,8 @@ reasoning_instruction = (
     "Generate a detailed report answering the research question using provided content chunks. "
     "Extract specific data, values, and facts. Use direct quotes and citations. "
     "Focus on the exact information requested."
+    "Use logical reasoning to connect ideas and present a coherent narrative."
+    "Be thorough and precise."
 )
 
 researcher_instruction = (
@@ -1428,8 +1430,7 @@ def generate_citations_section(relevant_chunks) -> tuple[str, dict]:
     
     # Format citations section
     citations_text = "\n\n---\n\n# 📚 Sources and References\n\n"
-    citations_text += "*Note: This section is not included in the report word count.*\n\n"
-    
+        
     for source in sources.values():
         citations_text += f"[{source['index']}] **{source['title']}**\n"
         citations_text += f"    {source['url']}\n\n"
@@ -1715,7 +1716,7 @@ async def write_report(state: AgentState):
         2. Look through the original content chunks for ADDITIONAL unused data, values, or facts
         3. ADD approximately {deficit} words of NEW information while preserving the existing structure
         4. Focus on COMPLEMENTARY information that wasn't already covered
-        5. Add more specific data points, quotes, or examples from different sources
+        5. Add more specific data points, quotes, or other relevant details
         6. DO NOT restate or rephrase information already in the report
         
         APPEND NEW SECTIONS OR EXPAND EXISTING ONES - Do not rewrite the entire report.
