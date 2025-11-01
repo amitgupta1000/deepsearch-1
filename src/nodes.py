@@ -105,7 +105,8 @@ except ImportError:
     # Define dummy functions or handle missing utilities within nodes if necessary
 
 try:
-    from .question_analyzer import analyze_research_question, generate_extraction_instructions
+    # Try importing from question_analyzer module if it exists
+    pass
 except ImportError:
     logging.warning("Could not import question analyzer. Using fallback methods.")
     def analyze_research_question(question):
@@ -1345,39 +1346,15 @@ async def AI_evaluate(state: AgentState) -> AgentState:
 
 #=============================================================================================
 reasoning_instruction = (
-    "You are tasked with generating a highly detailed and specific report "
-    "that directly answers the user's research question using the provided content chunks. The response should: \n"
-    "- FIRST identify the specific information requested in the research question\n"
-    "- EXTRACT exact data, values, numbers, dates, names, and specific facts from the content chunks\n"
-    "- DIRECTLY answer what was asked rather than providing general analysis\n"
-    "- If specific values, numbers, or data points were requested, FIND and PRESENT them prominently\n"
-    "- If comparisons were requested, EXTRACT the specific comparison data\n"
-    "- If trends were asked about, FIND the actual trend data and metrics\n"
-    "- Use direct quotes and specific citations for key findings\n"
-    "- Be verbose and comprehensive but FOCUSED on answering the specific question\n"
-    "- Provide insights and connections, but only AFTER presenting the specific requested information\n"
-    "- Attribute specific information to individual source URLs whenever possible\n"
-    "- Include citations in-line (e.g., 'According to [source_url], the value is X...')\n"
-    "- Begin with a clear statement of what specific information was found\n"
-    "- If the exact information requested is not available, state this clearly and provide the closest available data\n"
-    "- Respond as if writing a professional research report that directly addresses the user's specific needs"
+    "Generate a detailed report answering the research question using provided content chunks. "
+    "Extract specific data, values, and facts. Use direct quotes and citations. "
+    "Focus on the exact information requested."
 )
 
 researcher_instruction = (
-    "You are tasked with generating a factual and targeted report "
-    "that directly addresses the user's specific research question using the provided content chunks. The response should: \n"
-    "- FIRST identify exactly what information the user is seeking\n"
-    "- LOCATE and EXTRACT the specific data, values, facts, or information requested\n"
-    "- PRESENT the requested information clearly and prominently at the beginning\n"
-    "- If numerical values were requested, FIND and DISPLAY them with proper context\n"
-    "- If specific entities, names, or items were asked about, EXTRACT and LIST them\n"
-    "- Focus on factual coverage that directly answers the question\n"
-    "- Present information clearly and concisely, organized by relevance to the question\n"
-    "- Attribute each fact to its source URL\n"
-    "- Avoid generic analysis when specific information was requested\n"
-    "- Use bullet points or structured formatting to highlight key requested data\n"
-    "- If the exact requested information is not found, clearly state this and provide related available information\n"
-    "- Respond as if compiling a targeted factual digest that answers the specific question asked"
+    "Generate a factual report addressing the research question using provided content chunks. "
+    "Locate and present specific data requested. Use bullet points for key information. "
+    "Attribute facts to source URLs. Be concise and targeted."
 )
 #=============================================================================================
 
@@ -1466,11 +1443,7 @@ def generate_citations_section(relevant_chunks) -> tuple[str, dict]:
 async def write_report(state: AgentState):
     """
     Generates the final report and saves to text and PDF.
-    Now supports user choice between concise (600-1200 words) and detailed (800-3000 words) reports.
-    Two-stage generation to encourage verbosity:
-      1) Ask the LLM for a structured outline (sections + target word counts)
-      2) Expand each section separately and concatenate
-    Includes a safe retry/expansion pass if output is shorter than expected.
+    Supports concise (600-1200 words) and detailed (800-3000 words) reports.
     """
     # Use color constants from setup if available
     try:
@@ -1522,13 +1495,6 @@ async def write_report(state: AgentState):
     relevant_chunks = state.get('relevant_chunks', [])
     research_topic = state.get('new_query', 'the topic')
 
-    # Analyze the research question to understand what specific information is needed
-    question_analysis = analyze_research_question(research_topic)
-    extraction_instructions = generate_extraction_instructions(question_analysis)
-    
-    logging.info(f"Question analysis: {question_analysis}")
-    logging.info(f"Extraction focus: {extraction_instructions}")
-
     if not relevant_chunks:
         final_report_content = f"Could not generate a report. No relevant information was found for the topic: '{research_topic}'."
         errors.append(final_report_content)
@@ -1562,22 +1528,12 @@ async def write_report(state: AgentState):
 
     selected_instruction = reasoning_instruction if reasoning_mode else researcher_instruction
     
-    # Enhance the instruction with specific extraction guidance based on question analysis
+    # Simplified instruction focusing on key requirements
     enhanced_instruction = f"""
     {selected_instruction}
     
-    SPECIFIC EXTRACTION REQUIREMENTS FOR THIS QUESTION:
-    {extraction_instructions}
-    
-    QUESTION ANALYSIS RESULTS:
-    - Question type: {question_analysis.get('question_type', 'general')}
-    - Specificity level: {question_analysis.get('specificity_level', 'medium')}
-    - Requires numeric data: {question_analysis.get('requires_numeric_data', False)}
-    - Requires comparison: {question_analysis.get('requires_comparison', False)}
-    - Requires list: {question_analysis.get('requires_list', False)}
-    - Temporal context: {question_analysis.get('temporal_context', 'None specified')}
-    
-    REMEMBER: Your primary goal is to answer "{research_topic}" with specific information from the provided content chunks.
+    Answer: "{research_topic}"
+    Focus on specific data from content chunks. Include relevant citations [1], [2], etc.
     """
 
     # Helper to call the LLM with flexible wrappers
@@ -1596,32 +1552,14 @@ async def write_report(state: AgentState):
 
     # 1) Request an outline (JSON) specifying section titles and target word counts
     outline_prompt = f"""
-    You are creating an outline for a report that must directly answer this specific research question: "{research_topic}"
+    Create an outline for a {report_type} report answering: "{research_topic}"
     
     {report_writer_instructions.format(research_topic=research_topic, summaries=formatted_chunks, current_date=get_current_date())}
 
-    {enhanced_instruction}
+    Provide JSON outline with {min_sections}-{max_sections} sections, maximum {max_words} words total.
     
-    CRITICAL TASK: Analyze the research question to understand what specific information is being requested, then create an outline that will ensure this information is extracted and presented.
-
-    Research Question Analysis:
-    - What specific data, values, metrics, or facts is the user asking for?
-    - What type of answer does this question require (numerical data, comparison, list, analysis, etc.)?
-    - What are the key components that need to be addressed?
-
-    Please provide a JSON-only outline for a {report_type} report that will DIRECTLY ANSWER the research question above. The JSON should be a single object with a "sections" key whose value is a list of objects with the keys:
-      - title: string (section heading that relates to answering the specific question)
-      - target_words: integer (approximate number of words to generate for this section)
-
-    IMPORTANT: 
-    - This is a {report_type.upper()} report with a MAXIMUM of {max_words} words total
-    - Each section should be designed to extract and present specific information that answers the research question
-    - Suggest between {min_sections} and {max_sections} sections that focus on different aspects of answering the question
-    - Make sure the total target word count is around {max_words} words but does not exceed it
-    - Section titles should indicate what specific information will be presented, not generic categories
-
-    Respond with JSON only (no surrounding explanation). Example:
-    {{"sections": [{{"title": "Specific Data and Values Found", "target_words": {default_section_words//2}}}, {{"title": "Detailed Analysis of [Specific Aspect]", "target_words": {default_section_words}}}, ...]}}
+    JSON format:
+    {{"sections": [{{"title": "Section Name", "target_words": {default_section_words}}}]}}
     """
 
     messages = [SystemMessage(content=outline_prompt), HumanMessage(content=f"Provide the outline for: {research_topic}")]
@@ -1717,42 +1655,16 @@ async def write_report(state: AgentState):
         ])
 
         expand_prompt = f"""
-        You are writing the section titled: {sec_title}
+        Section: {sec_title}
+        Target: ~{target_words} words for {report_type} report
+        Research Question: "{research_topic}"
         
-        CRITICAL: This report must directly answer the user's specific research question: "{research_topic}"
+        Extract specific information from content chunks to answer the research question.
+        Use citations [1], [2], etc. from the content below.
+        Focus on unique data for this section.
         
-        Target length: approximately {target_words} words. This is part of a {report_type} report (maximum {max_words} words total).
-        
-        CITATION INSTRUCTIONS:
-        - Use numbered citations in brackets when referencing sources: [1], [2], etc.
-        - The citation numbers are provided in the content chunks below
-        - Example: "According to the study [3], the market grew by 15%"
-        - All major claims should include citation numbers
-        
-        SPECIFIC INSTRUCTIONS FOR THIS SECTION:
-        1. FIRST examine the research question to identify what specific information is being requested
-        2. SCAN the provided content chunks for the exact data, values, numbers, names, or facts that answer the question
-        3. EXTRACT and PRESENT the specific requested information prominently in this section
-        4. Focus on UNIQUE information from your assigned content chunks - avoid repeating information that would appear in other sections
-        5. If the user asked for specific values, metrics, or data points - FIND them and state them clearly with citations [N]
-        6. If comparisons were requested - EXTRACT the comparison data and present it with citations [N]
-        7. If trends or changes were asked about - FIND the actual trend data and present it with citations [N]
-        8. Use direct quotes from sources with proper citations: "As stated in [2], 'direct quote here'"
-        9. Cite specific data points: "The value is X [1], which represents a Y% change [2]"
-        
-        AVOID generic statements like "X is important and should be evaluated carefully" 
-        INSTEAD provide specific information like "X has a value of Y [1], which represents a Z% change from the previous year [2]"
-        
-        AVOID REPETITION: This section should contain unique information not covered in other sections.
-        
-        {"Be concise but specific - focus on answering the exact question asked." if report_type == "concise" else "Be detailed and comprehensive, but prioritize presenting the specific information requested in the research question. Cite sources when possible using the provided extracts."}
-
-        PROVIDED CONTENT TO EXTRACT INFORMATION FROM (Section {i+1} of {len(sanitized_sections)}):
+        Content chunks:
         {section_formatted_chunks}
-        
-        REMINDER: Your goal is to answer "{research_topic}" specifically using the unique information from your assigned content chunks.
-        
-        Write the section "{sec_title}" that directly addresses the research question using specific information from the content:
         """
 
         messages = [SystemMessage(content=report_writer_instructions.format(research_topic=research_topic, summaries=section_formatted_chunks, current_date=get_current_date()) + "\n\n" + enhanced_instruction), HumanMessage(content=expand_prompt)]
