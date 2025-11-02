@@ -77,7 +77,14 @@ GOOGLE_MODEL = os.getenv("GOOGLE_MODEL", "gemini-2.0-flash")
 
 # Embedding Configuration
 EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "google")
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "models/text-embedding-005")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")  # Updated to latest model
+
+# Enhanced embedding configuration
+EMBEDDING_TASK_TYPE = os.getenv("EMBEDDING_TASK_TYPE", "RETRIEVAL_DOCUMENT")  # Default task type
+EMBEDDING_DIMENSIONALITY = get_env_int("EMBEDDING_DIMENSIONALITY", 768)  # Efficient default
+EMBEDDING_NORMALIZE = get_env_bool("EMBEDDING_NORMALIZE", True)  # Auto-normalize for non-3072 dims
+EMBEDDING_BATCH_SIZE = get_env_int("EMBEDDING_BATCH_SIZE", 100)  # Batch processing
+USE_ENHANCED_EMBEDDINGS = get_env_bool("USE_ENHANCED_EMBEDDINGS", True)  # Use new implementation
 
 # LLM Settings
 LLM_TEMPERATURE = get_env_float("LLM_TEMPERATURE", 0.1)  # Low temperature for factual research
@@ -273,6 +280,10 @@ __all__ = [
     # LLM Configuration  
     'PRIMARY_LLM_PROVIDER', 'GOOGLE_MODEL', 'EMBEDDING_MODEL',
     'LLM_TEMPERATURE', 'MAX_TOKENS',
+    
+    # Enhanced Embedding Configuration
+    'EMBEDDING_PROVIDER', 'EMBEDDING_TASK_TYPE', 'EMBEDDING_DIMENSIONALITY',
+    'EMBEDDING_NORMALIZE', 'EMBEDDING_BATCH_SIZE', 'USE_ENHANCED_EMBEDDINGS',
     
     # Search and Processing
     'MAX_SEARCH_QUERIES', 'MAX_SEARCH_RESULTS', 'MAX_CONCURRENT_SCRAPES',

@@ -92,7 +92,7 @@ class HybridRetriever:
                 
             self.documents = documents
             
-            # Build vector index
+            # Build vector index with task-optimized embeddings
             vector_success = self._build_vector_index(documents)
             
             # Build BM25 index
@@ -171,14 +171,32 @@ class HybridRetriever:
             return []
     
     def _build_vector_index(self, documents: List[Document]) -> bool:
-        """Build FAISS vector index."""
+        """Build FAISS vector index with task-optimized embeddings."""
         try:
             if not self.embeddings or not FAISS:
                 self.logger.warning("Embeddings or FAISS not available for vector index")
                 return False
+            
+            # Use task-optimized embeddings if available
+            if hasattr(self.embeddings, 'embed_documents'):
+                # Check if it's our enhanced embeddings class
+                if hasattr(self.embeddings, 'embed_for_retrieval') or 'Enhanced' in str(type(self.embeddings)):
+                    # Use document-specific task type for indexing
+                    self.logger.info("Using task-optimized embeddings for document indexing")
+                    if hasattr(self.embeddings, 'default_task_type'):
+                        original_task = self.embeddings.default_task_type
+                        self.embeddings.default_task_type = "RETRIEVAL_DOCUMENT"
+                        self.vector_store = FAISS.from_documents(documents, self.embeddings)
+                        self.embeddings.default_task_type = original_task
+                    else:
+                        self.vector_store = FAISS.from_documents(documents, self.embeddings)
+                else:
+                    # Standard LangChain embeddings
+                    self.vector_store = FAISS.from_documents(documents, self.embeddings)
+            else:
+                self.vector_store = FAISS.from_documents(documents, self.embeddings)
                 
-            self.vector_store = FAISS.from_documents(documents, self.embeddings)
-            self.logger.info("Vector index built successfully")
+            self.logger.info("Vector index built successfully with optimized embeddings")
             return True
             
         except Exception as e:
@@ -235,20 +253,41 @@ class HybridRetriever:
             return self._retrieve_manual_fusion(query)
     
     def _retrieve_manual_fusion(self, query: str) -> List[Document]:
-        """Manual fusion of vector and BM25 results."""
+        """Manual fusion of vector and BM25 results with task-optimized query embeddings."""
         try:
             vector_results = []
             bm25_results = []
             
-            # Get vector results
+            # Get vector results with query-optimized embeddings
             if self.vector_store:
                 try:
-                    vector_results = self.vector_store.similarity_search_with_score(
-                        query, 
-                        k=self.config.top_k * self.config.fetch_k_multiplier,
-                        score_threshold=self.config.score_threshold
-                    )
+                    # Optimize query embedding for retrieval if using enhanced embeddings
+                    if hasattr(self.embeddings, 'embed_query') and hasattr(self.embeddings, 'default_task_type'):
+                        # Temporarily set task type for query
+                        original_task = getattr(self.embeddings, 'default_task_type', None)
+                        if hasattr(self.embeddings, 'default_task_type'):
+                            self.embeddings.default_task_type = "RETRIEVAL_QUERY"
+                        
+                        vector_results = self.vector_store.similarity_search_with_score(
+                            query, 
+                            k=self.config.top_k * self.config.fetch_k_multiplier,
+                            score_threshold=self.config.score_threshold
+                        )
+                        
+                        # Restore original task type
+                        if original_task and hasattr(self.embeddings, 'default_task_type'):
+                            self.embeddings.default_task_type = original_task
+                    else:
+                        # Standard vector search
+                        vector_results = self.vector_store.similarity_search_with_score(
+                            query, 
+                            k=self.config.top_k * self.config.fetch_k_multiplier,
+                            score_threshold=self.config.score_threshold
+                        )
+                    
                     vector_results = [(doc, score) for doc, score in vector_results]
+                    self.logger.info(f"Vector search returned {len(vector_results)} results")
+                    
                 except Exception as e:
                     self.logger.warning(f"Vector search failed: {e}")
             
@@ -257,6 +296,7 @@ class HybridRetriever:
                 try:
                     bm25_results = self.bm25_retriever.invoke(query)
                     bm25_results = [(doc, 1.0) for doc in bm25_results]  # Uniform scores
+                    self.logger.info(f"BM25 search returned {len(bm25_results)} results")
                 except Exception as e:
                     self.logger.warning(f"BM25 search failed: {e}")
             

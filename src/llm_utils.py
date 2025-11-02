@@ -67,21 +67,57 @@ except ImportError:
 
 embeddings = None # The primary embeddings model
 
-# For embedding/indexing
+# Enhanced embeddings with task type support
 try:
-    if GOOGLE_API_KEY and LANGCHAIN_GOOGLE_AVAILABLE:
-        embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=GOOGLE_API_KEY)
-        logging.info("Initialized GoogleGenerativeAIEmbeddings with models/text-embedding-004.")
+    from .enhanced_embeddings import EnhancedGoogleEmbeddings, create_enhanced_embeddings
+    USE_ENHANCED_EMBEDDINGS = True
+except ImportError:
+    logging.warning("Enhanced embeddings not available, falling back to standard implementation")
+    USE_ENHANCED_EMBEDDINGS = False
+
+# For embedding/indexing - use enhanced embeddings if available
+try:
+    if GOOGLE_API_KEY:
+        if USE_ENHANCED_EMBEDDINGS:
+            # Use enhanced embeddings with task type optimization
+            embeddings = create_enhanced_embeddings(
+                google_api_key=GOOGLE_API_KEY,
+                use_case="retrieval",  # Optimized for document retrieval
+                output_dimensionality=768,  # Efficient size
+                normalize_embeddings=True,
+                batch_size=50  # Reasonable batch size
+            )
+            logging.info("Initialized Enhanced Google Embeddings with gemini-embedding-001 (task-optimized)")
+        
+        elif LANGCHAIN_GOOGLE_AVAILABLE:
+            # Fallback to LangChain implementation
+            embeddings = GoogleGenerativeAIEmbeddings(
+                model="gemini-embedding-001", 
+                google_api_key=GOOGLE_API_KEY
+            )
+            logging.info("Initialized GoogleGenerativeAIEmbeddings with gemini-embedding-001 (fallback)")
+        
+        else:
+            embeddings = None
+            logging.error("No embedding implementation available")
     else:
          embeddings = None
-         if not LANGCHAIN_GOOGLE_AVAILABLE:
-             logging.error("Google GenAI package not available.")
-         else:
-             logging.error("No Google API key available for initializing embeddings.")
+         logging.error("No Google API key available for initializing embeddings.")
 
 except Exception as e:
     embeddings = None
     logging.error(f"Failed to initialize embeddings model: {e}")
+    
+    # Try fallback to older model
+    try:
+        if GOOGLE_API_KEY and LANGCHAIN_GOOGLE_AVAILABLE:
+            embeddings = GoogleGenerativeAIEmbeddings(
+                model="models/text-embedding-004", 
+                google_api_key=GOOGLE_API_KEY
+            )
+            logging.info("Fallback: Initialized with models/text-embedding-004")
+    except Exception as fallback_e:
+        logging.error(f"Fallback embedding initialization also failed: {fallback_e}")
 
 # --- LLM Model Initialization --- 
 

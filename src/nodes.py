@@ -159,6 +159,12 @@ try:
             MIN_WORD_COUNT,
             USE_RERANKING,
             RERANKER_CANDIDATES_MULTIPLIER,
+            # Enhanced embedding configuration
+            USE_ENHANCED_EMBEDDINGS,
+            EMBEDDING_TASK_TYPE,
+            EMBEDDING_DIMENSIONALITY,
+            EMBEDDING_NORMALIZE,
+            EMBEDDING_BATCH_SIZE,
             )
 except ImportError:
     logging.warning("Could not import config settings. Using defaults.")
@@ -193,6 +199,12 @@ except ImportError:
     MIN_WORD_COUNT = 10
     USE_RERANKING = False
     RERANKER_CANDIDATES_MULTIPLIER = 3
+    # Enhanced embedding fallback defaults
+    USE_ENHANCED_EMBEDDINGS = True
+    EMBEDDING_TASK_TYPE = "RETRIEVAL_DOCUMENT"
+    EMBEDDING_DIMENSIONALITY = 768
+    EMBEDDING_NORMALIZE = True
+    EMBEDDING_BATCH_SIZE = 50
     # Color constants and chunking fallbacks
     CHUNK_SIZE = 1000
     CHUNK_OVERLAP = 100
