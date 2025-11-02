@@ -226,8 +226,6 @@ except ImportError:
     RED = '\033[91m'
     GREEN = '\033[92m'
     BLUE = '\033[94m'
-    CHUNK_SIZE = 1000
-    CHUNK_OVERLAP = 100
     # Enhanced deduplication fallback defaults
     USE_LLM_DEDUPLICATION = False
     LLM_DEDUP_DETAILED_ONLY = True
