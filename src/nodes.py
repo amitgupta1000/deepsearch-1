@@ -165,6 +165,10 @@ try:
             EMBEDDING_DIMENSIONALITY,
             EMBEDDING_NORMALIZE,
             EMBEDDING_BATCH_SIZE,
+            # Multi-query retrieval settings
+            USE_MULTI_QUERY_RETRIEVAL,
+            MAX_RETRIEVAL_QUERIES,
+            QUERY_CHUNK_DISTRIBUTION,
             )
 except ImportError:
     logging.warning("Could not import config settings. Using defaults.")
@@ -205,6 +209,10 @@ except ImportError:
     EMBEDDING_DIMENSIONALITY = 768
     EMBEDDING_NORMALIZE = True
     EMBEDDING_BATCH_SIZE = 50
+    # Multi-query retrieval fallback defaults
+    USE_MULTI_QUERY_RETRIEVAL = True
+    MAX_RETRIEVAL_QUERIES = 5
+    QUERY_CHUNK_DISTRIBUTION = True
     # Color constants and chunking fallbacks
     CHUNK_SIZE = 1000
     CHUNK_OVERLAP = 100
@@ -1137,21 +1145,35 @@ async def embed_index_and_extract(state: AgentState) -> AgentState:
             
             # Build indices
             if hybrid_retriever.build_index(relevant_contexts):
-                # Get retrieval query
-                retrieval_query = state.get("new_query")
-                if not retrieval_query:
-                    logging.warning("No retrieval query found for hybrid retrieval.")
+                # Get retrieval queries - use the specific search queries that were used to find documents
+                search_queries = state.get("search_queries", [])
+                original_query = state.get("new_query")
+                
+                if search_queries:
+                    # Use the specific search queries for better relevance
+                    logging.info(f"Using {len(search_queries)} specific search queries for retrieval")
+                    relevant_chunks = hybrid_retriever.retrieve_multi_query(search_queries)
+                    retrieval_method = "multi-query hybrid retrieval"
+                elif original_query:
+                    # Fallback to original query if no search queries available
+                    logging.info("Using original query for retrieval (fallback)")
+                    relevant_chunks = hybrid_retriever.retrieve(original_query)
+                    retrieval_method = "single-query hybrid retrieval"
                 else:
-                    # Retrieve relevant chunks
-                    relevant_chunks = hybrid_retriever.retrieve(retrieval_query)
-                    
+                    logging.warning("No retrieval queries found for hybrid retrieval.")
+                    relevant_chunks = []
+                    retrieval_method = "no queries"
+                
+                if relevant_chunks:
                     # Log retrieval stats
                     stats = hybrid_retriever.get_stats()
                     logging.info(f"Hybrid retrieval stats: {stats}")
-                    logging.info(f"Retrieved {len(relevant_chunks)} chunks using hybrid approach")
+                    logging.info(f"Retrieved {len(relevant_chunks)} chunks using {retrieval_method}")
                     
                     state["relevant_chunks"] = relevant_chunks
                     return state
+                else:
+                    logging.warning("No chunks retrieved from hybrid retrieval, falling back to standard approach")
             else:
                 logging.warning("Failed to build hybrid retriever indices, falling back to standard approach")
                 
@@ -1274,61 +1296,101 @@ async def embed_index_and_extract(state: AgentState) -> AgentState:
     # --- Relevant Chunk Retrieval Logic ---
     # Use the vector_db (FAISS VectorStore) or fallback document store
 
-    # Define the query for retrieval (using the original user query)
-    retrieval_query = state.get("new_query")
-
-    if not retrieval_query:
-        logging.warning("No retrieval query found for chunk retrieval.")
+    # Define the queries for retrieval - prioritize specific search queries over original query
+    search_queries = state.get("search_queries", [])
+    original_query = state.get("new_query")
+    
+    # Determine retrieval strategy
+    if search_queries:
+        retrieval_queries = search_queries[:5]  # Limit to top 5 queries for performance
+        retrieval_method = f"multi-query retrieval ({len(retrieval_queries)} queries)"
+        logging.info(f"Using {len(retrieval_queries)} specific search queries for chunk retrieval")
+    elif original_query:
+        retrieval_queries = [original_query]
+        retrieval_method = "single-query retrieval (fallback)"
+        logging.info("Using original query for chunk retrieval (fallback)")
+    else:
+        logging.warning("No retrieval queries found for chunk retrieval.")
         state["relevant_chunks"] = []
          # Safely update error state
-        new_error = (str(current_error_state or '') + "\nNo retrieval query found for chunk retrieval.").strip()
+        new_error = (str(current_error_state or '') + "\nNo retrieval queries found for chunk retrieval.").strip()
         state['error'] = None if new_error == "" else new_error
         return state
 
     try:
+        all_relevant_chunks = []
+        
         if vector_db and hasattr(vector_db, 'as_retriever'):
-            # FAISS mode - perform vector similarity search with better configuration
+            # FAISS mode - perform vector similarity search for each query
             retriever = vector_db.as_retriever(
                 search_type="similarity_score_threshold",
                 search_kwargs={
-                    "k": N_CHUNKS,
+                    "k": max(5, N_CHUNKS // len(retrieval_queries)),  # Distribute chunks across queries
                     "score_threshold": 0.1,  # Only retrieve reasonably relevant chunks
                     "fetch_k": N_CHUNKS * 2  # Search more candidates for better selection
                 }
             )
-            relevant_chunks = retriever.invoke(retrieval_query)
-            logging.info("Retrieved %d relevant chunks for query '%s' using FAISS with score threshold.", len(relevant_chunks), retrieval_query)
+            
+            # Retrieve chunks for each query
+            seen_chunks = set()
+            for query in retrieval_queries:
+                query_chunks = retriever.invoke(query)
+                
+                # Add unique chunks
+                for chunk in query_chunks:
+                    chunk_key = f"{chunk.metadata.get('source', '')}_{chunk.metadata.get('chunk_index', 0)}"
+                    if chunk_key not in seen_chunks:
+                        all_relevant_chunks.append(chunk)
+                        seen_chunks.add(chunk_key)
+                
+                if len(all_relevant_chunks) >= N_CHUNKS:
+                    break
+            
+            relevant_chunks = all_relevant_chunks[:N_CHUNKS]
+            logging.info("Retrieved %d relevant chunks using %s with FAISS and score threshold.", 
+                        len(relevant_chunks), retrieval_method)
             
         elif vector_db and isinstance(vector_db, dict) and vector_db.get('type') == 'fallback':
-            # Fallback mode - enhanced text matching with optional reranking
+            # Fallback mode - enhanced text matching for multiple queries
             docs = vector_db.get('documents', [])
-            query_words = retrieval_query.lower().split()
+            all_scored_docs = []
             
-            # Score documents based on keyword overlap
-            scored_docs = []
-            for doc in docs:
-                content = getattr(doc, 'page_content', '') or str(doc)
-                content_lower = content.lower()
-                score = sum(1 for word in query_words if word in content_lower)
-                if score > 0:
-                    scored_docs.append((score, doc))
+            # Score documents for each query
+            for query in retrieval_queries:
+                query_words = query.lower().split()
+                
+                for doc in docs:
+                    content = getattr(doc, 'page_content', '') or str(doc)
+                    content_lower = content.lower()
+                    score = sum(1 for word in query_words if word in content_lower)
+                    if score > 0:
+                        all_scored_docs.append((score, doc, query))
             
-            # Sort by score and get candidates
-            scored_docs.sort(key=lambda x: x[0], reverse=True)
-            candidate_count = N_CHUNKS * RERANKER_CANDIDATES_MULTIPLIER if USE_RERANKING else N_CHUNKS
-            candidate_chunks = [doc for score, doc in scored_docs[:candidate_count]]
+            # Sort by score and deduplicate
+            all_scored_docs.sort(key=lambda x: x[0], reverse=True)
+            
+            seen_chunks = set()
+            candidate_chunks = []
+            for score, doc, query in all_scored_docs:
+                doc_key = f"{doc.metadata.get('source', '')}_{doc.metadata.get('chunk_index', 0)}"
+                if doc_key not in seen_chunks:
+                    candidate_chunks.append(doc)
+                    seen_chunks.add(doc_key)
+                    
+                if len(candidate_chunks) >= N_CHUNKS * RERANKER_CANDIDATES_MULTIPLIER if USE_RERANKING else N_CHUNKS:
+                    break
             
             # Apply reranking if enabled and we have enough chunks
             if USE_RERANKING and len(candidate_chunks) > N_CHUNKS:
                 # TODO: Implement rerank_chunks function for advanced reranking
-                # relevant_chunks = rerank_chunks(retrieval_query, candidate_chunks, target_count=N_CHUNKS)
+                # relevant_chunks = rerank_chunks(retrieval_queries[0], candidate_chunks, target_count=N_CHUNKS)
                 relevant_chunks = candidate_chunks[:N_CHUNKS]  # Fallback to simple truncation
-                logging.info("Retrieved %d fallback candidates, truncated to %d relevant chunks for query '%s' (reranking disabled).", 
-                           len(candidate_chunks), len(relevant_chunks), retrieval_query)
+                logging.info("Retrieved %d fallback candidates, truncated to %d relevant chunks using %s (reranking disabled).", 
+                           len(candidate_chunks), len(relevant_chunks), retrieval_method)
             else:
                 relevant_chunks = candidate_chunks[:N_CHUNKS]
-                logging.info("Retrieved %d relevant chunks for query '%s' using fallback text search%s.", 
-                           len(relevant_chunks), retrieval_query,
+                logging.info("Retrieved %d relevant chunks using %s with fallback text search%s.", 
+                           len(relevant_chunks), retrieval_method,
                            " (reranking disabled)" if not USE_RERANKING else "")
         else:
             # No vector_db available at all
@@ -1336,7 +1398,7 @@ async def embed_index_and_extract(state: AgentState) -> AgentState:
             relevant_chunks = []
 
     except Exception as e:
-        error_msg = f"Error during similarity search for query '{retrieval_query}': {e}"
+        error_msg = f"Error during similarity search using {retrieval_method}: {e}"
         errors.append(error_msg)
         logging.exception("Error during chunk retrieval: %s", e)
         relevant_chunks = [] # Ensure relevant_chunks is empty on error

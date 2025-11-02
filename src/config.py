@@ -142,6 +142,11 @@ RETRIEVAL_TOP_K = get_env_int("RETRIEVAL_TOP_K", 20)               # Number of c
 MIN_CHUNK_LENGTH = get_env_int("MIN_CHUNK_LENGTH", 50)            # Minimum chunk length
 MIN_WORD_COUNT = get_env_int("MIN_WORD_COUNT", 10)                # Minimum words per chunk
 
+# Multi-query retrieval settings  
+USE_MULTI_QUERY_RETRIEVAL = get_env_bool("USE_MULTI_QUERY_RETRIEVAL", True)  # Use specific search queries
+MAX_RETRIEVAL_QUERIES = get_env_int("MAX_RETRIEVAL_QUERIES", 5)               # Max queries to use for retrieval
+QUERY_CHUNK_DISTRIBUTION = get_env_bool("QUERY_CHUNK_DISTRIBUTION", True)     # Distribute chunks across queries
+
 # Enable/disable features
 USE_HYBRID_RETRIEVAL = get_env_bool("USE_HYBRID_RETRIEVAL", True)  # Enable hybrid approach
 USE_RERANKING = get_env_bool("USE_RERANKING", False)               # Post-retrieval reranking
@@ -293,6 +298,7 @@ __all__ = [
     'RETRIEVAL_METHOD', 'HYBRID_VECTOR_WEIGHT', 'HYBRID_BM25_WEIGHT',
     'HYBRID_FUSION_METHOD', 'HYBRID_RRF_K', 'VECTOR_SCORE_THRESHOLD',
     'RETRIEVAL_TOP_K', 'USE_HYBRID_RETRIEVAL', 'USE_RERANKING',
+    'USE_MULTI_QUERY_RETRIEVAL', 'MAX_RETRIEVAL_QUERIES', 'QUERY_CHUNK_DISTRIBUTION',
     
     # Reports
     'REPORT_FORMAT', 'REPORT_FILENAME_TEXT', 'REPORT_FILENAME_PDF',

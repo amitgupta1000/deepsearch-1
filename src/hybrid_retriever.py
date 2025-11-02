@@ -241,6 +241,88 @@ class HybridRetriever:
             self.logger.error(f"Error during retrieval: {e}")
             return []
     
+    def retrieve_multi_query(self, queries: List[str], deduplicate: bool = True) -> List[Document]:
+        """
+        Retrieve relevant documents using multiple queries for better coverage.
+        
+        Args:
+            queries: List of search queries to use for retrieval
+            deduplicate: Whether to remove duplicate documents
+            
+        Returns:
+            List of relevant Document objects from all queries
+        """
+        try:
+            all_results = []
+            seen_docs = set()
+            
+            # Retrieve documents for each query
+            for query in queries:
+                if not query.strip():
+                    continue
+                    
+                query_results = self.retrieve(query)
+                
+                for doc in query_results:
+                    doc_key = self._get_doc_key(doc)
+                    
+                    if deduplicate and doc_key in seen_docs:
+                        continue
+                        
+                    all_results.append(doc)
+                    seen_docs.add(doc_key)
+                    
+                    # Stop if we have enough results
+                    if len(all_results) >= self.config.top_k:
+                        break
+                
+                if len(all_results) >= self.config.top_k:
+                    break
+            
+            # Re-rank combined results if we have more than needed
+            if len(all_results) > self.config.top_k:
+                # Use the first query as primary for ranking
+                primary_query = queries[0] if queries else ""
+                ranked_results = self._rerank_multi_query_results(primary_query, all_results)
+                return ranked_results[:self.config.top_k]
+            
+            self.logger.info(f"Multi-query retrieval returned {len(all_results)} documents from {len(queries)} queries")
+            return all_results
+            
+        except Exception as e:
+            self.logger.error(f"Error during multi-query retrieval: {e}")
+            # Fallback to single query with first query
+            return self.retrieve(queries[0] if queries else "")
+    
+    def _rerank_multi_query_results(self, primary_query: str, documents: List[Document]) -> List[Document]:
+        """Re-rank results from multiple queries using the primary query."""
+        try:
+            # Simple scoring based on primary query keyword overlap
+            query_words = set(primary_query.lower().split())
+            
+            scored_docs = []
+            for doc in documents:
+                content = doc.page_content.lower()
+                # Score based on keyword overlap and metadata relevance
+                keyword_score = sum(1 for word in query_words if word in content)
+                
+                # Boost score for documents with query terms in title/source
+                title = doc.metadata.get('title', '').lower()
+                source = doc.metadata.get('source', '').lower()
+                title_boost = sum(2 for word in query_words if word in title)
+                source_boost = sum(1 for word in query_words if word in source)
+                
+                total_score = keyword_score + title_boost + source_boost
+                scored_docs.append((total_score, doc))
+            
+            # Sort by score (descending)
+            scored_docs.sort(key=lambda x: x[0], reverse=True)
+            return [doc for score, doc in scored_docs]
+            
+        except Exception as e:
+            self.logger.error(f"Error re-ranking multi-query results: {e}")
+            return documents
+    
     def _retrieve_ensemble(self, query: str) -> List[Document]:
         """Retrieve using LangChain ensemble retriever."""
         try:
