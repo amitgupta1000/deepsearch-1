@@ -95,6 +95,12 @@ except ImportError:
     Scraper, ScrapedContent = None, None
 
 try:
+    from .hybrid_retriever import HybridRetriever, HybridRetrieverConfig, create_hybrid_retriever
+except ImportError:
+    logging.warning("Could not import hybrid retriever. Using fallback retrieval.")
+    HybridRetriever, HybridRetrieverConfig, create_hybrid_retriever = None, None, None
+
+try:
     from .utils import (
         safe_format, get_current_date, clean_extracted_text,
         fetch_pdf_content, rank_urls, save_report_to_text,
@@ -141,6 +147,18 @@ try:
             BLUE,
             CHUNK_SIZE,
             CHUNK_OVERLAP,
+            # Hybrid retrieval configuration
+            USE_HYBRID_RETRIEVAL,
+            RETRIEVAL_TOP_K,
+            HYBRID_VECTOR_WEIGHT,
+            HYBRID_BM25_WEIGHT,
+            HYBRID_FUSION_METHOD,
+            HYBRID_RRF_K,
+            VECTOR_SCORE_THRESHOLD,
+            MIN_CHUNK_LENGTH,
+            MIN_WORD_COUNT,
+            USE_RERANKING,
+            RERANKER_CANDIDATES_MULTIPLIER,
             )
 except ImportError:
     logging.warning("Could not import config settings. Using defaults.")
@@ -163,10 +181,21 @@ except ImportError:
     URL_TIMEOUT = 10
     SKIP_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mp3', '.zip', '.exe']
     BLOCKED_DOMAINS = []
-    # Retrieval configuration fallbacks
-    USE_RERANKING = False  # Temporarily disabled until rerank_chunks function is implemented
+    # Hybrid retrieval fallback defaults
+    USE_HYBRID_RETRIEVAL = True
+    RETRIEVAL_TOP_K = 20
+    HYBRID_VECTOR_WEIGHT = 0.6
+    HYBRID_BM25_WEIGHT = 0.4
+    HYBRID_FUSION_METHOD = "rrf"
+    HYBRID_RRF_K = 60
+    VECTOR_SCORE_THRESHOLD = 0.1
+    MIN_CHUNK_LENGTH = 50
+    MIN_WORD_COUNT = 10
+    USE_RERANKING = False
     RERANKER_CANDIDATES_MULTIPLIER = 3
-    RERANK_TOP_K = 20
+    # Color constants and chunking fallbacks
+    CHUNK_SIZE = 1000
+    CHUNK_OVERLAP = 100
     # Simple ANSI color fallbacks
     YELLOW = '\033[93m'
     ENDC = '\033[0m'
@@ -1048,10 +1077,8 @@ async def extract_content(state: AgentState) -> AgentState:
 
 async def embed_index_and_extract(state: AgentState) -> AgentState:
     """
-    Combines embedding, indexing, and relevant chunk retrieval into a single node
-    using FAISS as the vector database.
-    Processes extracted text, creates embeddings, stores them in a FAISS index,
-    and then retrieves relevant chunks using similarity search against the index.
+    Enhanced embedding, indexing, and retrieval using hybrid approach.
+    Combines BM25 (sparse) and vector search (dense) for improved relevance.
     """
     # Use color constants from setup if available
     try:
@@ -1068,6 +1095,61 @@ async def embed_index_and_extract(state: AgentState) -> AgentState:
     # Retrieve current error state safely
     current_error_state = state.get('error')
 
+    # Check if we have contexts to process
+    if not relevant_contexts:
+        logging.warning("No relevant contexts found for embedding and retrieval.")
+        state["relevant_chunks"] = []
+        new_error = (str(current_error_state or '') + "\nNo relevant contexts found for embedding and retrieval.").strip()
+        state['error'] = None if new_error == "" else new_error
+        return state
+
+    # Try hybrid retriever first
+    if create_hybrid_retriever and embeddings and USE_HYBRID_RETRIEVAL:
+        try:
+            logging.info("Using hybrid retriever (BM25 + Vector Search)")
+            
+            # Create hybrid retriever with configuration from config.py
+            hybrid_retriever = create_hybrid_retriever(
+                embeddings=embeddings,
+                top_k=RETRIEVAL_TOP_K,
+                vector_weight=HYBRID_VECTOR_WEIGHT,
+                bm25_weight=HYBRID_BM25_WEIGHT,
+                fusion_method=HYBRID_FUSION_METHOD,
+                rrf_k=HYBRID_RRF_K,
+                chunk_size=CHUNK_SIZE,
+                chunk_overlap=CHUNK_OVERLAP,
+                score_threshold=VECTOR_SCORE_THRESHOLD,
+                min_chunk_length=MIN_CHUNK_LENGTH,
+                min_word_count=MIN_WORD_COUNT
+            )
+            
+            # Build indices
+            if hybrid_retriever.build_index(relevant_contexts):
+                # Get retrieval query
+                retrieval_query = state.get("new_query")
+                if not retrieval_query:
+                    logging.warning("No retrieval query found for hybrid retrieval.")
+                else:
+                    # Retrieve relevant chunks
+                    relevant_chunks = hybrid_retriever.retrieve(retrieval_query)
+                    
+                    # Log retrieval stats
+                    stats = hybrid_retriever.get_stats()
+                    logging.info(f"Hybrid retrieval stats: {stats}")
+                    logging.info(f"Retrieved {len(relevant_chunks)} chunks using hybrid approach")
+                    
+                    state["relevant_chunks"] = relevant_chunks
+                    return state
+            else:
+                logging.warning("Failed to build hybrid retriever indices, falling back to standard approach")
+                
+        except Exception as e:
+            logging.error(f"Hybrid retriever failed: {e}, falling back to standard approach")
+            errors.append(f"Hybrid retriever error: {str(e)}")
+
+    # Fallback to existing FAISS-only approach
+    logging.info("Using fallback vector search approach")
+    
     # Ensure necessary components are available
     if not embeddings or not Document or not RecursiveCharacterTextSplitter:
          errors.append("Required components for embedding/indexing (embeddings, Document, RecursiveCharacterTextSplitter) are not available.")
@@ -1083,14 +1165,6 @@ async def embed_index_and_extract(state: AgentState) -> AgentState:
         logging.warning("FAISS not available. Using fallback text-based similarity search.")
 
     # --- Embedding and Indexing Logic (with FAISS fallback) ---
-    if not relevant_contexts:
-        logging.warning("No relevant contexts found for embedding and indexing.")
-        # Safely update error state
-        new_error = (str(current_error_state or '') + "\nNo relevant contexts found for embedding and indexing.").strip()
-        state['error'] = None if new_error == "" else new_error
-        state["relevant_chunks"] = [] # Ensure relevant_chunks is initialized even on error
-        return state
-
     logging.info("Processing %d relevant contexts for embedding and indexing%s.", 
                  len(relevant_contexts), " using FAISS" if faiss_available else " using fallback method")
 

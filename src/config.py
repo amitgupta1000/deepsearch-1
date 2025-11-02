@@ -79,11 +79,6 @@ GOOGLE_MODEL = os.getenv("GOOGLE_MODEL", "gemini-2.0-flash")
 EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "google")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "models/text-embedding-005")
 
-# Retrieval Configuration
-USE_RERANKING = get_env_bool("USE_RERANKING", True)  # Enable reranking by default
-RERANKER_CANDIDATES_MULTIPLIER = get_env_int("RERANKER_CANDIDATES_MULTIPLIER", 3)  # Retrieve 3x more candidates
-RERANK_TOP_K = get_env_int("RERANK_TOP_K", 20)  # Final number of chunks after reranking
-
 # LLM Settings
 LLM_TEMPERATURE = get_env_float("LLM_TEMPERATURE", 0.1)  # Low temperature for factual research
 MAX_TOKENS = get_env_int("MAX_TOKENS", 30000)  # High token limit for comprehensive reports
@@ -117,6 +112,33 @@ CHUNK_SIZE = get_env_int("CHUNK_SIZE", 1000)  # Optimized for embedding model co
 CHUNK_OVERLAP = get_env_int("CHUNK_OVERLAP", 100)  # Minimal overlap for efficiency
 MAX_CONTENT_LENGTH = get_env_int("MAX_CONTENT_LENGTH", 10000)  # Reasonable limit per source
 URL_TIMEOUT = get_env_int("URL_TIMEOUT", 30)  # Quick timeout to prevent hanging
+
+# =============================================================================
+# HYBRID RETRIEVAL CONFIGURATION
+# =============================================================================
+
+# Retrieval method: "hybrid", "vector", or "bm25"
+RETRIEVAL_METHOD = os.getenv("RETRIEVAL_METHOD", "hybrid")
+
+# Hybrid retrieval settings
+HYBRID_VECTOR_WEIGHT = get_env_float("HYBRID_VECTOR_WEIGHT", 0.6)  # Weight for vector search
+HYBRID_BM25_WEIGHT = get_env_float("HYBRID_BM25_WEIGHT", 0.4)      # Weight for BM25 search
+HYBRID_FUSION_METHOD = os.getenv("HYBRID_FUSION_METHOD", "rrf")    # "rrf" or "weighted"
+HYBRID_RRF_K = get_env_int("HYBRID_RRF_K", 60)                     # RRF parameter
+
+# Vector search settings
+VECTOR_SCORE_THRESHOLD = get_env_float("VECTOR_SCORE_THRESHOLD", 0.1)
+VECTOR_FETCH_K_MULTIPLIER = get_env_int("VECTOR_FETCH_K_MULTIPLIER", 2)
+
+# Retrieval quality settings
+RETRIEVAL_TOP_K = get_env_int("RETRIEVAL_TOP_K", 20)               # Number of chunks to retrieve
+MIN_CHUNK_LENGTH = get_env_int("MIN_CHUNK_LENGTH", 50)            # Minimum chunk length
+MIN_WORD_COUNT = get_env_int("MIN_WORD_COUNT", 10)                # Minimum words per chunk
+
+# Enable/disable features
+USE_HYBRID_RETRIEVAL = get_env_bool("USE_HYBRID_RETRIEVAL", True)  # Enable hybrid approach
+USE_RERANKING = get_env_bool("USE_RERANKING", False)               # Post-retrieval reranking
+RERANKER_CANDIDATES_MULTIPLIER = get_env_int("RERANKER_CANDIDATES_MULTIPLIER", 3)
 
 # Legacy support
 MAX_RESULTS = MAX_SEARCH_RESULTS  # Backward compatibility
@@ -255,6 +277,11 @@ __all__ = [
     # Search and Processing
     'MAX_SEARCH_QUERIES', 'MAX_SEARCH_RESULTS', 'MAX_CONCURRENT_SCRAPES',
     'MAX_AI_ITERATIONS', 'CHUNK_SIZE', 'CHUNK_OVERLAP',
+    
+    # Hybrid Retrieval
+    'RETRIEVAL_METHOD', 'HYBRID_VECTOR_WEIGHT', 'HYBRID_BM25_WEIGHT',
+    'HYBRID_FUSION_METHOD', 'HYBRID_RRF_K', 'VECTOR_SCORE_THRESHOLD',
+    'RETRIEVAL_TOP_K', 'USE_HYBRID_RETRIEVAL', 'USE_RERANKING',
     
     # Reports
     'REPORT_FORMAT', 'REPORT_FILENAME_TEXT', 'REPORT_FILENAME_PDF',
