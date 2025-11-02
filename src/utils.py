@@ -165,9 +165,9 @@ def save_report_to_text(report_content: str, filename: str = REPORT_FILENAME_TEX
 # Function to generate PDF from markdown
 
 def generate_pdf_from_md(content, filename=REPORT_FILENAME_PDF):
-    """Generates a PDF from Markdown-like content."""
-    if content is None:
-        content = ""
+    """Generates a PDF from Markdown-like content with enhanced error handling."""
+    if content is None or not content.strip():
+        return "Error generating PDF: No content provided"
 
     try:
         pdf = PDF()
@@ -178,30 +178,53 @@ def generate_pdf_from_md(content, filename=REPORT_FILENAME_PDF):
         sanitized_content = sanitize_content(content)
         sanitized_content = replace_problematic_characters(sanitized_content)
 
-        # Basic Markdown parsing
+        # Basic Markdown parsing with line length validation
         lines = sanitized_content.split('\n')
 
         for line in lines:
             line = line.strip() # Strip leading/trailing whitespace
+            
+            # Skip empty lines
+            if not line:
+                pdf.ln(5) # Add a small gap for empty lines
+                continue
+            
+            # Validate line length to prevent rendering issues
+            if len(line) > 1000:  # Truncate very long lines
+                line = line[:997] + "..."
+                
+            # Additional validation for problematic characters
+            line = line.encode('latin1', errors='ignore').decode('latin1')
+            
             if not line: # Skip empty lines
                 pdf.ln(5) # Add a small gap for empty lines
                 continue
 
             if line.startswith('#'):
-                header_level = min(line.count('#'), 4)
-                # Remove markdown bold indicators within headers for cleaner PDF
-                header_text = re.sub(r'\*\*([^\*]+)\*\*', r'\1', line.strip('# ').strip())
-                font_size = 16 - (header_level - 1) * 2 # Vary font size by header level
-                pdf.set_font('Arial', 'B', font_size)
-                pdf.multi_cell(0, 10, header_text)
-                pdf.ln(2) # Add space after header
-                pdf.set_font('Arial', '', 12) # Reset font
+                try:
+                    header_level = min(line.count('#'), 4)
+                    # Remove markdown bold indicators within headers for cleaner PDF
+                    header_text = re.sub(r'\*\*([^\*]+)\*\*', r'\1', line.strip('# ').strip())
+                    font_size = max(10, 16 - (header_level - 1) * 2) # Ensure minimum font size
+                    pdf.set_font('Arial', 'B', font_size)
+                    if header_text:  # Only add if not empty
+                        pdf.multi_cell(0, 10, header_text)
+                    pdf.ln(2) # Add space after header
+                    pdf.set_font('Arial', '', 12) # Reset font
+                except Exception as e:
+                    logging.warning(f"Error adding header to PDF: {e}")
+                    continue
             elif line.startswith('* ') or line.startswith('- '): # Basic list items
-                 list_item_text = line[2:].strip()
-                 # Replace the bullet point character explicitly with a hyphen for multi_cell compatibility
-                 list_item_text = list_item_text.replace('\u2022', '-')
-                 pdf.set_font('Arial', '', 12)
-                 pdf.multi_cell(0, 10, f"- {list_item_text}") # Use hyphen for bullet points in PDF
+                try:
+                    list_item_text = line[2:].strip()
+                    # Replace the bullet point character explicitly with a hyphen for multi_cell compatibility
+                    list_item_text = list_item_text.replace('\u2022', '-')
+                    pdf.set_font('Arial', '', 12)
+                    if list_item_text:  # Only add if not empty
+                        pdf.multi_cell(0, 10, f"- {list_item_text}") # Use hyphen for bullet points in PDF
+                except Exception as e:
+                    logging.warning(f"Error adding list item to PDF: {e}")
+                    continue
             else:
                 # Handle inline formatting (bold, italic, links)
                 # Ensure the regex correctly handles nested markdown if needed, but current seems basic

@@ -183,7 +183,14 @@ You are an expert editor tasked with improving a research report by eliminating 
 """
 
     try:
-        from langchain_core.messages import SystemMessage, HumanMessage
+        try:
+            from langchain_core.messages import SystemMessage, HumanMessage
+        except ImportError:
+            # Fallback for when langchain_core is not available
+            class SystemMessage:
+                def __init__(self, content): self.content = content
+            class HumanMessage:
+                def __init__(self, content): self.content = content
         
         messages = [
             SystemMessage(content="You are an expert research report editor focused on eliminating redundancy while preserving all important information."),
@@ -211,12 +218,16 @@ You are an expert editor tasked with improving a research report by eliminating 
             
             return deduplicated_content
         else:
-            logging.warning("LLM deduplication failed, using original content")
+            logging.warning("LLM deduplication returned no content, using original")
             return content
             
     except Exception as e:
         logging.error(f"Error in LLM deduplication: {e}")
-        return content
+        logging.debug(f"Falling back to basic deduplication")
+        # Fallback to basic deduplication if LLM fails
+        sentences = split_into_sentences(content)
+        basic_deduplicated_sentences = basic_deduplicate(sentences)
+        return ' '.join(basic_deduplicated_sentences)
 
 async def enhanced_deduplicate_content(text: str, report_type: str = "detailed") -> str:
     """

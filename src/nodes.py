@@ -1227,8 +1227,7 @@ async def embed_index_and_extract(state: AgentState) -> AgentState:
         logging.info("Using embeddings model: %s", type(embeddings).__name__)
         logging.info("Processing %d document chunks for embedding", len(documents_content))
 
-        # Process and chunk content # Use config constants for chunking
-        from .config import CHUNK_SIZE, CHUNK_OVERLAP
+        # Process and chunk content using config constants
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=CHUNK_SIZE, 
             chunk_overlap=CHUNK_OVERLAP,
