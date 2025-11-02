@@ -1457,18 +1457,12 @@ def generate_citations_section(relevant_chunks) -> tuple[str, dict]:
     
     for chunk in relevant_chunks:
         source_url = chunk.metadata.get('source', 'Unknown URL')
-        title = chunk.metadata.get('title', 'Untitled')
-        
-        # Clean up the title if it's too long
-        if len(title) > 100:
-            title = title[:97] + "..."
         
         # Avoid duplicate sources
         if source_url not in sources:
             citation_number = len(sources) + 1
             sources[source_url] = {
                 'index': citation_number,
-                'title': title,
                 'url': source_url
             }
             source_mapping[source_url] = citation_number
@@ -1477,8 +1471,7 @@ def generate_citations_section(relevant_chunks) -> tuple[str, dict]:
     citations_text = "\n\n---\n\n# 📚 Sources and References\n\n"
         
     for source in sources.values():
-        citations_text += f"[{source['index']}] **{source['title']}**\n"
-        citations_text += f"    {source['url']}\n\n"
+        citations_text += f"[{source['index']}] {source['url']}\n\n"
     
     citations_text += f"*Total sources referenced: {len(sources)}*\n"
     citations_text += f"*Research conducted on: {get_current_date()}*"
