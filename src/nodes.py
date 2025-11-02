@@ -169,7 +169,11 @@ try:
             USE_MULTI_QUERY_RETRIEVAL,
             MAX_RETRIEVAL_QUERIES,
             QUERY_CHUNK_DISTRIBUTION,
+            # Enhanced deduplication configuration
+            USE_LLM_DEDUPLICATION,
+            LLM_DEDUP_DETAILED_ONLY
             )
+    from .enhanced_deduplication import enhanced_deduplicate_content
 except ImportError:
     logging.warning("Could not import config settings. Using defaults.")
     # Fallback defaults to ensure nodes run in degraded mode
@@ -224,6 +228,12 @@ except ImportError:
     BLUE = '\033[94m'
     CHUNK_SIZE = 1000
     CHUNK_OVERLAP = 100
+    # Enhanced deduplication fallback defaults
+    USE_LLM_DEDUPLICATION = False
+    LLM_DEDUP_DETAILED_ONLY = True
+    # Import fallback deduplication function
+    def enhanced_deduplicate_content(text: str, report_type: str = "detailed") -> str:
+        return deduplicate_content(text)  # Fallback to basic deduplication
 
 
 # Import prompt instructions
@@ -1949,9 +1959,9 @@ IMPORTANT: Ensure your report specifically addresses each of these research quer
             break
         expansion_attempts += 1
 
-    # Apply deduplication to reduce repetitive content
-    logging.info("Applying content deduplication...")
-    final_report_content = deduplicate_content(final_report_content)
+    # Apply enhanced deduplication to reduce repetitive content
+    logging.info("Applying enhanced content deduplication...")
+    final_report_content = await enhanced_deduplicate_content(final_report_content, report_type)
     
     # Add citations section (excluded from word count)
     citations_section, source_mapping = generate_citations_section(relevant_chunks)

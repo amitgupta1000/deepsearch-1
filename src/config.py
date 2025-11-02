@@ -197,6 +197,24 @@ SKIP_EXTENSIONS = get_env_list("SKIP_EXTENSIONS", [
 CACHE_ENABLED = get_env_bool("CACHE_ENABLED", True)  # Enabled for production performance
 CACHE_TTL = get_env_int("CACHE_TTL", 86400)  # 24 hours for good balance
 
+# =============================================================================
+# ENHANCED DEDUPLICATION SETTINGS
+# =============================================================================
+
+# Enable LLM-powered intelligent deduplication
+USE_LLM_DEDUPLICATION = get_env_bool("USE_LLM_DEDUPLICATION", True)
+DEDUPLICATION_CACHE_ENABLED = get_env_bool("DEDUPLICATION_CACHE_ENABLED", True)
+DEDUPLICATION_CACHE_TTL = get_env_int("DEDUPLICATION_CACHE_TTL", 7200)  # 2 hours cache
+
+# Deduplication thresholds
+SIMILARITY_THRESHOLD = get_env_float("SIMILARITY_THRESHOLD", 0.75)  # When to consider content similar
+MIN_SENTENCE_LENGTH = get_env_int("MIN_SENTENCE_LENGTH", 3)  # Minimum words per sentence
+DEDUPLICATION_BATCH_SIZE = get_env_int("DEDUPLICATION_BATCH_SIZE", 10)  # Process sentences in batches
+
+# When to apply LLM deduplication (word thresholds)
+LLM_DEDUP_MIN_WORDS = get_env_int("LLM_DEDUP_MIN_WORDS", 800)  # Apply to reports above this size
+LLM_DEDUP_DETAILED_ONLY = get_env_bool("LLM_DEDUP_DETAILED_ONLY", True)  # Only for detailed reports
+
 # Rate limiting
 MAX_CONCURRENT_CALLS = get_env_int("MAX_CONCURRENT_CALLS", 10)  # Conservative for stability
 MAX_CALLS_PER_SECOND = get_env_int("MAX_CALLS_PER_SECOND", 30)  # Reasonable rate limiting
