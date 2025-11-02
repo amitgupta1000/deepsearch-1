@@ -1681,6 +1681,7 @@ async def write_report(state: AgentState):
 
     relevant_chunks = state.get('relevant_chunks', [])
     research_topic = state.get('new_query', 'the topic')
+    search_queries = state.get('search_queries', [])
 
     if not relevant_chunks:
         final_report_content = f"Could not generate a report. No relevant information was found for the topic: '{research_topic}'."
@@ -1707,6 +1708,17 @@ async def write_report(state: AgentState):
         state['error'] = None if state['error'] == "" else state['error']
         return state
 
+    # Prepare search queries context for report instructions
+    search_queries_context = ""
+    if search_queries:
+        search_queries_context = f"""
+
+**SPECIFIC RESEARCH QUERIES TO ADDRESS:**
+{chr(10).join(f"• {query}" for query in search_queries)}
+
+IMPORTANT: Ensure your report specifically addresses each of these research queries using the relevant content chunks below. Each query represents a critical aspect of the research topic that must be covered.
+"""
+
     # Prepare the combined chunk context (keep it reasonably sized to avoid extremely long prompts)
     formatted_chunks = "\n---\n".join([
         f"Source: {chunk.metadata.get('source', 'Unknown URL')}\nContent:\n{chunk.page_content}"
@@ -1721,6 +1733,7 @@ async def write_report(state: AgentState):
     
     Answer: "{research_topic}"
     Focus on specific data from content chunks. Include relevant citations [1], [2], etc.
+    {search_queries_context}
     """
 
     # Helper to call the LLM with flexible wrappers
@@ -1742,6 +1755,7 @@ async def write_report(state: AgentState):
     Create an outline for a {report_type} report answering: "{research_topic}"
     
     {report_writer_instructions.format(research_topic=research_topic, summaries=formatted_chunks, current_date=get_current_date())}
+    {search_queries_context}
 
     Provide JSON outline with {min_sections}-{max_sections} sections, maximum {max_words} words total.
     
@@ -1849,6 +1863,7 @@ async def write_report(state: AgentState):
         Extract specific information from content chunks to answer the research question.
         Use citations [1], [2], etc. from the content below.
         Focus on unique data for this section.
+        {search_queries_context}
         
         Content chunks:
         {section_formatted_chunks}
@@ -1904,6 +1919,7 @@ async def write_report(state: AgentState):
         4. Focus on COMPLEMENTARY information that wasn't already covered
         5. Add more specific data points, quotes, or other relevant details
         6. DO NOT restate or rephrase information already in the report
+        {search_queries_context}
         
         APPEND NEW SECTIONS OR EXPAND EXISTING ONES - Do not rewrite the entire report.
         
