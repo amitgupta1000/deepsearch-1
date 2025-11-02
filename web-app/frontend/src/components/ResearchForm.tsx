@@ -173,7 +173,7 @@ const ResearchForm: React.FC = () => {
                   type="radio"
                   value="reasoning"
                   checked={reasoningMode === true}
-                  onChange={(e) => setReasoningMode(true)}
+                  onChange={() => setReasoningMode(true)}
                   className="sr-only"
                   disabled={state.isLoading}
                 />
@@ -200,7 +200,7 @@ const ResearchForm: React.FC = () => {
                   type="radio"
                   value="research"
                   checked={reasoningMode === false}
-                  onChange={(e) => setReasoningMode(false)}
+                  onChange={() => setReasoningMode(false)}
                   className="sr-only"
                   disabled={state.isLoading}
                 />
