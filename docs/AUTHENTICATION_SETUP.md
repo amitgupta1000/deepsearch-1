@@ -201,8 +201,8 @@ curl -H "X-API-Key: your-admin-key" https://your-app.onrender.com/api/auth/info
 - ✅ **Access All Sessions**: Can view any user's research sessions
 - ✅ **Full Research Access**: All research endpoints available
 - ✅ **Session Management**: Can check status/results for any session ID
-- ✅ **Same Rate Limits**: No special rate limit exemptions
-- ✅ **Clear Identification**: `/api/auth/info` shows `"is_admin": true`
+- ✅ **Unlimited Rate Limits**: No rate limiting restrictions (bypass all limits)
+- ✅ **Clear Identification**: `/api/auth/info` shows `"is_admin": true` and `"rate_limits": "unlimited"`
 
 ### ⚠️ **Important Admin Notes**
 

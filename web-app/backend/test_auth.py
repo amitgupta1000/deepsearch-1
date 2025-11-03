@@ -97,6 +97,7 @@ def test_authentication_flow():
             if user_info.get('is_admin', False):
                 print("✅ Admin user correctly identified")
                 print(f"   User ID: {user_info.get('user_id', 'unknown')}")
+                print(f"   Rate Limits: {user_info.get('rate_limits', 'unknown')}")
             else:
                 print("❌ Admin user not correctly identified")
         else:
@@ -105,7 +106,7 @@ def test_authentication_flow():
         print(f"❌ Test failed: {e}")
     
     # Test 6: Rate limiting (make multiple requests quickly)
-    print("\n6️⃣ Testing rate limiting...")
+    print("\n6️⃣ Testing rate limiting for regular user...")
     try:
         headers = {"X-API-Key": DEMO_KEYS["valid_user"]}
         
@@ -126,15 +127,43 @@ def test_authentication_flow():
             time.sleep(0.1)  # Small delay between requests
         
         if rate_limited:
-            print("✅ Rate limiting working correctly")
+            print("✅ Rate limiting working correctly for regular users")
         else:
             print(f"❌ Rate limiting may not be working (completed {success_count}/6 requests)")
             
     except Exception as e:
         print(f"❌ Rate limit test failed: {e}")
     
-    # Test 7: Research endpoint authentication
-    print("\n7️⃣ Testing research endpoint authentication...")
+    # Test 7: Admin rate limit bypass
+    print("\n7️⃣ Testing admin rate limit bypass...")
+    try:
+        headers = {"X-API-Key": DEMO_KEYS["admin_user"]}
+        
+        # Make 10 requests quickly (should NOT trigger rate limit for admin)
+        print("   Making 10 rapid requests as admin (should bypass rate limits)...")
+        success_count = 0
+        rate_limited = False
+        
+        for i in range(10):
+            response = requests.get(f"{BASE_URL}/api/auth/info", headers=headers, timeout=5)
+            if response.status_code == 200:
+                success_count += 1
+            elif response.status_code == 429:
+                rate_limited = True
+                print(f"   ❌ Admin rate limit triggered on request {i+1} (should not happen)")
+                break
+            time.sleep(0.05)  # Faster requests
+        
+        if not rate_limited and success_count == 10:
+            print("✅ Admin successfully bypassed rate limits")
+        else:
+            print(f"❌ Admin rate limit bypass failed (completed {success_count}/10 requests)")
+            
+    except Exception as e:
+        print(f"❌ Admin rate limit test failed: {e}")
+    
+    # Test 8: Research endpoint authentication
+    print("\n8️⃣ Testing research endpoint authentication...")
     try:
         headers = {"X-API-Key": DEMO_KEYS["valid_user"], "Content-Type": "application/json"}
         test_request = {
@@ -184,15 +213,20 @@ def test_authentication_flow():
     print("🎯 Authentication Test Summary:")
     print("✅ Basic authentication flow implemented")
     print("✅ API key validation working")
-    print("✅ Rate limiting enabled") 
+    print("✅ Rate limiting enabled for regular users") 
+    print("✅ Admin users bypass rate limits")
     print("✅ Session ownership protection")
     print("✅ Admin user detection")
     print("\n📋 Next Steps:")
     print("1. Start frontend: npm run dev")
     print("2. Test authentication in browser")
     print("3. Try demo keys:")
-    print(f"   Regular user: {DEMO_KEYS['valid_user']}")
-    print(f"   Admin user: {DEMO_KEYS['admin_user']}")
+    print(f"   Regular user: {DEMO_KEYS['valid_user']} (rate limited)")
+    print(f"   Admin user: {DEMO_KEYS['admin_user']} (unlimited)")
+    print("\n💡 Admin Privileges:")
+    print("✅ Unlimited API requests (no rate limits)")
+    print("✅ Access to all user sessions")
+    print("✅ Full research endpoint access")
     
     return True
 

@@ -89,6 +89,11 @@ class RateLimiter:
     
     def check_rate_limit(self, user_id: str) -> None:
         """Check if user has exceeded rate limits"""
+        # Admin users bypass all rate limits
+        if is_admin_user(user_id):
+            logger.debug(f"Admin user {user_id} bypassing rate limits")
+            return
+        
         now = datetime.now()
         
         # Clean old requests
@@ -184,10 +189,12 @@ async def verify_admin_access(user_id: str = Depends(verify_api_key)):
 
 def get_user_info(user_id: str) -> Dict:
     """Get user information for API responses"""
+    admin_status = is_admin_user(user_id)
+    
     return {
         "user_id": user_id,
-        "is_admin": is_admin_user(user_id),
-        "rate_limits": rate_limiter.limits,
+        "is_admin": admin_status,
+        "rate_limits": "unlimited" if admin_status else rate_limiter.limits,
         "authenticated_at": datetime.now().isoformat()
     }
 
