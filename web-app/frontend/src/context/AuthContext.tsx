@@ -21,46 +21,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return import.meta.env.VITE_API_URL || 'http://localhost:8000';
   };
 
-  // Make authenticated API requests
-  const makeAuthenticatedRequest = async (endpoint: string, options: RequestInit = {}) => {
-    const apiKey = authState.apiKey || localStorage.getItem('intellisearch_api_key');
-    
-    if (!apiKey) {
-      throw new Error('No API key available');
-    }
-
-    const headers = {
-      'Content-Type': 'application/json',
-      'X-API-Key': apiKey,
-      ...options.headers
-    };
-
-    const response = await fetch(`${getApiUrl()}${endpoint}`, {
-      ...options,
-      headers
-    });
-
-    if (response.status === 401) {
-      // API key is invalid, clear auth state
-      clearAuth();
-      throw new Error('Invalid API key. Please check your credentials.');
-    }
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-      throw new Error(errorData.detail || `Request failed with status ${response.status}`);
-    }
-
-    return response;
-  };
-
   // Set and validate API key
   const setApiKey = async (apiKey: string): Promise<boolean> => {
     try {
       setAuthState(prev => ({ ...prev, error: null }));
-
-      // Store the API key temporarily
-      const tempAuthState = { ...authState, apiKey: apiKey.trim() };
       
       // Validate the API key by calling the auth info endpoint
       const response = await fetch(`${getApiUrl()}/api/auth/info`, {
