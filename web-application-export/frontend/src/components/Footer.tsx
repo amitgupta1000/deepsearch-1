@@ -1,5 +1,5 @@
 import React from 'react';
-import { Brain, Github, ExternalLink, Heart } from 'lucide-react';
+import { CpuChipIcon, ArrowTopRightOnSquareIcon, HeartIcon } from '@heroicons/react/24/outline';
 
 const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
@@ -12,7 +12,7 @@ const Footer: React.FC = () => {
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center space-x-3 mb-4">
               <div className="flex items-center justify-center w-10 h-10 bg-primary-600 rounded-lg">
-                <Brain className="w-6 h-6 text-white" />
+                <CpuChipIcon className="w-6 h-6 text-white" />
               </div>
               <div>
                 <h3 className="text-xl font-bold text-gray-900">INTELLISEARCH</h3>
@@ -49,17 +49,17 @@ const Footer: React.FC = () => {
                   className="text-sm text-gray-600 hover:text-primary-600 transition-colors flex items-center space-x-1"
                 >
                   <span>API Documentation</span>
-                  <ExternalLink className="w-3 h-3" />
+                  <ArrowTopRightOnSquareIcon className="w-3 h-3" />
                 </a>
               </li>
               <li>
                 <a 
-                  href="https://github.com" 
+                  href="https://ArrowTopRightOnSquareIcon.com" 
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm text-gray-600 hover:text-primary-600 transition-colors flex items-center space-x-1"
                 >
-                  <Github className="w-3 h-3" />
+                  <ArrowTopRightOnSquareIcon className="w-3 h-3" />
                   <span>Source Code</span>
                 </a>
               </li>
@@ -93,7 +93,7 @@ const Footer: React.FC = () => {
             <div className="flex items-center space-x-6 text-sm text-gray-600">
               <span className="flex items-center space-x-1">
                 <span>Made with</span>
-                <Heart className="w-4 h-4 text-red-500" />
+                <HeartIcon className="w-4 h-4 text-red-500" />
                 <span>using React & FastAPI</span>
               </span>
             </div>

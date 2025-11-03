@@ -1,25 +1,25 @@
 import React from 'react';
-import { Brain, Zap, FileText, Users, Globe, Target } from 'lucide-react';
+import { CpuChipIcon, BoltIcon, DocumentTextIcon, UsersIcon, GlobeAltIcon, TagIcon } from '@heroicons/react/24/outline';
 
 const WelcomeSection: React.FC = () => {
   const features = [
     {
-      icon: <Brain className="w-6 h-6" />,
+      icon: <CpuChipIcon className="w-6 h-6" />,
       title: "AI-Powered Research",
       description: "Advanced Google Gemini AI analyzes and synthesizes information"
     },
     {
-      icon: <Zap className="w-6 h-6" />,
+      icon: <BoltIcon className="w-6 h-6" />,
       title: "Lightning Fast",
       description: "Get comprehensive research reports in minutes, not hours"
     },
     {
-      icon: <FileText className="w-6 h-6" />,
+      icon: <DocumentTextIcon className="w-6 h-6" />,
       title: "Professional Reports",
       description: "Structured reports with citations and source validation"
     },
     {
-      icon: <Globe className="w-6 h-6" />,
+      icon: <GlobeAltIcon className="w-6 h-6" />,
       title: "Web-Wide Search",
       description: "Searches across millions of web sources for relevant information"
     }
@@ -42,15 +42,15 @@ const WelcomeSection: React.FC = () => {
 
       <div className="flex flex-wrap justify-center gap-4">
         <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-full shadow-sm border">
-          <Target className="w-4 h-4 text-green-500" />
+          <TagIcon className="w-4 h-4 text-green-500" />
           <span className="text-sm font-medium text-gray-700">Accurate Research</span>
         </div>
         <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-full shadow-sm border">
-          <Users className="w-4 h-4 text-blue-500" />
+          <UsersIcon className="w-4 h-4 text-blue-500" />
           <span className="text-sm font-medium text-gray-700">Trusted by Researchers</span>
         </div>
         <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-full shadow-sm border">
-          <Zap className="w-4 h-4 text-yellow-500" />
+          <BoltIcon className="w-4 h-4 text-yellow-500" />
           <span className="text-sm font-medium text-gray-700">Instant Results</span>
         </div>
       </div>

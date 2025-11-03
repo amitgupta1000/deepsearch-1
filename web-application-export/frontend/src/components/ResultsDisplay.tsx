@@ -1,17 +1,27 @@
 import React from 'react';
-import { FileText, Clock, ExternalLink, Download, AlertCircle, Loader2, CheckCircle, Copy, Share2 } from 'lucide-react';
+import { 
+  DocumentTextIcon, 
+  ClockIcon, 
+  ArrowTopRightOnSquareIcon, 
+  ArrowDownTrayIcon, 
+  ExclamationCircleIcon, 
+  CheckCircleIcon,
+  ClipboardDocumentIcon,
+  ShareIcon 
+} from '@heroicons/react/24/outline';
+import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import { useResearch } from '../context/ResearchContext';
 
 const ResultsDisplay: React.FC = () => {
   const { state, clearResults } = useResearch();
   const { isLoading, result, error } = state;
 
-  const copyToClipboard = async (text: string) => {
+  const ClipboardDocumentIconToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
       // You could add a toast notification here
     } catch (err) {
-      console.error('Failed to copy text: ', err);
+      console.error('Failed to ClipboardDocumentIcon text: ', err);
     }
   };
 
@@ -34,7 +44,7 @@ const ResultsDisplay: React.FC = () => {
       <div className="card p-8 shadow-lg">
         <div className="flex flex-col items-center space-y-6">
           <div className="relative">
-            <Loader2 className="w-12 h-12 text-primary-600 animate-spin" />
+            <ArrowPathIcon className="w-12 h-12 text-primary-600 animate-spin" />
             <div className="absolute inset-0 w-12 h-12 border-4 border-primary-200 rounded-full"></div>
           </div>
           <div className="text-center space-y-2">
@@ -55,7 +65,7 @@ const ResultsDisplay: React.FC = () => {
     return (
       <div className="card p-8 border-red-200 bg-red-50 shadow-lg">
         <div className="flex items-start space-x-4">
-          <AlertCircle className="w-6 h-6 text-red-600 mt-1 flex-shrink-0" />
+          <ExclamationCircleIcon className="w-6 h-6 text-red-600 mt-1 flex-shrink-0" />
           <div className="flex-1">
             <h3 className="text-xl font-semibold text-red-900 mb-2">Research Error</h3>
             <p className="text-red-700 mb-4">{error}</p>
@@ -134,7 +144,7 @@ const ResultsDisplay: React.FC = () => {
       {/* Success Header */}
       <div className="card p-6 bg-gradient-to-r from-green-50 to-blue-50 border-green-200 shadow-lg">
         <div className="flex items-center space-x-3 mb-4">
-          <CheckCircle className="w-8 h-8 text-green-600" />
+          <CheckCircleIcon className="w-8 h-8 text-green-600" />
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Research Complete!</h2>
             <p className="text-gray-600">Your comprehensive report is ready</p>
@@ -167,12 +177,12 @@ const ResultsDisplay: React.FC = () => {
       <div className="card p-6 shadow-lg">
         <div className="flex flex-col md:flex-row md:items-center justify-between space-y-4 md:space-y-0">
           <div className="flex items-center space-x-3">
-            <FileText className="w-6 h-6 text-primary-600" />
+            <DocumentTextIcon className="w-6 h-6 text-primary-600" />
             <div>
               <h3 className="text-xl font-semibold text-gray-900">Research Report</h3>
               <div className="flex items-center space-x-4 text-sm text-gray-600">
                 <span className="flex items-center space-x-1">
-                  <Clock className="w-4 h-4" />
+                  <ClockIcon className="w-4 h-4" />
                   <span>{new Date(result.timestamp).toLocaleString()}</span>
                 </span>
               </div>
@@ -180,18 +190,18 @@ const ResultsDisplay: React.FC = () => {
           </div>
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => copyToClipboard(result.report)}
+              onClick={() => ClipboardDocumentIconToClipboard(result.report)}
               className="btn-secondary flex items-center space-x-1"
             >
-              <Copy className="w-4 h-4" />
-              <span>Copy</span>
+              <ClipboardDocumentIcon className="w-4 h-4" />
+              <span>ClipboardDocumentIcon</span>
             </button>
             {'share' in navigator && (
               <button
                 onClick={shareResults}
                 className="btn-secondary flex items-center space-x-1"
               >
-                <Share2 className="w-4 h-4" />
+                <ShareIcon className="w-4 h-4" />
                 <span>Share</span>
               </button>
             )}
@@ -200,14 +210,14 @@ const ResultsDisplay: React.FC = () => {
                 onClick={() => downloadReportAs('txt')}
                 className="btn-secondary flex items-center space-x-1"
               >
-                <FileText className="w-4 h-4" />
+                <DocumentTextIcon className="w-4 h-4" />
                 <span>Download TXT</span>
               </button>
               <button
                 onClick={() => downloadReportAs('pdf')}
                 className="btn-secondary flex items-center space-x-1"
               >
-                <Download className="w-4 h-4" />
+                <ArrowDownTrayIcon className="w-4 h-4" />
                 <span>Download PDF</span>
               </button>
             </div>
@@ -234,7 +244,7 @@ const ResultsDisplay: React.FC = () => {
       {result.citations && result.citations.length > 0 && (
         <div className="card p-6 shadow-lg">
           <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center space-x-2">
-            <ExternalLink className="w-5 h-5" />
+            <ArrowTopRightOnSquareIcon className="w-5 h-5" />
             <span>Citations & References</span>
             <span className="text-sm bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
               {result.citations.length} sources
@@ -250,11 +260,11 @@ const ResultsDisplay: React.FC = () => {
                   <p className="text-sm text-gray-900 break-words leading-relaxed">{citation}</p>
                 </div>
                 <button
-                  onClick={() => copyToClipboard(citation)}
+                  onClick={() => ClipboardDocumentIconToClipboard(citation)}
                   className="flex-shrink-0 p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                  title="Copy citation"
+                  title="ClipboardDocumentIcon citation"
                 >
-                  <Copy className="w-4 h-4" />
+                  <ClipboardDocumentIcon className="w-4 h-4" />
                 </button>
               </div>
             ))}
@@ -275,7 +285,7 @@ const ResultsDisplay: React.FC = () => {
                 rel="noopener noreferrer"
                 className="flex items-center space-x-3 p-4 bg-gray-50 hover:bg-primary-50 rounded-lg transition-colors group"
               >
-                <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-primary-600 flex-shrink-0" />
+                <ArrowTopRightOnSquareIcon className="w-4 h-4 text-gray-400 group-hover:text-primary-600 flex-shrink-0" />
                 <span className="text-sm text-primary-600 hover:text-primary-800 break-all flex-1">
                   {source}
                 </span>

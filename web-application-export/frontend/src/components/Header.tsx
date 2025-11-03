@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Brain, Menu, X, Settings } from 'lucide-react';
+import { CpuChipIcon, Bars3Icon, XMarkIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
 
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -11,7 +11,7 @@ const Header: React.FC = () => {
           {/* Logo and Brand */}
           <div className="flex items-center space-x-3">
             <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-r from-primary-600 to-blue-600 rounded-lg">
-              <Brain className="w-6 h-6 text-white" />
+              <CpuChipIcon className="w-6 h-6 text-white" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">INTELLISEARCH</h1>
@@ -42,7 +42,7 @@ const Header: React.FC = () => {
               </div>
               
               <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
-                <Settings className="w-5 h-5" />
+                <Cog6ToothIcon className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -53,7 +53,7 @@ const Header: React.FC = () => {
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
             >
-              {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {isMenuOpen ? <XMarkIcon className="w-6 h-6" /> : <Bars3Icon className="w-6 h-6" />}
             </button>
           </div>
         </div>
@@ -81,7 +81,7 @@ const Header: React.FC = () => {
                     <span className="text-sm text-gray-600">AI System Online</span>
                   </div>
                   <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
-                    <Settings className="w-5 h-5" />
+                    <Cog6ToothIcon className="w-5 h-5" />
                   </button>
                 </div>
               </div>

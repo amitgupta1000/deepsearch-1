@@ -14,6 +14,9 @@ import uuid
 from datetime import datetime
 import json
 
+# Import authentication module
+from auth import verify_api_key_with_rate_limit, get_user_info, log_api_usage
+
 # Add the parent src directory to the path to import our existing modules
 import sys
 import os
@@ -21,6 +24,11 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
 # Import our existing INTELLISEARCH modules
+INTELLISEARCH_AVAILABLE = False
+workflow_app = None
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+SERPER_API_KEY = os.getenv("SERPER_API_KEY", "")
+
 try:
     from src.graph import app as workflow_app
     from src.nodes import AgentState
@@ -28,9 +36,16 @@ try:
     from src.utils import get_current_date
     INTELLISEARCH_AVAILABLE = True
     logging.info("Successfully imported INTELLISEARCH modules")
+    logging.info(f"GOOGLE_API_KEY available: {bool(GOOGLE_API_KEY)}")
+    logging.info(f"SERPER_API_KEY available: {bool(SERPER_API_KEY)}")
+    logging.info(f"Workflow app type: {type(workflow_app)}")
 except ImportError as e:
     logging.error(f"Failed to import INTELLISEARCH modules: {e}")
     INTELLISEARCH_AVAILABLE = False
+    
+    # Fallback function
+    def get_current_date():
+        return datetime.now().strftime("%Y-%m-%d")
     
     # Define fallback classes for development
     class AgentState:
@@ -65,7 +80,12 @@ app = FastAPI(
 # CORS middleware for React frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],  # React dev servers
+    allow_origins=[
+        "http://localhost:3000", 
+        "http://localhost:5173",  # React dev servers
+        "https://intellisearch-frontend-kdqh.onrender.com",  # Production frontend (actual)
+        "https://*.onrender.com"  # Allow all Render subdomains
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -74,12 +94,19 @@ app.add_middleware(
 # Global storage for research sessions (in production, use Redis or database)
 research_sessions: Dict[str, Dict] = {}
 
+# Root endpoint
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {"message": "INTELLISEARCH API is running", "status": "active", "timestamp": datetime.now().isoformat()}
+
 # Pydantic models for API requests/responses
 class ResearchRequest(BaseModel):
     query: str = Field(..., description="Research query or question")
     report_type: str = Field(default="detailed", description="'concise' or 'detailed'")
     prompt_type: str = Field(default="general", description="Prompt type: general, legal, macro, etc.")
     automation_level: str = Field(default="full", description="Automation level for the research")
+    reasoning_mode: bool = Field(default=True, description="True for reasoning mode, False for research mode")
 
 class ResearchSession(BaseModel):
     session_id: str
@@ -121,6 +148,19 @@ async def health_check():
         }
     }
 
+# Debug endpoint
+@app.get("/api/debug")
+async def debug_info():
+    """Debug information"""
+    return {
+        "intellisearch_available": INTELLISEARCH_AVAILABLE,
+        "workflow_app_available": workflow_app is not None,
+        "google_api_key_set": bool(GOOGLE_API_KEY),
+        "serper_api_key_set": bool(SERPER_API_KEY),
+        "environment": os.getenv("ENVIRONMENT", "development"),
+        "python_path": sys.path[-3:],  # Last 3 entries
+    }
+
 # Configuration endpoint
 @app.get("/api/config")
 async def get_config():
@@ -136,11 +176,28 @@ async def get_config():
         }
     }
 
+# Authentication info endpoint
+@app.get("/api/auth/info")
+async def get_auth_info(user_id: str = Depends(verify_api_key_with_rate_limit)):
+    """Get current user authentication information"""
+    return {
+        "authenticated": True,
+        "user": get_user_info(user_id),
+        "message": f"Successfully authenticated as {user_id}"
+    }
+
 # Start research endpoint
 @app.post("/api/research/start", response_model=APIResponse)
-async def start_research(request: ResearchRequest, background_tasks: BackgroundTasks):
-    """Start a new research session"""
+async def start_research(
+    request: ResearchRequest, 
+    background_tasks: BackgroundTasks,
+    user_id: str = Depends(verify_api_key_with_rate_limit)
+):
+    """Start a new research session (requires API key authentication)"""
     try:
+        # Log API usage for monitoring
+        log_api_usage(user_id, "/api/research/start", success=True)
+        
         # Validate request
         if len(request.query.strip()) < 10:
             raise HTTPException(status_code=400, detail="Query must be at least 10 characters long")
@@ -152,6 +209,7 @@ async def start_research(request: ResearchRequest, background_tasks: BackgroundT
         session_id = str(uuid.uuid4())
         session = {
             "session_id": session_id,
+            "user_id": user_id,  # Track which user owns this session
             "query": request.query.strip(),
             "status": "pending",
             "report_type": request.report_type,
@@ -171,12 +229,15 @@ async def start_research(request: ResearchRequest, background_tasks: BackgroundT
         # Start background research task
         background_tasks.add_task(run_research_pipeline, session_id, request)
         
-        logger.info(f"Started research session {session_id} for query: {request.query[:100]}...")
+        logger.info(f"Started research session {session_id} for user {user_id} with query: {request.query[:100]}...")
         
         return APIResponse(
             success=True,
             message="Research session started successfully",
-            data={"session_id": session_id}
+            data={
+                "session_id": session_id,
+                "user_info": get_user_info(user_id)
+            }
         )
         
     except Exception as e:
@@ -185,12 +246,19 @@ async def start_research(request: ResearchRequest, background_tasks: BackgroundT
 
 # Get research status
 @app.get("/api/research/{session_id}/status", response_model=ResearchStatus)
-async def get_research_status(session_id: str):
-    """Get the current status of a research session"""
+async def get_research_status(
+    session_id: str,
+    user_id: str = Depends(verify_api_key_with_rate_limit)
+):
+    """Get the current status of a research session (requires API key authentication)"""
     if session_id not in research_sessions:
         raise HTTPException(status_code=404, detail="Research session not found")
     
     session = research_sessions[session_id]
+    
+    # Verify user owns this session
+    if session.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Access denied: You can only access your own research sessions")
     
     return ResearchStatus(
         session_id=session_id,
@@ -202,12 +270,19 @@ async def get_research_status(session_id: str):
 
 # Get research results
 @app.get("/api/research/{session_id}/result")
-async def get_research_result(session_id: str):
-    """Get the completed research report"""
+async def get_research_result(
+    session_id: str,
+    user_id: str = Depends(verify_api_key_with_rate_limit)
+):
+    """Get the completed research report (requires API key authentication)"""
     if session_id not in research_sessions:
         raise HTTPException(status_code=404, detail="Research session not found")
     
     session = research_sessions[session_id]
+    
+    # Verify user owns this session
+    if session.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Access denied: You can only access your own research sessions")
     
     if session["status"] != "completed":
         raise HTTPException(status_code=400, detail=f"Research not completed. Status: {session['status']}")
@@ -223,12 +298,20 @@ async def get_research_result(session_id: str):
 
 # Download report as file
 @app.get("/api/research/{session_id}/download")
-async def download_report(session_id: str, format: str = "txt"):
-    """Download the research report as a text or PDF file"""
+async def download_report(
+    session_id: str, 
+    format: str = "txt",
+    user_id: str = Depends(verify_api_key_with_rate_limit)
+):
+    """Download the research report as a text or PDF file (requires API key authentication)"""
     if session_id not in research_sessions:
         raise HTTPException(status_code=404, detail="Research session not found")
     
     session = research_sessions[session_id]
+    
+    # Verify user owns this session
+    if session.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Access denied: You can only access your own research sessions")
     
     if session["status"] != "completed" or not session["report_filename"]:
         raise HTTPException(status_code=400, detail="Report not available for download")
@@ -316,9 +399,10 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
         initial_state = {
             "new_query": request.query,
             "report_type": request.report_type,
+            "prompt_type": getattr(request, 'prompt_type', 'general'),
             "non_interactive": True,  # Disable interactive prompts
             "auto_report_type": request.report_type,
-            "reasoning_mode": True,
+            "reasoning_mode": request.reasoning_mode,  # Use reasoning mode from request
             "auto_approve": True,  # Auto-approve queries in web mode
             "approval_choice": "yes",
             "report_type_choice": request.report_type,
@@ -343,6 +427,14 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
         
         session["current_step"] = "Analyzing research question..."
         session["progress"] = 15
+
+        # Check if INTELLISEARCH workflow is available
+        if not INTELLISEARCH_AVAILABLE or workflow_app is None:
+            logger.error("INTELLISEARCH workflow not available - check imports and API keys")
+            session["status"] = "failed"
+            session["error_message"] = "Research workflow not available. Please check API configuration."
+            session["updated_at"] = datetime.now()
+            return
         
         # Run the workflow with progress updates
         async def progress_callback(step_name: str, progress: int):
@@ -356,20 +448,28 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
         
         # Execute the actual workflow
         try:
-            final_state = workflow_app.invoke(initial_state)
+            logger.info(f"Starting workflow with state: {initial_state}")
+            final_state = await workflow_app.ainvoke(initial_state)
+            logger.info(f"Workflow completed successfully")
             
             # Extract results from the final state
             report_content = final_state.get("report", "No report generated")
             sources = final_state.get("sources", [])
             citations = final_state.get("citations", [])
             
+            if not report_content or report_content == "No report generated":
+                logger.warning("Workflow completed but no report generated")
+                session["status"] = "failed"
+                session["error_message"] = "Research completed but no report was generated"
+                session["updated_at"] = datetime.now()
+                return
+            
         except Exception as workflow_error:
-            logger.error(f"Workflow execution failed: {workflow_error}")
-            # Fallback to simulation if workflow fails
-            final_state = await simulate_research_workflow(initial_state, progress_callback)
-            report_content = final_state.get("report", "No report generated")
-            sources = final_state.get("sources", [])
-            citations = final_state.get("citations", [])
+            logger.error(f"Workflow execution failed: {workflow_error}", exc_info=True)
+            session["status"] = "failed"
+            session["error_message"] = f"Research workflow failed: {str(workflow_error)}"
+            session["updated_at"] = datetime.now()
+            return
         
         # Update session with results
         session["status"] = "completed"
@@ -389,28 +489,15 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
         session["current_step"] = f"Error: {str(e)}"
         session["updated_at"] = datetime.now()
 
-# Temporary simulation function - replace with actual workflow
-async def simulate_research_workflow(initial_state: AgentState, progress_callback):
-    """Simulate the research workflow - replace with actual implementation"""
-    steps = [
-        ("Analyzing research question...", 25),
-        ("Searching for relevant information...", 40),
-        ("Scraping and processing content...", 55),
-        ("Analyzing and evaluating sources...", 70),
-        ("Generating report sections...", 85),
-        ("Finalizing report and citations...", 95)
-    ]
-    
-    for step_name, progress in steps:
-        await progress_callback(step_name, progress)
-        await asyncio.sleep(2)  # Simulate processing time
-    
-    # Return mock final state
-    return {
-        "report": f"# Research Report: {initial_state['new_query']}\n\nThis is a simulated report...",
-        "report_filename": "simulated_report.txt"
-    }
-
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    import os
+    
+    # Use PORT environment variable for production (Render) or default to 8000
+    port = int(os.getenv("PORT", 8000))
+    
+    # Disable reload in production
+    reload = os.getenv("ENVIRONMENT") != "production"
+    
+    # Use asyncio loop to avoid conflicts with nest_asyncio
+    uvicorn.run(app, host="0.0.0.0", port=port, reload=reload, loop="asyncio")
