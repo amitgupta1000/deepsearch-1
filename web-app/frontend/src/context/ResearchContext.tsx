@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer } from 'react';
 import type { ReactNode } from 'react';
 import type { ResearchState, ResearchRequest, ResearchResult } from '../types';
+import { useAuthenticatedFetch } from './AuthContext';
 
 type ActivityLog = {
   id: string;
@@ -60,6 +61,7 @@ const ResearchContext = createContext<ResearchContextType | undefined>(undefined
 
 export const ResearchProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(researchReducer, initialState);
+  const authenticatedFetch = useAuthenticatedFetch();
 
   const addLog = (level: ActivityLog['level'], message: string, details?: any) => {
     const log: ActivityLog = {
@@ -96,15 +98,12 @@ export const ResearchProvider: React.FC<{ children: ReactNode }> = ({ children }
         addLog('warning', 'Health check failed, proceeding anyway', healthError);
       }
       
-      // Step 1: Start the research
+      // Step 1: Start the research (requires authentication)
       updateProgress(10, 'Initializing research pipeline...');
-      addLog('info', 'Sending research request to backend...');
+      addLog('info', 'Sending authenticated research request to backend...');
       
-      const startResponse = await fetch(`${apiUrl}/api/research/start`, {
+      const startResponse = await authenticatedFetch('/api/research/start', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           query: request.query,
           report_type: request.reportType,
@@ -145,7 +144,7 @@ export const ResearchProvider: React.FC<{ children: ReactNode }> = ({ children }
           addLog('info', `Checking research progress (${attempts}/${maxAttempts})`);
           updateProgress(progressPercent, 'Research in progress, analyzing sources...');
           
-          const statusResponse = await fetch(`${apiUrl}/api/research/${sessionId}/status`);
+          const statusResponse = await authenticatedFetch(`/api/research/${sessionId}/status`);
           
           if (!statusResponse.ok) {
             addLog('error', `Failed to check status: ${statusResponse.status}`);
@@ -167,7 +166,7 @@ export const ResearchProvider: React.FC<{ children: ReactNode }> = ({ children }
             updateProgress(95, 'Retrieving final report...');
             
             // Get the final result
-            const resultResponse = await fetch(`${apiUrl}/api/research/${sessionId}/result`);
+            const resultResponse = await authenticatedFetch(`/api/research/${sessionId}/result`);
             if (!resultResponse.ok) {
               addLog('error', `Failed to get result: ${resultResponse.status}`);
               throw new Error(`Failed to get research result: ${resultResponse.status}`);
