@@ -1,14 +1,12 @@
 import React, { useState } from 'react';
-import { MagnifyingGlassIcon, Cog6ToothIcon, KeyIcon, SparklesIcon, DocumentTextIcon, BoltIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, Cog6ToothIcon, KeyIcon } from '@heroicons/react/24/outline';
 import { useResearch } from '../context/ResearchContext';
 import type { ResearchRequest } from '../types';
 
 const ResearchForm: React.FC = () => {
   const { startResearch, state } = useResearch();
   const [query, setQuery] = useState('');
-  const [reportType, setReportType] = useState<'concise' | 'detailed'>('concise');
   const [promptType, setPromptType] = useState('general');
-  const [reasoningMode, setReasoningMode] = useState(true);
   const [showApiKeys, setShowApiKeys] = useState(false);
   const [apiKeys, setApiKeys] = useState({
     gemini: '',
@@ -30,9 +28,7 @@ const ResearchForm: React.FC = () => {
 
     const request: ResearchRequest = {
       query: query.trim(),
-      reportType,
       promptType,
-      reasoningMode,
       apiKeys,
     };
 
@@ -51,7 +47,7 @@ const ResearchForm: React.FC = () => {
       {/* Header */}
       <div className="text-center space-y-4">
         <h2 className="text-2xl font-bold text-gray-900 flex items-center justify-center space-x-3">
-          <SparklesIcon className="w-6 h-6 text-primary-600" />
+          <MagnifyingGlassIcon className="w-6 h-6 text-primary-600" />
           <span>Start Your Research</span>
         </h2>
         <p className="text-gray-600">
@@ -97,130 +93,6 @@ const ResearchForm: React.FC = () => {
                   </button>
                 ))}
               </div>
-            </div>
-          </div>
-
-          {/* Report Type Selection */}
-          <div className="space-y-4">
-            <label className="block text-lg font-semibold text-gray-800">
-              Choose Report Type
-            </label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <label className="cursor-pointer">
-                <input
-                  type="radio"
-                  value="concise"
-                  checked={reportType === 'concise'}
-                  onChange={(e) => setReportType(e.target.value as 'concise' | 'detailed')}
-                  className="sr-only"
-                  disabled={state.isLoading}
-                />
-                <div className={`p-6 rounded-xl border-2 transition-all duration-200 ${
-                  reportType === 'concise'
-                    ? 'border-primary-500 bg-primary-50 shadow-md'
-                    : 'border-gray-300 bg-white hover:border-gray-400 hover:shadow-sm'
-                }`}>
-                  <div className="flex items-center space-x-3 mb-3">
-                    <BoltIcon className={`w-5 h-5 ${reportType === 'concise' ? 'text-primary-600' : 'text-gray-500'}`} />
-                    <div className="font-semibold text-lg">Concise Report</div>
-                  </div>
-                  <div className="text-sm text-gray-600 space-y-1">
-                    <div>• ~500 words</div>
-                    <div>• Quick insights</div>
-                    <div>• Key findings only</div>
-                    <div>• 2-3 minutes read</div>
-                  </div>
-                </div>
-              </label>
-              
-              <label className="cursor-pointer">
-                <input
-                  type="radio"
-                  value="detailed"
-                  checked={reportType === 'detailed'}
-                  onChange={(e) => setReportType(e.target.value as 'concise' | 'detailed')}
-                  className="sr-only"
-                  disabled={state.isLoading}
-                />
-                <div className={`p-6 rounded-xl border-2 transition-all duration-200 ${
-                  reportType === 'detailed'
-                    ? 'border-primary-500 bg-primary-50 shadow-md'
-                    : 'border-gray-300 bg-white hover:border-gray-400 hover:shadow-sm'
-                }`}>
-                  <div className="flex items-center space-x-3 mb-3">
-                    <DocumentTextIcon className={`w-5 h-5 ${reportType === 'detailed' ? 'text-primary-600' : 'text-gray-500'}`} />
-                    <div className="font-semibold text-lg">Detailed Report</div>
-                  </div>
-                  <div className="text-sm text-gray-600 space-y-1">
-                    <div>• ~1000 words</div>
-                    <div>• Comprehensive analysis</div>
-                    <div>• Multiple perspectives</div>
-                    <div>• 5-7 minutes read</div>
-                  </div>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          {/* Reasoning Mode Selection */}
-          <div className="space-y-4">
-            <label className="block text-lg font-semibold text-gray-800">
-              Choose Analysis Mode
-            </label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <label className="cursor-pointer">
-                <input
-                  type="radio"
-                  value="reasoning"
-                  checked={reasoningMode === true}
-                  onChange={() => setReasoningMode(true)}
-                  className="sr-only"
-                  disabled={state.isLoading}
-                />
-                <div className={`p-6 rounded-xl border-2 transition-all duration-200 ${
-                  reasoningMode === true
-                    ? 'border-primary-500 bg-primary-50 shadow-md'
-                    : 'border-gray-300 bg-white hover:border-gray-400 hover:shadow-sm'
-                }`}>
-                  <div className="flex items-center space-x-3 mb-3">
-                    <SparklesIcon className={`w-5 h-5 ${reasoningMode === true ? 'text-primary-600' : 'text-gray-500'}`} />
-                    <div className="font-semibold text-lg">Reasoning Mode</div>
-                  </div>
-                  <div className="text-sm text-gray-600 space-y-1">
-                    <div>• AI provides opinions & analysis</div>
-                    <div>• Interpretive insights</div>
-                    <div>• Expert conclusions</div>
-                    <div>• "What this means" perspective</div>
-                  </div>
-                </div>
-              </label>
-              
-              <label className="cursor-pointer">
-                <input
-                  type="radio"
-                  value="research"
-                  checked={reasoningMode === false}
-                  onChange={() => setReasoningMode(false)}
-                  className="sr-only"
-                  disabled={state.isLoading}
-                />
-                <div className={`p-6 rounded-xl border-2 transition-all duration-200 ${
-                  reasoningMode === false
-                    ? 'border-primary-500 bg-primary-50 shadow-md'
-                    : 'border-gray-300 bg-white hover:border-gray-400 hover:shadow-sm'
-                }`}>
-                  <div className="flex items-center space-x-3 mb-3">
-                    <DocumentTextIcon className={`w-5 h-5 ${reasoningMode === false ? 'text-primary-600' : 'text-gray-500'}`} />
-                    <div className="font-semibold text-lg">Research Mode</div>
-                  </div>
-                  <div className="text-sm text-gray-600 space-y-1">
-                    <div>• No opinions or analysis</div>
-                    <div>• Pure facts and data only</div>
-                    <div>• Objective information</div>
-                    <div>• "Just the facts" approach</div>
-                  </div>
-                </div>
-              </label>
             </div>
           </div>
 

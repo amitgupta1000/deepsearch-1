@@ -77,11 +77,9 @@ except ImportError as e:
 
 async def run_workflow(
     initial_query: str, 
-    reasoning_mode_flag: bool, 
     prompt_type: str, 
     enable_automation: bool = False,
-    automation_profile: str = "full",
-    report_type: str = "detailed"
+    automation_profile: str = "full"
 ):
     """
     Runs the LangGraph workflow with an initial query.
@@ -89,7 +87,6 @@ async def run_workflow(
 
     Args:
         initial_query: The user's initial research query.
-        reasoning_mode_flag: True for reasoning mode, False for research mode.
         prompt_type: Type of prompt to use.
         enable_automation: If True, run with full automation (no user input).
         automation_profile: Automation profile ('full', 'query_only', 'none').
@@ -104,24 +101,20 @@ async def run_workflow(
     logging.info(f"Starting {mode_text} workflow for query: '{initial_query}'")
     
     if enable_automation:
-        logging.info(f"Configuration: reasoning_mode={reasoning_mode_flag}, prompt_type={prompt_type}, automation={automation_profile}, report_type={report_type}")
+        logging.info(f"Configuration: prompt_type={prompt_type}, automation={automation_profile}")
 
     # Get automation configuration if enabled
     automation_config = None
     if enable_automation and get_automation_config:
         try:
             automation_config = get_automation_config(automation_profile)
-            # Override report type if specified
-            if report_type:
-                automation_config.auto_report_type = report_type
-                automation_config.report_type_choice = report_type
         except Exception as e:
             logging.warning(f"Could not load automation profile '{automation_profile}': {e}")
 
     # Define the initial state for the graph
     initial_state = {
         "new_query": initial_query,
-        "reasoning_mode": reasoning_mode_flag,
+        "reasoning_mode": True,  # Set to True by default for unified approach
         "search_queries": [],
         "rationale": None,
         "data": [],
@@ -145,8 +138,8 @@ async def run_workflow(
         "non_interactive": enable_automation,
         "auto_approve": enable_automation,
         "approval_choice": "yes" if enable_automation else None,
-        "auto_report_type": report_type if enable_automation else None,
-        "report_type_choice": report_type if enable_automation else None,
+        "auto_report_type": "unified" if enable_automation else None,
+        "report_type_choice": "unified" if enable_automation else None,
         "new_query_override": None
     }
 
@@ -275,39 +268,18 @@ def interactive_mode():
     selected_prompt_type = prompt_type_mapping.get(prompt_type_choice, "general")
     print(f"Selected prompt type: {selected_prompt_type}")
 
-    # Get reasoning mode from user
-    print("\nSelect reasoning mode:")
-    print("1: Reasoning (AI provides opinions, analysis, and expert conclusions)")
-    print("2: Research (No opinions - just facts and data only)")
-    reasoning_mode_choice = input("Enter the number for your desired reasoning mode: ")
-
-    reasoning_mode_flag = True if reasoning_mode_choice == "1" else False
-    print(f"Selected reasoning mode: {'Reasoning' if reasoning_mode_flag else 'Research'}")
-
-    # Get report type if automation is enabled
-    report_type = "detailed"
-    if enable_automation:
-        print("\nSelect report type:")
-        print("1: Detailed")
-        print("2: Concise")
-        report_choice = input("Enter the number for your desired report type: ")
-        report_type = "concise" if report_choice == "2" else "detailed"
-
     if enable_automation:
         print(f"\n🚀 Starting automated workflow...")
         print(f"   Query: {user_research_query}")
         print(f"   Prompt Type: {selected_prompt_type}")
-        print(f"   Reasoning Mode: {'Reasoning' if reasoning_mode_flag else 'Research'}")
-        print(f"   Report Type: {report_type}")
+        print(f"   Report Format: Unified (500-2000 words)")
         print(f"   All queries will be auto-approved")
 
     # Run the async workflow
     return asyncio.run(run_workflow(
         user_research_query, 
-        reasoning_mode_flag, 
         selected_prompt_type, 
-        enable_automation,
-        report_type=report_type
+        enable_automation
     ))
 
 
@@ -317,15 +289,11 @@ def command_line_mode():
     """
     parser = argparse.ArgumentParser(description="INTELLISEARCH Research Tool")
     parser.add_argument("query", nargs='?', help="Research query to process")
-    parser.add_argument("--reasoning-mode", choices=["reasoning", "research"], 
-                       default="reasoning", help="reasoning: AI gives opinions/analysis, research: facts only (default: reasoning)")
     parser.add_argument("--prompt-type", 
                        choices=["legal", "general", "macro", "deepsearch", "person_search", "investment"],
                        default="general", help="Prompt type (default: general)")
     parser.add_argument("--automation", choices=["full", "query_only", "none"],
                        default="full", help="Automation profile (default: full)")
-    parser.add_argument("--report-type", choices=["concise", "detailed"],
-                       default="detailed", help="Report type (default: detailed)")
     parser.add_argument("--batch-file", help="Text file with one query per line for batch processing")
     parser.add_argument("--interactive", action="store_true", help="Run in interactive mode")
     
@@ -334,9 +302,6 @@ def command_line_mode():
     # If no query and no batch file, or interactive flag is set, run interactive mode
     if (not args.query and not args.batch_file) or args.interactive:
         return interactive_mode()
-    
-    # Convert reasoning mode
-    reasoning_mode = args.reasoning_mode == "reasoning"
     
     if args.batch_file:
         # Batch processing mode
@@ -348,11 +313,9 @@ def command_line_mode():
             
             return asyncio.run(batch_research(
                 queries,
-                reasoning_mode_flag=reasoning_mode,
                 prompt_type=args.prompt_type,
                 enable_automation=True,
-                automation_profile=args.automation,
-                report_type=args.report_type
+                automation_profile=args.automation
             ))
             
         except FileNotFoundError:
@@ -365,11 +328,9 @@ def command_line_mode():
         # Single query mode
         return asyncio.run(run_workflow(
             args.query,
-            reasoning_mode_flag=reasoning_mode,
             prompt_type=args.prompt_type,
             enable_automation=True,
-            automation_profile=args.automation,
-            report_type=args.report_type
+            automation_profile=args.automation
         ))
 
 

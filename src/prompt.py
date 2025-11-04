@@ -407,24 +407,47 @@ report_writer_instructions_legal = """
 
 ## Date: {current_date}
 
-Write a comprehensive report analyzing legal and financial developments affecting the company. Focus on actionable insights for decision-makers.
+## Main Research Query
+**{research_topic}**
 
-**Structure:**
-- **Company Profile**: Business model, sector, recent performance
-- **Legal Landscape**: Regulatory actions, litigation, governance issues
-- **Financial Impact**: Revenue effects, compliance costs, investor perception
-- **Strategic Response**: Company actions and mitigation strategies  
-- **Risk Outlook**: Short-term (0-6 months) and medium-term (6-18 months) threats
-- **Benchmarks**: Peer comparisons and industry trends
+## Research Results
 
-**Requirements:**
-- Use markdown formatting with clear headings and structure
-- Cite all claims from summaries using [1], [2] notation
-- Include reference list at end
-- Start directly with content, no introductory sections
-- Use full token capacity for thorough analysis
+### Legal and Financial Query Analysis
+For each research sub-query that was generated during the search phase, provide dedicated analysis:
 
-**Data Source:** {summaries}
+**Sub-Query 1: [First generated legal/financial query]**
+- Specific legal findings and financial data
+- Regulatory actions, litigation details, governance issues
+- Revenue effects, compliance costs, investor perception
+- Relevant citations [1], [2], etc.
+
+**Sub-Query 2: [Second generated legal/financial query]**
+- Specific legal findings and financial data
+- Strategic company responses and mitigation strategies
+- Risk assessment and benchmarks
+- Relevant citations [1], [2], etc.
+
+[Continue for all generated queries...]
+
+## Conclusion
+- Comprehensive risk outlook: Short-term (0-6 months) and medium-term (6-18 months)
+- Strategic implications for decision-makers
+- Peer comparisons and industry trends
+- Key actionable insights
+
+## Citations and Sources
+- [1] Source URL or reference
+- [2] Source URL or reference
+- [Continue for all sources used...]
+
+**Instructions:**
+- Focus on actionable insights for decision-makers
+- Address each legal/financial sub-query explicitly
+- Target 500-2000 words with substantive analysis
+- Use markdown formatting with clear structure
+
+**Research Topic:** {research_topic}
+**Data:** {summaries}
 """
 
 #======================================
@@ -435,29 +458,43 @@ report_writer_instructions_general = """
 ## Date
 {current_date}
 
-## Objective
-Streamlined structure for research reports.
+## Main Research Query
+**{research_topic}**
 
-## Contextual Overview
-- Current relevant aspects & recent developments
-- Key players, policy updates & technological shifts
-- Public sentiment & supporting examples
+## Research Results
 
-## Thematic Analysis
-- 3-5 major themes with:
-  - Historical context & current implications
-  - Future possibilities & concerns
-  - Supporting evidence & citations
+### Query-Based Analysis
+For each research sub-query that was generated during the search phase, provide a dedicated answer section:
 
-## Data Insights
-- Quantifiable information (statistics, trends, projections)
-- Visual structure for enhanced readability
+**Sub-Query 1: [First generated query]**
+- Direct answer based on sources
+- Supporting evidence and data
+- Relevant citations [1], [2], etc.
 
-## Risks & Uncertainties
-- Unknowns, open questions & risk factors
-- Data gaps & controversial viewpoints
+**Sub-Query 2: [Second generated query]**
+- Direct answer based on sources  
+- Supporting evidence and data
+- Relevant citations [1], [2], etc.
 
-Cite all claims [1], [2], etc. Use markdown formatting.
+[Continue for all generated queries...]
+
+## Conclusion
+- Synthesize findings from all sub-queries
+- Address the main research question comprehensively
+- Highlight key insights and implications
+- Note any limitations or areas needing further research
+
+## Citations and Sources
+- [1] Source URL or reference
+- [2] Source URL or reference
+- [Continue for all sources used...]
+
+**Instructions:**
+- Ensure each sub-query from the search generation phase is explicitly addressed
+- Provide substantive answers (50 - 100 words per sub-query)
+- Use markdown formatting for clear structure
+- Target 500-2000 words total
+- Focus on factual information with analytical insights where appropriate
 
 **Research Topic:** {research_topic}
 **Data:** {summaries}
@@ -468,27 +505,44 @@ report_writer_instructions_macro = """
 # Commodity Macro Report: {research_topic}
 Date: {current_date}
 
-## Recent Developments
-- Price trends & geopolitical shifts
-- Regulatory updates & policy announcements
-- Global events & institutional positions
+## Main Research Query
+**{research_topic}**
 
-## Market Dynamics
-- Supply & Demand Analysis (seasonal effects, trade flows, inventories)
-- Macroeconomic Influences (interest rates, inflation, currency)
+## Research Results
+
+### Macro Analysis by Query
+For each research sub-query that was generated during the search phase, provide dedicated analysis:
+
+**Sub-Query 1: [First generated macro query]**
+- Price trends & recent developments
+- Geopolitical shifts & regulatory updates
+- Supply & demand analysis
+- Relevant citations [1], [2], etc.
+
+**Sub-Query 2: [Second generated macro query]**
+- Market dynamics & macroeconomic influences
+- Seasonal effects, trade flows, inventories
+- Interest rates, inflation, currency impacts
+- Relevant citations [1], [2], etc.
+
+[Continue for all generated queries...]
+
+## Conclusion
 - Short-Term Outlook (0-3 months)
 - Medium-Term Outlook (3-12 months)
+- Key risks & uncertainties (policy shifts, weather, supply chain disruptions)
+- Historical trends & theoretical context
 
-## Risks & Uncertainties
-- Policy shifts & weather anomalies
-- Supply chain disruptions & geopolitical tensions
-- Market volatility factors
+## Citations and Sources
+- [1] Source URL or reference
+- [2] Source URL or reference
+- [Continue for all sources used...]
 
-## Theoretical Context
-- Historical trends & economic models
-- Regional case studies & comparative analysis
-
-Cite all data [1], [2], etc. Use markdown formatting.
+**Instructions:**
+- Address each macro sub-query explicitly
+- Focus on market dynamics and economic influences
+- Target 500-2000 words with analytical depth
+- Use markdown formatting for clear structure
 
 **Research Topic:** {research_topic}
 **Data:** {summaries}
@@ -499,17 +553,44 @@ report_writer_instructions_deepsearch = """
 # Factual Summary Report: {research_topic}
 Date: {current_date}
 
-## Key Findings
+## Main Research Query
+**{research_topic}**
+
+## Research Results
+
+### Query-Based Findings
+For each research sub-query that was generated during the search phase, provide factual findings:
+
+**Sub-Query 1: [First generated query]**
 - All facts, events & updates discovered
 - Dates, names & source references
 - Recent information prioritized
+- Relevant citations [1], [2], etc.
 
-## Source Highlights
-- Leading informative sources
-- Coverage gaps or discrepancies  
-- Multiple source confirmations
+**Sub-Query 2: [Second generated query]**
+- All facts, events & updates discovered
+- Dates, names & source references  
+- Recent information prioritized
+- Relevant citations [1], [2], etc.
 
-Cite all facts [1], [2], etc. Maintain neutral, factual tone.
+[Continue for all generated queries...]
+
+## Conclusion
+- Leading informative sources summary
+- Coverage gaps or discrepancies identified
+- Multiple source confirmations noted
+- Key factual insights synthesized
+
+## Citations and Sources
+- [1] Source URL or reference
+- [2] Source URL or reference
+- [Continue for all sources used...]
+
+**Instructions:**
+- Address each sub-query with factual findings only
+- Maintain neutral, factual tone
+- Target 500-2000 words total
+- Prioritize recent information and verifiable facts
 
 **Research Topic:** {research_topic}
 **Data:** {summaries}
@@ -521,32 +602,54 @@ report_writer_instructions_person_search = """
 # Digital Profile Report: {research_topic}
 Date: {current_date}
 
-## Personal & Professional Overview
+## Main Research Query
+**{research_topic}**
+
+## Research Results
+
+### Query-Based Profile Analysis
+For each research sub-query that was generated during the search phase, provide dedicated analysis:
+
+**Sub-Query 1: [First generated person search query]**
+- Personal & professional overview findings
 - Current position & professional affiliations
 - Educational background & qualifications
-- Career timeline & major milestones
+- Relevant citations [1], [2], etc.
 
-## Professional Network Analysis
+**Sub-Query 2: [Second generated person search query]**
+- Professional network analysis
 - LinkedIn presence & career progression
 - Professional achievements & recognition
-- Industry expertise & specializations
+- Relevant citations [1], [2], etc.
 
-## Social Media & Public Presence
-- Twitter/X thought leadership & engagement
-- Facebook/Instagram professional content
+**Sub-Query 3: [Third generated person search query]**
+- Social media & public presence findings
+- Twitter/X, Facebook/Instagram professional content
 - Media mentions & interviews
+- Relevant citations [1], [2], etc.
 
-## Legal & Regulatory Involvement
-- Court cases & business litigation
-- Professional legal opinions
-- Regulatory matters
+[Continue for all generated queries...]
 
-## Achievements & Recognition
-- Awards, honors & industry recognition
-- Speaking engagements & published works
-- Digital reputation analysis
+## Conclusion
+- Digital reputation analysis summary
+- Cross-platform information consistency
+- Network size & influence metrics
+- Key insights about the person's professional profile
 
-## Verification & Analysis
+## Citations and Sources
+- [1] Source URL or reference
+- [2] Source URL or reference
+- [Continue for all sources used...]
+
+**Instructions:**
+- Address each person search sub-query explicitly
+- Maintain professional, respectful tone
+- Target 500-2000 words with comprehensive coverage
+- Focus on publicly available information only
+
+**Person Profile:** {research_topic}
+**Data:** {summaries}
+"""
 - Cross-platform information consistency
 - Network size & influence metrics
 - Information reliability assessment
@@ -563,32 +666,51 @@ report_writer_instructions_investment = """
 # Investment Research Report: {research_topic}
 Date: {current_date}
 
-## Executive Summary
-- Investment Recommendation (Buy/Hold/Sell)
-- Target Price & Key Highlights  
+## Main Research Query
+**{research_topic}**
+
+## Research Results
+
+### Investment Query Analysis
+For each research sub-query that was generated during the search phase, provide dedicated analysis:
+
+**Sub-Query 1: [First generated investment query]**
+- Financial performance and metrics findings
+- Revenue & profitability trends
+- Balance sheet & cash flow strength
+- Relevant citations [1], [2], etc.
+
+**Sub-Query 2: [Second generated investment query]**
+- Business fundamentals analysis
+- Management quality & strategy assessment
+- Market position & competitive landscape
+- Relevant citations [1], [2], etc.
+
+**Sub-Query 3: [Third generated investment query]**
+- Growth prospects & risk assessment
+- Market opportunities & growth drivers
+- ESG considerations & regulatory factors
+- Relevant citations [1], [2], etc.
+
+[Continue for all generated queries...]
+
+## Conclusion
+- Investment Recommendation (Buy/Hold/Sell) with rationale
+- Target Price & Key Highlights
 - Risk Rating & Investment Horizon
-
-## Financial Performance Analysis
-- Revenue & Profitability Trends
-- Balance Sheet & Cash Flow Strength
-- Valuation Multiples & Peer Comparison
-
-## Business Fundamentals
-- Business Model & Competitive Advantages
-- Management Quality & Strategy
-- Market Position & Competitive Landscape
-
-## Growth Prospects & Risks
-- Growth Drivers & Market Opportunities
-- Business & Financial Risk Assessment
-- ESG Considerations
-
-## Investment Recommendation
 - Bull Case, Bear Case & Base Case Scenarios
-- Valuation Analysis & Price Target
 - Timeline & Key Catalysts
 
-Cite all data [1], [2], etc. Use markdown formatting.
+## Citations and Sources
+- [1] Source URL or reference
+- [2] Source URL or reference
+- [Continue for all sources used...]
+
+**Instructions:**
+- Address each investment sub-query explicitly
+- Focus on actionable investment insights
+- Target 500-2000 words with comprehensive analysis
+- Use markdown formatting for clear structure
 
 **Analysis Subject:** {research_topic}
 **Data:** {summaries}

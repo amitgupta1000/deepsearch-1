@@ -611,73 +611,14 @@ async def user_approval_for_queries(state: AgentState) -> AgentState:
 
 async def choose_report_type(state: AgentState) -> AgentState:
     """
-    Asks the user to choose between a concise report (600-1200 words) and 
-    a detailed report (800-3000 words).
-    Supports non-interactive operation via state flags:
-      - state['non_interactive'] = True : run without blocking input()
-      - state['auto_report_type'] = 'concise'|'detailed' : automatically choose report type
-      - state['report_type_choice'] = 'concise'|'detailed' : simulated user response
+    Sets unified report type. No user selection needed since we now use a single
+    500-2000 word report format with query-answer structure.
+    Maintains compatibility with existing automation flags.
     """
     
-    try:
-        from setup import YELLOW, ENDC, BLUE
-    except ImportError:
-        YELLOW = '\033[93m'
-        ENDC = '\033[0m'
-        BLUE = '\033[94m'
-    
-    # Non-interactive shortcuts
-    non_interactive = state.get('non_interactive', False)
-    auto_report_type = state.get('auto_report_type', None)
-    report_type_choice = state.get('report_type_choice', None)
-    
-    if non_interactive:
-        if report_type_choice is not None:
-            choice = report_type_choice.strip().lower()
-            logging.info("Non-interactive report type choice provided: %s", choice)
-            if choice in ['concise', 'c']:
-                state['report_type'] = 'concise'
-                return state
-            elif choice in ['detailed', 'd']:
-                state['report_type'] = 'detailed'
-                return state
-            else:
-                logging.warning("Invalid non-interactive report type choice. Defaulting to detailed.")
-                state['report_type'] = 'detailed'
-                return state
-        elif auto_report_type is not None:
-            logging.info("Non-interactive auto report type enabled: %s", auto_report_type)
-            state['report_type'] = auto_report_type if auto_report_type in ['concise', 'detailed'] else 'detailed'
-            return state
-        else:
-            # Default for non_interactive with no explicit choice: detailed
-            logging.info("Non-interactive mode with no report type flags set. Defaulting to detailed.")
-            state['report_type'] = 'detailed'
-            return state
-    
-    # Interactive mode
-    print(f"\n{YELLOW}Choose your report type:{ENDC}")
-    print(f"{BLUE}1. Concise Report{ENDC} - 600-1200 words, focused summary")
-    print(f"{BLUE}2. Detailed Report{ENDC} - 800-3000 words, comprehensive analysis")
-    
-    for _ in range(5):  # Limit invalid attempts
-        user_input = input("\nEnter your choice (1/concise or 2/detailed): ").lower().strip()
-        
-        if user_input in ['1', 'concise', 'c']:
-            state['report_type'] = 'concise'
-            logging.info("User selected concise report type")
-            return state
-        elif user_input in ['2', 'detailed', 'd']:
-            state['report_type'] = 'detailed'
-            logging.info("User selected detailed report type")
-            return state
-        else:
-            print("Invalid choice. Please enter '1' or 'concise' for concise report, or '2' or 'detailed' for detailed report.")
-            logging.warning("Invalid input received for report type choice.")
-    
-    # Default to detailed if too many invalid attempts
-    logging.warning("Too many invalid attempts at report type selection. Defaulting to detailed.")
-    state['report_type'] = 'detailed'
+    # Set unified report type - no user interaction needed
+    state['report_type'] = 'unified'
+    logging.info("Using unified report format (500-2000 words)")
     return state
 
 
@@ -1538,25 +1479,17 @@ async def AI_evaluate(state: AgentState) -> AgentState:
     return state
 
 #=============================================================================================
-reasoning_instruction = (
-    "Generate an analytical report with your expert opinions and interpretations about the research question. "
-    "Provide your analysis, insights, and reasoned conclusions based on the data. "
-    "Make connections between ideas, offer interpretations of trends and patterns. "
-    "Present your professional judgment on implications, significance, and potential outcomes. "
-    "Use phrases like 'This suggests...', 'The evidence indicates...', 'It appears that...', 'This could mean...'. "
-    "Give your expert opinion on what the data reveals and what it might mean for the future. "
-    "Be analytical and interpretive while supporting your views with citations."
-)
-
-researcher_instruction = (
-    "Generate a strictly factual report presenting only the relevant data found in the sources. "
-    "Do NOT provide opinions, interpretations, analysis, or conclusions. "
-    "Present only verified facts, statistics, quotes, and documented information. "
-    "Use neutral language and avoid any subjective commentary or speculation. "
-    "Structure the information clearly but let the data speak for itself. "
-    "Use phrases like 'According to...', 'The data shows...', 'Sources indicate...', 'Reports state...'. "
-    "Focus exclusively on documenting what is known without adding interpretation. "
-    "Be comprehensive in presenting all relevant factual information found."
+unified_report_instruction = (
+    "Generate a comprehensive research report with the following structure: "
+    "1) Main Research Query (the original question), "
+    "2) Research Results section where you address each sub-query individually with detailed answers, "
+    "3) Conclusion that synthesizes all findings, and "
+    "4) Citations and Sources. "
+    "For each sub-query in the Research Results section, provide: the query itself, a comprehensive answer based on sources, "
+    "supporting evidence, and relevant citations [1], [2], etc. "
+    "Ensure every sub-query from the search generation phase is explicitly addressed. "
+    "Aim for 500-2000 words with balanced coverage. Target 100-200 words per sub-query answer. "
+    "Use clear markdown formatting with proper headings and structure."
 )
 #=============================================================================================
 
@@ -1651,28 +1584,16 @@ async def write_report(state: AgentState):
 
     # Config and state
     prompt_type = state.get("prompt_type", "general")
-    reasoning_mode = state.get("reasoning_mode", True)
-    report_type = state.get("report_type", "detailed")  # Get user's choice
+    # Remove reasoning_mode and report_type dependencies - use unified approach
     
-    # Convert boolean reasoning_mode to human-readable name
-    reasoning_mode_name = "Reasoning" if reasoning_mode else "Researcher"
-    
-    logging.info("Using prompt type '%s', reasoning mode '%s', and report type '%s' for report generation.", 
-                 prompt_type, reasoning_mode_name, report_type)
+    logging.info("Using prompt type '%s' with unified report generation (500-2000 words).", prompt_type)
 
-    # Set word limits based on report type
-    if report_type == "concise":
-        max_words = 1200
-        min_sections = 2
-        max_sections = 4
-        default_section_words = 300
-        logging.info("Generating concise report (maximum 1200 words)")
-    else:  # detailed
-        max_words = 3000
-        min_sections = 3
-        max_sections = 8
-        default_section_words = 600
-        logging.info("Generating detailed report (maximum 3000 words)")
+    # Set unified word limits (500-2000 words)
+    max_words = 2000
+    min_sections = 3
+    max_sections = 6
+    default_section_words = 400
+    logging.info("Generating unified report (500-2000 words)")
 
     report_writer_instructions = report_writer_instructions_general
     if prompt_type == "legal":
@@ -1720,10 +1641,31 @@ async def write_report(state: AgentState):
     if search_queries:
         search_queries_context = f"""
 
-**SPECIFIC RESEARCH QUERIES TO ADDRESS:**
-{chr(10).join(f"• {query}" for query in search_queries)}
+**REPORT STRUCTURE REQUIRED:**
 
-IMPORTANT: Ensure your report specifically addresses each of these research queries using the relevant content chunks below. Each query represents a critical aspect of the research topic that must be covered.
+## Main Research Query
+**{research_topic}**
+
+## Research Results
+For each sub-query below, create a dedicated subsection with the query as the heading and provide a comprehensive answer:
+
+{chr(10).join(f"### Sub-Query {i+1}: {query}" + chr(10) + "- [Provide detailed answer based on sources]" + chr(10) + "- [Include supporting evidence and citations [1], [2], etc.]" + chr(10) for i, query in enumerate(search_queries))}
+
+## Conclusion
+- Synthesize findings from all sub-queries
+- Address the main research question comprehensively
+- Highlight key insights and implications
+
+## Citations and Sources
+- List all sources used with [1], [2], etc. format
+
+CRITICAL: Each sub-query listed above MUST be explicitly addressed in the Research Results section with its own subsection.
+"""
+    else:
+        search_queries_context = """
+
+**REPORT STRUCTURE REQUIRED:**
+Follow the template: Main Research Query → Research Results (with sub-queries and answers) → Conclusion → Citations and Sources
 """
 
     # Prepare the combined chunk context (keep it reasonably sized to avoid extremely long prompts)
@@ -1732,7 +1674,7 @@ IMPORTANT: Ensure your report specifically addresses each of these research quer
         for chunk in relevant_chunks
     ])
 
-    selected_instruction = reasoning_instruction if reasoning_mode else researcher_instruction
+    selected_instruction = unified_report_instruction
     
     # Simplified instruction focusing on key requirements
     enhanced_instruction = f"""
@@ -1759,7 +1701,7 @@ IMPORTANT: Ensure your report specifically addresses each of these research quer
 
     # 1) Request an outline (JSON) specifying section titles and target word counts
     outline_prompt = f"""
-    Create an outline for a {report_type} report answering: "{research_topic}"
+    Create an outline for a research report answering: "{research_topic}"
     
     {report_writer_instructions.format(research_topic=research_topic, summaries=formatted_chunks, current_date=get_current_date())}
     {search_queries_context}
@@ -1789,25 +1731,22 @@ IMPORTANT: Ensure your report specifically addresses each of these research quer
 
     # Fallback simple outline if parsing failed
     if not sections:
-        logging.warning("Could not parse outline from LLM. Falling back to question-focused outline based on report type.")
-        if report_type == "concise":
-            sections = [
-                {"title": "Direct Answer to Research Question", "target_words": 400},
-                {"title": "Supporting Data and Evidence", "target_words": 500},
-                {"title": "Key Findings Summary", "target_words": 300}
-            ]
-        else:  # detailed
-            sections = [
-                {"title": "Specific Information Requested", "target_words": 600},
-                {"title": "Detailed Data and Analysis", "target_words": 1200},
-                {"title": "Supporting Evidence and Sources", "target_words": 800},
-                {"title": "Additional Context and Implications", "target_words": 400}
-            ]
+        logging.warning("Could not parse outline from LLM. Falling back to unified report structure.")
+        # Calculate words per query based on number of search queries
+        num_queries = len(search_queries) if search_queries else 3
+        words_per_query = min(200, max(100, 1200 // num_queries))  # 100-200 words per query
+        
+        sections = [
+            {"title": "Main Research Query", "target_words": 100},
+            {"title": "Research Results", "target_words": words_per_query * num_queries},
+            {"title": "Conclusion", "target_words": 400},
+            {"title": "Citations and Sources", "target_words": 100}
+        ]
 
-    # Clamp and sanitize sections based on report type
+    # Clamp and sanitize sections based on unified report type
     sanitized_sections = []
     total_target = 0
-    max_section_words = max_words // 2 if report_type == "concise" else max_words // 3
+    max_section_words = max_words // 3  # For unified reports
     
     for s in sections[:max_sections]:
         title = s.get('title') if isinstance(s, dict) else str(s)
@@ -1816,11 +1755,8 @@ IMPORTANT: Ensure your report specifically addresses each of these research quer
         except Exception:
             tw = default_section_words
         
-        # Adjust word count based on report type
-        if report_type == "concise":
-            tw = max(50, min(tw, max_section_words))  # Smaller sections for concise reports
-        else:
-            tw = max(100, min(tw, max_section_words))  # Larger sections for detailed reports
+        # Adjust word count for unified reports
+        tw = max(100, min(tw, max_section_words))  # Standard sections for unified reports
             
         sanitized_sections.append({"title": title.strip(), "target_words": tw})
         total_target += tw
@@ -1864,7 +1800,7 @@ IMPORTANT: Ensure your report specifically addresses each of these research quer
 
         expand_prompt = f"""
         Section: {sec_title}
-        Target: ~{target_words} words for {report_type} report
+        Target: ~{target_words} words for unified research report
         Research Question: "{research_topic}"
         
         Extract specific information from content chunks to answer the research question.
@@ -1901,12 +1837,12 @@ IMPORTANT: Ensure your report specifically addresses each of these research quer
     actual_words = _word_count(final_report_content)
     logging.info("Initial generated report: target_words=%d actual_words=%d max_words=%d", expected_words, actual_words, max_words)
 
-    # For concise reports, be more lenient with word count and skip expansion
-    min_threshold = 0.5 if report_type == "concise" else 0.7  # Reduced thresholds to minimize expansion
-    min_expected_words = max(int(expected_words * min_threshold), 500 if report_type == "concise" else 700)
+    # For unified reports, use moderate expansion threshold 
+    min_threshold = 0.6  # Moderate threshold for expansion
+    min_expected_words = max(int(expected_words * min_threshold), 500)  # Minimum 500 words
 
     expansion_attempts = 0
-    max_expansions = 0 if report_type == "concise" else 1  # Only expand detailed reports, and only once
+    max_expansions = 1  # Allow one expansion attempt
     
     # If actual words are significantly less than expected and under the max limit, request an expansion pass
     while actual_words < min_expected_words and actual_words < max_words * 0.8 and expansion_attempts < max_expansions:
@@ -1915,7 +1851,7 @@ IMPORTANT: Ensure your report specifically addresses each of these research quer
 
         # Focus on adding NEW information rather than rewriting existing content
         expand_all_prompt = f"""
-        The current {report_type} report below needs approximately {deficit} additional words but must not exceed {max_words} words total.
+        The current research report below needs approximately {deficit} additional words but must not exceed {max_words} words total.
         
         CRITICAL: Add NEW specific information that answers this research question: "{research_topic}"
         
@@ -1958,7 +1894,7 @@ IMPORTANT: Ensure your report specifically addresses each of these research quer
 
     # Apply enhanced deduplication to reduce repetitive content
     logging.info("Applying enhanced content deduplication...")
-    final_report_content = await enhanced_deduplicate_content(final_report_content, report_type)
+    final_report_content = await enhanced_deduplicate_content(final_report_content, "unified")
     
     # Add citations section (excluded from word count)
     citations_section, source_mapping = generate_citations_section(relevant_chunks)
@@ -1979,8 +1915,8 @@ IMPORTANT: Ensure your report specifically addresses each of these research quer
     # Final logging and saving (including citations in saved files)
     total_chars = len(final_report_content or "")
     total_chars_with_citations = len(final_report_with_citations or "")
-    logging.info("Final %s report size: %d chars, %d words (limit: %d words) + %d chars for citations", 
-                 report_type, total_chars, final_words, max_words, total_chars_with_citations - total_chars)
+    logging.info("Final unified report size: %d chars, %d words (limit: %d words) + %d chars for citations", 
+                 total_chars, final_words, max_words, total_chars_with_citations - total_chars)
 
     # Save to files (with citations)
     text_filename = save_report_to_text(final_report_with_citations, REPORT_FILENAME_TEXT)

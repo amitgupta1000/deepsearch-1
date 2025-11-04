@@ -11,26 +11,20 @@ class AutomationConfig:
     def __init__(
         self,
         auto_approve_queries: bool = True,
-        auto_report_type: str = "detailed",  # "concise" or "detailed"
         non_interactive: bool = True,
-        approval_choice: str = "yes",  # "yes" or "no"
-        report_type_choice: str = "detailed"  # "concise" or "detailed"
+        approval_choice: str = "yes"  # "yes" or "no"
     ):
         """
         Initialize automation configuration.
         
         Args:
             auto_approve_queries: Automatically approve generated search queries
-            auto_report_type: Automatically select report type ("concise" or "detailed")
             non_interactive: Run in non-interactive mode (no user input prompts)
             approval_choice: Simulated user response for query approval ("yes" or "no")
-            report_type_choice: Simulated user choice for report type
         """
         self.auto_approve_queries = auto_approve_queries
-        self.auto_report_type = auto_report_type
         self.non_interactive = non_interactive
         self.approval_choice = approval_choice
-        self.report_type_choice = report_type_choice
     
     def to_state_dict(self) -> Dict[str, Any]:
         """
@@ -41,10 +35,8 @@ class AutomationConfig:
         """
         return {
             "auto_approve": self.auto_approve_queries,
-            "auto_report_type": self.auto_report_type,
             "non_interactive": self.non_interactive,
-            "approval_choice": self.approval_choice,
-            "report_type_choice": self.report_type_choice
+            "approval_choice": self.approval_choice
         }
     
     @classmethod
@@ -57,10 +49,8 @@ class AutomationConfig:
         """
         return cls(
             auto_approve_queries=True,
-            auto_report_type="detailed",
             non_interactive=True,
-            approval_choice="yes",
-            report_type_choice="detailed"
+            approval_choice="yes"
         )
     
     @classmethod
@@ -73,10 +63,8 @@ class AutomationConfig:
         """
         return cls(
             auto_approve_queries=True,
-            auto_report_type=None,  # Still ask user for report type
-            non_interactive=False,  # Still interactive for report type
-            approval_choice="yes",
-            report_type_choice=None
+            non_interactive=False,
+            approval_choice="yes"
         )
     
     @classmethod
@@ -89,12 +77,9 @@ class AutomationConfig:
         """
         return cls(
             auto_approve_queries=False,
-            auto_report_type=None,
             non_interactive=False,
-            approval_choice=None,
-            report_type_choice=None
+            approval_choice=None
         )
-
 
 # Pre-defined automation profiles
 AUTOMATION_PROFILES = {

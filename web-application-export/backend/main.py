@@ -103,16 +103,13 @@ async def root():
 # Pydantic models for API requests/responses
 class ResearchRequest(BaseModel):
     query: str = Field(..., description="Research query or question")
-    report_type: str = Field(default="detailed", description="'concise' or 'detailed'")
     prompt_type: str = Field(default="general", description="Prompt type: general, legal, macro, etc.")
     automation_level: str = Field(default="full", description="Automation level for the research")
-    reasoning_mode: bool = Field(default=True, description="True for reasoning mode, False for research mode")
 
 class ResearchSession(BaseModel):
     session_id: str
     query: str
     status: str  # "pending", "running", "completed", "failed"
-    report_type: str
     prompt_type: str
     created_at: datetime
     updated_at: datetime
@@ -166,12 +163,11 @@ async def debug_info():
 async def get_config():
     """Get available configuration options"""
     return {
-        "report_types": ["concise", "detailed"],
         "prompt_types": ["general", "legal", "macro", "deepsearch", "person_search", "investment"],
         "automation_levels": ["full", "interactive"],
         "limits": {
-            "concise_words": 1200,
-            "detailed_words": 3000,
+            "min_words": 500,
+            "max_words": 2000,
             "max_query_length": 500
         }
     }
@@ -202,8 +198,7 @@ async def start_research(
         if len(request.query.strip()) < 10:
             raise HTTPException(status_code=400, detail="Query must be at least 10 characters long")
         
-        if request.report_type not in ["concise", "detailed"]:
-            raise HTTPException(status_code=400, detail="Report type must be 'concise' or 'detailed'")
+
         
         # Create new session
         session_id = str(uuid.uuid4())
@@ -212,7 +207,6 @@ async def start_research(
             "user_id": user_id,  # Track which user owns this session
             "query": request.query.strip(),
             "status": "pending",
-            "report_type": request.report_type,
             "prompt_type": request.prompt_type,
             "automation_level": request.automation_level,
             "created_at": datetime.now(),
@@ -398,14 +392,10 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
         # Prepare initial state
         initial_state = {
             "new_query": request.query,
-            "report_type": request.report_type,
             "prompt_type": getattr(request, 'prompt_type', 'general'),
             "non_interactive": True,  # Disable interactive prompts
-            "auto_report_type": request.report_type,
-            "reasoning_mode": request.reasoning_mode,  # Use reasoning mode from request
             "auto_approve": True,  # Auto-approve queries in web mode
             "approval_choice": "yes",
-            "report_type_choice": request.report_type,
             "search_queries": None,
             "rationale": None,
             "data": None,

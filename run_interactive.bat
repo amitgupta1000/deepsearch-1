@@ -12,6 +12,9 @@ echo   - Install required packages
 echo   - Check for .env configuration
 echo   - Run INTELLISEARCH in INTERACTIVE mode
 echo.
+echo NOTE: INTELLISEARCH now uses a unified report format (500-2000 words)
+echo with query-answer structure and citations.
+echo.
 
 :: Check if Python is installed
 python --version >nul 2>&1
@@ -111,6 +114,7 @@ echo      Starting INTELLISEARCH (Interactive)
 echo ===============================================
 echo.
 echo NOTE: You will be prompted to configure your research during execution.
+echo Reports are now generated in a unified format with query-answer structure.
 echo.
 
 python app.py
