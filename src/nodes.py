@@ -104,7 +104,7 @@ try:
     from .utils import (
         safe_format, get_current_date, clean_extracted_text,
         fetch_pdf_content, rank_urls, save_report_to_text,
-        generate_pdf_from_md # Import utility functions
+        generate_pdf_from_md, format_research_report, enhance_report_readability  # Import utility functions
     )
 except ImportError:
     logging.error("Could not import utility functions from utils.py. Some nodes may be limited.")
@@ -1893,6 +1893,14 @@ Follow the template: Main Research Query → Research Results (with sub-queries 
     citations_section, source_mapping = generate_citations_section(relevant_chunks)
     final_report_with_citations = final_report_content + citations_section
     logging.info("Added citations section with %d unique sources", len(source_mapping))
+    
+    # Apply comprehensive formatting to improve readability
+    logging.info("Applying comprehensive report formatting for improved readability...")
+    try:
+        final_report_with_citations = enhance_report_readability(final_report_with_citations)
+        logging.info("Report formatting applied successfully")
+    except Exception as format_error:
+        logging.warning(f"Report formatting failed, using unformatted version: {format_error}")
     
     # Final word count check and truncation if necessary (excluding citations)
     final_words = _word_count(final_report_content)  # Count only main content, not citations

@@ -382,4 +382,144 @@ def replace_problematic_characters(content):
 
     return content
 
+
+def format_research_report(report_content: str) -> str:
+    """
+    Format a research report with proper markdown structure and readability improvements.
+    
+    Args:
+        report_content (str): The raw report content to format
+        
+    Returns:
+        str: Formatted report with improved structure and readability
+    """
+    if not report_content or not report_content.strip():
+        return report_content
+    
+    # Split into lines for processing
+    lines = report_content.split('\n')
+    formatted_lines = []
+    
+    # Track current context
+    in_citation_section = False
+    last_was_empty = False
+    
+    for i, line in enumerate(lines):
+        line = line.strip()
+        
+        # Skip multiple consecutive empty lines
+        if not line:
+            if not last_was_empty:
+                formatted_lines.append('')
+                last_was_empty = True
+            continue
+        
+        last_was_empty = False
+        
+        # Detect citations section
+        if re.match(r'^#+ *(citations?|sources?|references?)', line, re.IGNORECASE):
+            in_citation_section = True
+            formatted_lines.append('')  # Add space before citations
+            formatted_lines.append(line)
+            formatted_lines.append('')  # Add space after heading
+            continue
+        
+        # Format main headings (# Title)
+        if line.startswith('# ') and not in_citation_section:
+            # Add extra spacing around main headings
+            if formatted_lines and formatted_lines[-1] != '':
+                formatted_lines.append('')
+            formatted_lines.append(line)
+            formatted_lines.append('')  # Add space after heading
+            continue
+        
+        # Format sub-headings (## Title)
+        if line.startswith('## '):
+            if formatted_lines and formatted_lines[-1] != '':
+                formatted_lines.append('')
+            formatted_lines.append(line)
+            formatted_lines.append('')  # Add space after sub-heading
+            continue
+        
+        # Format sub-sub-headings (### Title)
+        if line.startswith('### '):
+            if formatted_lines and formatted_lines[-1] != '':
+                formatted_lines.append('')
+            formatted_lines.append(line)
+            formatted_lines.append('')  # Add space after sub-sub-heading
+            continue
+        
+        # Format bullet points
+        if line.startswith('- ') or line.startswith('* '):
+            # Ensure proper spacing before bullet lists
+            if formatted_lines and not formatted_lines[-1].startswith(('- ', '* ')) and formatted_lines[-1] != '':
+                formatted_lines.append('')
+            formatted_lines.append(line)
+            continue
+        
+        # Format numbered lists
+        if re.match(r'^\d+\. ', line):
+            # Ensure proper spacing before numbered lists
+            if formatted_lines and not re.match(r'^\d+\. ', formatted_lines[-1] or '') and formatted_lines[-1] != '':
+                formatted_lines.append('')
+            formatted_lines.append(line)
+            continue
+        
+        # Format citations in the citations section
+        if in_citation_section and re.match(r'^\[\d+\]', line):
+            formatted_lines.append(line)
+            continue
+        
+        # Regular paragraph text
+        formatted_lines.append(line)
+    
+    # Join lines back together
+    formatted_content = '\n'.join(formatted_lines)
+    
+    # Clean up excessive whitespace (more than 2 consecutive empty lines)
+    formatted_content = re.sub(r'\n{4,}', '\n\n\n', formatted_content)
+    
+    # Ensure report starts and ends cleanly
+    formatted_content = formatted_content.strip()
+    
+    return formatted_content
+
+
+def enhance_report_readability(report_content: str) -> str:
+    """
+    Enhance report readability with additional formatting improvements.
+    
+    Args:
+        report_content (str): The report content to enhance
+        
+    Returns:
+        str: Enhanced report with improved readability
+    """
+    if not report_content or not report_content.strip():
+        return report_content
+    
+    content = report_content
+    
+    # Add proper spacing around citations
+    content = re.sub(r'(\[\d+\])(?=[A-Za-z])', r'\1 ', content)  # Space after citation if followed by letter
+    content = re.sub(r'([A-Za-z])(\[\d+\])', r'\1 \2', content)  # Space before citation if preceded by letter
+    
+    # Improve sentence structure
+    content = re.sub(r'\.([A-Z])', r'. \1', content)  # Ensure space after periods
+    content = re.sub(r',([A-Za-z])', r', \1', content)  # Ensure space after commas
+    content = re.sub(r';([A-Za-z])', r'; \1', content)  # Ensure space after semicolons
+    content = re.sub(r':([A-Za-z])', r': \1', content)  # Ensure space after colons
+    
+    # Fix multiple spaces
+    content = re.sub(r' {2,}', ' ', content)
+    
+    # Ensure proper paragraph breaks
+    content = re.sub(r'\.([A-Z][a-z])', r'.\n\n\1', content)  # Add paragraph breaks after sentences that end paragraphs
+    
+    # Format the content with the main formatting function
+    content = format_research_report(content)
+    
+    return content
+
+
 logging.info("utils.py loaded with utility functions.")
