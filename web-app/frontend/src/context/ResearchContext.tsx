@@ -81,7 +81,7 @@ export const ResearchProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const startResearch = async (request: ResearchRequest) => {
     dispatch({ type: 'START_RESEARCH' });
-    addLog('info', 'Research session started', { query: request.query, reportType: request.reportType });
+    addLog('info', 'Research session started', { query: request.query, promptType: request.promptType });
     
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -106,7 +106,6 @@ export const ResearchProvider: React.FC<{ children: ReactNode }> = ({ children }
         method: 'POST',
         body: JSON.stringify({
           query: request.query,
-          report_type: request.reportType,
           prompt_type: request.promptType || 'general',
           automation_level: 'full'
         }),

@@ -148,7 +148,6 @@ INTELLISEARCH/
 │   ├── llm_utils.py              # LLM utilities (Google GenAI)
 │   ├── nodes.py                  # Workflow node implementations
 │   ├── prompt.py                 # Prompt templates
-│   ├── question_analyzer.py      # Query analysis utilities
 │   ├── scraper.py                # Web scraping utilities
 │   ├── search.py                 # Search engine integration
 │   └── utils.py                  # General utilities (PDF, ranking, etc.)

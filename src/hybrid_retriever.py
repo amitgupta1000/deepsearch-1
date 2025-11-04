@@ -10,11 +10,13 @@ from dataclasses import dataclass
 
 # Type definitions and fallbacks
 try:
-    from langchain.schema import Document
-    from langchain.text_splitter import RecursiveCharacterTextSplitter
+    from langchain_core.documents import Document
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
     from langchain_community.vectorstores import FAISS
     from langchain_community.retrievers import BM25Retriever
-    from langchain.retrievers import EnsembleRetriever
+    from langchain_core.retrievers import BaseRetriever
+    # Note: EnsembleRetriever not available in current LangChain version
+    # Will implement custom ensemble logic below
 except ImportError as e:
     logging.warning(f"LangChain imports failed: {e}. Using fallback types.")
     class Document:
@@ -24,13 +26,78 @@ except ImportError as e:
     class RecursiveCharacterTextSplitter:
         def __init__(self, **kwargs): pass
         def split_text(self, text): return [text]
-    FAISS, BM25Retriever, EnsembleRetriever = None, None, None
+    FAISS, BM25Retriever = None, None
 
 try:
     from rank_bm25 import BM25Okapi
 except ImportError:
     logging.warning("rank_bm25 not available. BM25 functionality will be limited.")
     BM25Okapi = None
+
+# Custom EnsembleRetriever implementation since LangChain's is not available
+class EnsembleRetriever:
+    """
+    Custom implementation of ensemble retriever that combines multiple retrievers.
+    """
+    
+    def __init__(self, retrievers: List, weights: List[float]):
+        self.retrievers = retrievers
+        self.weights = weights if weights else [1.0] * len(retrievers)
+        if len(self.retrievers) != len(self.weights):
+            raise ValueError("Number of retrievers must match number of weights")
+    
+    def invoke(self, query: str) -> List[Document]:
+        """
+        Retrieve documents from all retrievers and combine using weights.
+        """
+        all_results = []
+        
+        for i, retriever in enumerate(self.retrievers):
+            try:
+                if hasattr(retriever, 'invoke'):
+                    docs = retriever.invoke(query)
+                elif hasattr(retriever, 'get_relevant_documents'):
+                    docs = retriever.get_relevant_documents(query)
+                else:
+                    # Try calling the retriever directly
+                    docs = retriever(query)
+                
+                # Add weight-based scoring to metadata
+                for j, doc in enumerate(docs):
+                    if not hasattr(doc, 'metadata'):
+                        doc.metadata = {}
+                    
+                    # Calculate score: higher weight = higher base score, position matters too
+                    base_score = self.weights[i] * (len(docs) - j) / len(docs)
+                    doc.metadata['ensemble_score'] = base_score
+                    doc.metadata['retriever_index'] = i
+                    
+                all_results.extend(docs)
+                    
+            except Exception as e:
+                logging.warning(f"Retriever {i} failed: {e}")
+                continue
+        
+        # Remove duplicates by content and re-rank by ensemble score
+        seen_content = {}
+        unique_results = []
+        
+        for doc in all_results:
+            content_hash = hash(doc.page_content)
+            if content_hash not in seen_content:
+                seen_content[content_hash] = doc
+                unique_results.append(doc)
+            else:
+                # Combine scores for duplicate content
+                existing_doc = seen_content[content_hash]
+                existing_score = existing_doc.metadata.get('ensemble_score', 0)
+                new_score = doc.metadata.get('ensemble_score', 0)
+                existing_doc.metadata['ensemble_score'] = existing_score + new_score
+        
+        # Sort by ensemble score (descending)
+        unique_results.sort(key=lambda x: x.metadata.get('ensemble_score', 0), reverse=True)
+        
+        return unique_results
 
 # Configuration
 @dataclass
@@ -99,7 +166,7 @@ class HybridRetriever:
             bm25_success = self._build_bm25_index(documents)
             
             # Create ensemble retriever if both are available
-            if vector_success and bm25_success and EnsembleRetriever:
+            if vector_success and bm25_success:
                 try:
                     self.ensemble_retriever = EnsembleRetriever(
                         retrievers=[

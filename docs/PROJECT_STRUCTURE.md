@@ -1,5 +1,7 @@
 # INTELLISEARCH Project Structure Overview
 
+*Last Updated: November 4, 2025 - Post-Cleanup*
+
 ## 🏗️ High-Level Architecture
 
 INTELLISEARCH is an AI-powered research pipeline built with a modular architecture that combines web scraping, semantic search, and AI analysis to generate comprehensive research reports. The project uses LangGraph for workflow orchestration and Google Gemini AI for all language processing tasks.
@@ -13,7 +15,8 @@ INTELLISEARCH/
 ├── 🌐 Web Application (web-app/)
 ├── 📚 Documentation (docs/)
 ├── 🧪 Tests (tests/)
-└── 📦 Deployment Assets
+├── 📦 Export Package (web-application-export/)
+└── � Deployment Assets
 ```
 
 ---
@@ -161,12 +164,12 @@ INTELLISEARCH/
 #### **nodes.py** - Workflow Node Implementations
 - **Role**: Contains all individual workflow steps/nodes
 - **Key Nodes**:
-  - `question_analyzer()`: Analyzes and generates search queries
-  - `search_web()`: Executes web searches
-  - `scrape_and_evaluate()`: Scrapes and evaluates content
+  - `create_queries()`: LLM-based query generation for different research types
+  - `evaluate_search_results()`: Web search execution and result evaluation
+  - `extract_content()`: Content scraping and extraction from URLs
   - `embed_index_and_extract()`: Creates embeddings and extracts relevant chunks
   - `write_report()`: Generates final research reports
-  - `evaluate_search_results()`: Assesses search quality
+  - `AI_evaluate()`: Assesses information sufficiency using AI
   - `choose_report_type()`: Determines report format
 
 #### **conditions.py** - Workflow Logic
@@ -190,10 +193,6 @@ cd web-app/frontend && npm run devion Management
   - PDF generation
   - Data formatting and cleaning
   - Error handling helpers
-
-#### **question_analyzer.py** - Query Processing
-- **Role**: Analyzes research questions and generates optimized search queries
-- **Functions**: Question decomposition, query optimization, search strategy planning
 
 #### **import_validator.py** - Dependency Validation
 - **Role**: Validates that all required packages are available
@@ -295,7 +294,7 @@ cd web-app/frontend && npm run devion Management
 ```
 1. Query Input (app.py / web interface)
        ↓
-2. Question Analysis (question_analyzer.py)
+2. LLM-Based Query Generation (nodes.py - create_queries)
        ↓
 3. Web Search (search.py)
        ↓
@@ -311,6 +310,31 @@ cd web-app/frontend && npm run devion Management
        ↓
 9. Output Generation (utils.py - PDF/text)
 ```
+
+---
+
+## 📦 Export Package (web-application-export/)
+
+### **Purpose**: Production-Ready Web Application Package
+This directory contains a synchronized copy of the web application, optimized for deployment and distribution.
+
+### **Contents**:
+- **backend/**: Complete FastAPI backend with authentication
+- **frontend/**: React/TypeScript frontend application
+- **Documentation**: Deployment guides and configuration instructions
+- **Configuration**: Environment setup and deployment configurations
+
+### **Synchronization**: 
+- Updated automatically during cleanup operations
+- Mirrors `web-app/` structure exactly
+- Excludes build artifacts (node_modules, dist, build directories)
+- Ready for immediate deployment to production environments
+
+### **Use Cases**:
+- **Production Deployment**: Direct deployment to cloud platforms
+- **Distribution**: Sharing complete application package
+- **Backup**: Stable version for rollback scenarios
+- **CI/CD**: Integration with automated deployment pipelines
 
 ---
 

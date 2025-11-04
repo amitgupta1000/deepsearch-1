@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
+    "preview": "vite preview --host 0.0.0.0",
     "start": "vite preview --port $PORT --host 0.0.0.0"
   },
   "dependencies": {
@@ -16,7 +16,6 @@
     "react-dom": "^19.1.1",
     "react-router-dom": "^6.28.0",
     "axios": "^1.7.7",
-    "lucide-react": "^0.294.0",
     "@headlessui/react": "^2.2.0",
     "@heroicons/react": "^2.1.5",
     "clsx": "^2.1.1",

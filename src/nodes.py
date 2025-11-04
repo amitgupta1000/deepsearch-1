@@ -110,15 +110,8 @@ except ImportError:
     logging.error("Could not import utility functions from utils.py. Some nodes may be limited.")
     # Define dummy functions or handle missing utilities within nodes if necessary
 
-try:
-    # Try importing from question_analyzer module if it exists
-    pass
-except ImportError:
-    logging.warning("Could not import question analyzer. Using fallback methods.")
-    def analyze_research_question(question):
-        return {"specificity_level": "medium", "requires_numeric_data": False}
-    def generate_extraction_instructions(analysis):
-        return "Extract relevant information from the content."
+# Note: question_analyzer module is not needed as LLM-based query generation 
+# in create_queries() provides superior question analysis and query generation
 
 try:
     from .config import(
