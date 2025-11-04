@@ -361,6 +361,77 @@ class HybridRetriever:
             # Fallback to single query with first query
             return self.retrieve(queries[0] if queries else "")
     
+    def retrieve_with_query_responses(self, queries: List[str]) -> Tuple[List[Document], Dict[str, str]]:
+        """
+        Retrieve documents and capture individual query responses.
+        
+        Args:
+            queries: List of search queries to use for retrieval
+            
+        Returns:
+            Tuple of (all_documents, query_responses_dict)
+        """
+        try:
+            all_results = []
+            query_responses = {}
+            seen_docs = set()
+            
+            # Retrieve documents for each query and capture responses
+            for query in queries:
+                if not query.strip():
+                    continue
+                    
+                query_results = self.retrieve(query)
+                
+                # Create response summary for this query
+                if query_results:
+                    # Take top documents for this query's response
+                    top_docs = query_results[:3]  # Top 3 for concise response
+                    response_parts = []
+                    
+                    for doc in top_docs:
+                        # Extract key information from document
+                        content = doc.page_content[:200]  # First 200 chars
+                        source = doc.metadata.get('source', 'Unknown')
+                        title = doc.metadata.get('title', 'Untitled')
+                        
+                        response_parts.append(f"From {title} ({source}): {content}...")
+                    
+                    query_responses[query] = "\n\n".join(response_parts)
+                else:
+                    query_responses[query] = "No relevant information found for this query."
+                
+                # Add documents to combined results (with deduplication)
+                for doc in query_results:
+                    doc_key = self._get_doc_key(doc)
+                    
+                    if doc_key not in seen_docs:
+                        all_results.append(doc)
+                        seen_docs.add(doc_key)
+                    
+                    # Stop if we have enough results
+                    if len(all_results) >= self.config.top_k:
+                        break
+                
+                if len(all_results) >= self.config.top_k:
+                    break
+            
+            # Re-rank combined results if we have more than needed
+            if len(all_results) > self.config.top_k:
+                primary_query = queries[0] if queries else ""
+                ranked_results = self._rerank_multi_query_results(primary_query, all_results)
+                all_results = ranked_results[:self.config.top_k]
+            
+            self.logger.info(f"Multi-query retrieval with responses returned {len(all_results)} documents and {len(query_responses)} query responses")
+            return all_results, query_responses
+            
+        except Exception as e:
+            self.logger.error(f"Error during multi-query retrieval with responses: {e}")
+            # Fallback to single query
+            fallback_docs = self.retrieve(queries[0] if queries else "")
+            fallback_responses = {queries[0]: "Fallback response due to error"} if queries else {}
+            return fallback_docs, fallback_responses
+    
     def _rerank_multi_query_results(self, primary_query: str, documents: List[Document]) -> List[Document]:
         """Re-rank results from multiple queries using the primary query."""
         try:

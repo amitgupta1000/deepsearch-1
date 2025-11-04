@@ -333,6 +333,7 @@ class AgentState(TypedDict):
     data: Optional[List[SearchResult]] # List of SearchResult objects after evaluation
     relevant_contexts: Optional[Dict[str, Dict[str, str]]] # Extracted content and metadata from relevant URLs
     relevant_chunks: Optional[List[Document]] # Relevant chunks extracted from contexts per query
+    retriever_responses: Optional[Dict[str, str]] # Query-answer pairs from retrieval process
     proceed: Optional[bool] # Flag for conditional transitions (e.g., proceed to next stage or loop)
     visited_urls: Optional[List[str]] # List of URLs that have been visited/processed
     failed_urls: Optional[List[str]] # List of URLs that have failed and should not be revisited
@@ -1138,20 +1139,23 @@ async def embed_index_and_extract(state: AgentState) -> AgentState:
                 # Get retrieval queries - use the specific search queries that were used to find documents
                 search_queries = state.get("search_queries", [])
                 original_query = state.get("new_query")
+                retriever_responses = {}
                 
                 if search_queries:
-                    # Use the specific search queries for better relevance
+                    # Use the specific search queries for better relevance and capture individual responses
                     logging.info(f"Using {len(search_queries)} specific search queries for retrieval")
-                    relevant_chunks = hybrid_retriever.retrieve_multi_query(search_queries)
-                    retrieval_method = "multi-query hybrid retrieval"
+                    relevant_chunks, retriever_responses = hybrid_retriever.retrieve_with_query_responses(search_queries)
+                    retrieval_method = "multi-query hybrid retrieval with responses"
                 elif original_query:
                     # Fallback to original query if no search queries available
                     logging.info("Using original query for retrieval (fallback)")
                     relevant_chunks = hybrid_retriever.retrieve(original_query)
+                    retriever_responses = {original_query: f"Retrieved {len(relevant_chunks)} documents for original query."}
                     retrieval_method = "single-query hybrid retrieval"
                 else:
                     logging.warning("No retrieval queries found for hybrid retrieval.")
                     relevant_chunks = []
+                    retriever_responses = {}
                     retrieval_method = "no queries"
                 
                 if relevant_chunks:
@@ -1159,8 +1163,10 @@ async def embed_index_and_extract(state: AgentState) -> AgentState:
                     stats = hybrid_retriever.get_stats()
                     logging.info(f"Hybrid retrieval stats: {stats}")
                     logging.info(f"Retrieved {len(relevant_chunks)} chunks using {retrieval_method}")
+                    logging.info(f"Captured {len(retriever_responses)} query responses")
                     
                     state["relevant_chunks"] = relevant_chunks
+                    state["retriever_responses"] = retriever_responses
                     return state
                 else:
                     logging.warning("No chunks retrieved from hybrid retrieval, falling back to standard approach")
@@ -1651,6 +1657,7 @@ async def write_report(state: AgentState):
     relevant_chunks = state.get('relevant_chunks', [])
     research_topic = state.get('new_query', 'the topic')
     search_queries = state.get('search_queries', [])
+    retriever_responses = state.get('retriever_responses', {})
 
     if not relevant_chunks:
         final_report_content = f"Could not generate a report. No relevant information was found for the topic: '{research_topic}'."
@@ -1680,6 +1687,16 @@ async def write_report(state: AgentState):
     # Prepare search queries context for report instructions
     search_queries_context = ""
     if search_queries:
+        # Prepare query-response pairs for better structure
+        query_response_sections = []
+        for i, query in enumerate(search_queries):
+            response = retriever_responses.get(query, "[No specific response captured for this query]")
+            query_response_sections.append(f"### Sub-Query {i+1}: {query}")
+            query_response_sections.append(f"**Retriever Response:** {response[:300]}..." if len(response) > 300 else f"**Retriever Response:** {response}")
+            query_response_sections.append("- [Provide detailed analysis based on retrieved content and sources]")
+            query_response_sections.append("- [Include supporting evidence and citations [1], [2], etc.]")
+            query_response_sections.append("")
+        
         search_queries_context = f"""
 
 **REPORT STRUCTURE REQUIRED:**
@@ -1688,19 +1705,19 @@ async def write_report(state: AgentState):
 **{research_topic}**
 
 ## Research Results
-For each sub-query below, create a dedicated subsection with the query as the heading and provide a comprehensive answer:
+For each sub-query below, analyze the retriever response and expand with comprehensive research from the sources:
 
-{chr(10).join(f"### Sub-Query {i+1}: {query}" + chr(10) + "- [Provide detailed answer based on sources]" + chr(10) + "- [Include supporting evidence and citations [1], [2], etc.]" + chr(10) for i, query in enumerate(search_queries))}
+{chr(10).join(query_response_sections)}
 
 ## Conclusion
-- Synthesize findings from all sub-queries
+- Synthesize findings from all sub-queries and retriever responses
 - Address the main research question comprehensively
 - Highlight key insights and implications
 
 ## Citations and Sources
 - List all sources used with [1], [2], etc. format
 
-CRITICAL: Each sub-query listed above MUST be explicitly addressed in the Research Results section with its own subsection.
+CRITICAL: Each sub-query listed above MUST be explicitly addressed in the Research Results section with its own subsection, building upon the retriever response provided.
 """
     else:
         search_queries_context = """
@@ -1834,6 +1851,17 @@ Follow the template: Main Research Query → Research Results (with sub-queries 
             for chunk in section_chunks
         ])
 
+        # Add retriever responses context if available
+        retriever_context = ""
+        if retriever_responses and sec_title == "Research Results":
+            retriever_context = f"""
+        
+        **Retriever Query Responses to Build Upon:**
+        {chr(10).join(f"- Query: {query}" + chr(10) + f"  Response: {response[:200]}..." if len(response) > 200 else f"  Response: {response}" for query, response in retriever_responses.items())}
+        
+        Use these retriever responses as a foundation and expand with detailed analysis from the content chunks.
+        """
+
         expand_prompt = f"""
         Section: {sec_title}
         Target: ~{target_words} words for unified research report
@@ -1843,6 +1871,7 @@ Follow the template: Main Research Query → Research Results (with sub-queries 
         Use citations [1], [2], etc. from the content below.
         Focus on unique data for this section.
         {search_queries_context}
+        {retriever_context}
         
         Content chunks:
         {section_formatted_chunks}
