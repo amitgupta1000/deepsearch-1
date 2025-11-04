@@ -20,24 +20,6 @@ except ImportError as e:
     logging.warning(f"Google GenAI not available: {e}")
     GOOGLE_GENAI_AVAILABLE = False
 
-# LangChain compatibility imports
-try:
-    from langchain.embeddings.base import Embeddings
-    from langchain_core.documents import Document
-    LANGCHAIN_AVAILABLE = True
-except ImportError:
-    logging.warning("LangChain embeddings not available. Using basic implementation.")
-    
-    class Embeddings:
-        """Fallback embeddings base class."""
-        def embed_documents(self, texts: List[str]) -> List[List[float]]:
-            raise NotImplementedError
-        
-        def embed_query(self, text: str) -> List[float]:
-            raise NotImplementedError
-    
-    LANGCHAIN_AVAILABLE = False
-
 # Task type configurations for different use cases
 @dataclass
 class EmbeddingTask:
@@ -57,7 +39,7 @@ class EmbeddingTask:
     CODE_RETRIEVAL_QUERY = "CODE_RETRIEVAL_QUERY" # For code search queries
 
 
-class EnhancedGoogleEmbeddings(Embeddings):
+class EnhancedGoogleEmbeddings:
     """
     Enhanced Google Embeddings using direct genai.Client with task type specification.
     Supports the latest gemini-embedding-001 model with optimized configurations.
