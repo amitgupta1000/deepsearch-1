@@ -31,39 +31,6 @@ QUERY:
 {query}
 """
 
-#=======================================
-reflection_instructions = """You are an expert research assistant analyzing answers about "{research_topic}".
-
-Instructions:
-- Identify knowledge gaps or areas that need deeper exploration and generate a follow-up query. (1 or multiple).
-- If provided answers are sufficient to answer the user's question, don't generate a follow-up query.
-- If there is a knowledge gap, generate a follow-up query that would help expand your understanding.
-- Focus on technical details, implementation specifics, or emerging trends that weren't fully covered.
-
-Requirements:
-- Ensure the follow-up query is self-contained and includes necessary context for web search.
-
-Output Format:
-- Format your response as a JSON object with these exact keys:
-   - "is_sufficient": true or false
-   - "knowledge_gap": Describe what information is missing or needs clarification
-   - "follow_up_queries": Write a specific question to address this gap
-
-Example:
-```json
-{{
-    "is_sufficient": true, // or false
-    "knowledge_gap": "The summary lacks information about performance metrics and benchmarks", // "" if is_sufficient is true
-    "follow_up_queries": ["What are typical performance benchmarks and metrics used to evaluate [specific technology]?"] // [] if is_sufficient is true
-}}
-```
-
-Reflect carefully on the Summaries to identify knowledge gaps and produce a follow-up query. Then, produce your output following this JSON format:
-
-Answers:
-{summaries}
-"""
-
 #================================================
 reflection_instructions_modified = """You are an expert research assistant analyzing extracted information about "{research_topic}".
 
@@ -415,25 +382,24 @@ report_writer_instructions_legal = """
 ### Legal and Financial Query Analysis
 For each research sub-query that was generated during the search phase, provide dedicated analysis:
 
-**Sub-Query 1: [First generated legal/financial query]**
-- Specific legal findings and financial data
-- Regulatory actions, litigation details, governance issues
-- Revenue effects, compliance costs, investor perception
+**Sub-Query 1: [First generated query]**
+- Direct answer based on sources
+- Supporting evidence and data
 - Relevant citations [1], [2], etc.
 
-**Sub-Query 2: [Second generated legal/financial query]**
-- Specific legal findings and financial data
-- Strategic company responses and mitigation strategies
-- Risk assessment and benchmarks
+**Sub-Query 2: [Second generated query]**
+- Direct answer based on sources  
+- Supporting evidence and data
 - Relevant citations [1], [2], etc.
+
 
 [Continue for all generated queries...]
 
 ## Conclusion
-- Comprehensive risk outlook: Short-term (0-6 months) and medium-term (6-18 months)
+- Comprehensive legal risk outlook: Short-term (0-6 months) and medium-term (6-18 months)
 - Strategic implications for decision-makers
-- Peer comparisons and industry trends
-- Key actionable insights
+- Potential financial exposures
+- Key Legal Issues to Monitor
 
 ## Citations and Sources
 - [1] Source URL or reference
@@ -482,7 +448,7 @@ For each research sub-query that was generated during the search phase, provide 
 - Synthesize findings from all sub-queries
 - Address the main research question comprehensively
 - Highlight key insights and implications
-- Note any limitations or areas needing further research
+- Note any areas needing further research
 
 ## Citations and Sources
 - [1] Source URL or reference
@@ -491,7 +457,6 @@ For each research sub-query that was generated during the search phase, provide 
 
 **Instructions:**
 - Ensure each sub-query from the search generation phase is explicitly addressed
-- Provide substantive answers (50 - 100 words per sub-query)
 - Use markdown formatting for clear structure
 - Target 500-2000 words total
 - Focus on factual information with analytical insights where appropriate
@@ -513,16 +478,14 @@ Date: {current_date}
 ### Macro Analysis by Query
 For each research sub-query that was generated during the search phase, provide dedicated analysis:
 
-**Sub-Query 1: [First generated macro query]**
-- Price trends & recent developments
-- Geopolitical shifts & regulatory updates
-- Supply & demand analysis
+**Sub-Query 1: [First generated query]**
+- Direct answer based on sources
+- Supporting evidence and data
 - Relevant citations [1], [2], etc.
 
-**Sub-Query 2: [Second generated macro query]**
-- Market dynamics & macroeconomic influences
-- Seasonal effects, trade flows, inventories
-- Interest rates, inflation, currency impacts
+**Sub-Query 2: [Second generated query]**
+- Direct answer based on sources  
+- Supporting evidence and data
 - Relevant citations [1], [2], etc.
 
 [Continue for all generated queries...]
@@ -610,22 +573,14 @@ Date: {current_date}
 ### Query-Based Profile Analysis
 For each research sub-query that was generated during the search phase, provide dedicated analysis:
 
-**Sub-Query 1: [First generated person search query]**
-- Personal & professional overview findings
-- Current position & professional affiliations
-- Educational background & qualifications
+**Sub-Query 1: [First generated query]**
+- Direct answer based on sources
+- Supporting evidence and data
 - Relevant citations [1], [2], etc.
 
-**Sub-Query 2: [Second generated person search query]**
-- Professional network analysis
-- LinkedIn presence & career progression
-- Professional achievements & recognition
-- Relevant citations [1], [2], etc.
-
-**Sub-Query 3: [Third generated person search query]**
-- Social media & public presence findings
-- Twitter/X, Facebook/Instagram professional content
-- Media mentions & interviews
+**Sub-Query 2: [Second generated query]**
+- Direct answer based on sources  
+- Supporting evidence and data
 - Relevant citations [1], [2], etc.
 
 [Continue for all generated queries...]
@@ -650,15 +605,6 @@ For each research sub-query that was generated during the search phase, provide 
 **Person Profile:** {research_topic}
 **Data:** {summaries}
 """
-- Cross-platform information consistency
-- Network size & influence metrics
-- Information reliability assessment
-
-Cite all information [1], [2], etc. Maintain professional, respectful tone.
-
-**Person Profile:** {research_topic}
-**Data:** {summaries}
-"""
 
 #======================================
 
@@ -674,29 +620,21 @@ Date: {current_date}
 ### Investment Query Analysis
 For each research sub-query that was generated during the search phase, provide dedicated analysis:
 
-**Sub-Query 1: [First generated investment query]**
-- Financial performance and metrics findings
-- Revenue & profitability trends
-- Balance sheet & cash flow strength
+**Sub-Query 1: [First generated query]**
+- Direct answer based on sources
+- Supporting evidence and data
 - Relevant citations [1], [2], etc.
 
-**Sub-Query 2: [Second generated investment query]**
-- Business fundamentals analysis
-- Management quality & strategy assessment
-- Market position & competitive landscape
-- Relevant citations [1], [2], etc.
-
-**Sub-Query 3: [Third generated investment query]**
-- Growth prospects & risk assessment
-- Market opportunities & growth drivers
-- ESG considerations & regulatory factors
+**Sub-Query 2: [Second generated query]**
+- Direct answer based on sources  
+- Supporting evidence and data
 - Relevant citations [1], [2], etc.
 
 [Continue for all generated queries...]
 
 ## Conclusion
 - Investment Recommendation (Buy/Hold/Sell) with rationale
-- Target Price & Key Highlights
+- Target Price & Key Highlights 
 - Risk Rating & Investment Horizon
 - Bull Case, Bear Case & Base Case Scenarios
 - Timeline & Key Catalysts
