@@ -172,14 +172,21 @@ You are an expert editor tasked with improving a research report by eliminating 
 3. **Merge Similar Content**: If two sentences cover similar points but add different value, merge them intelligently
 4. **Maintain Structure**: Preserve headers, sections, and logical flow
 5. **Keep Citations**: Maintain all citation references [1], [2], etc.
-6. **Improve Transitions**: Ensure smooth flow between sentences and paragraphs
+6. **Preserve Formatting**: Maintain proper spacing around punctuation, citations, and headings
+7. **Improve Transitions**: Ensure smooth flow between sentences and paragraphs
+
+**FORMATTING REQUIREMENTS**:
+- Maintain proper spacing after periods, commas, colons, and semicolons
+- Keep proper spacing around citations: "text [1] more text" 
+- Preserve markdown headers with proper spacing
+- Keep paragraph breaks and bullet point formatting
 
 **CURRENT DATE**: {get_current_date()}
 
 **CONTENT TO DEDUPLICATE**:
 {content}
 
-**OUTPUT**: Return the improved content with redundancy removed but all important information preserved.
+**OUTPUT**: Return the improved content with redundancy removed but all important information and formatting preserved.
 """
 
     try:

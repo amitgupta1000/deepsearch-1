@@ -109,6 +109,15 @@ try:
 except ImportError:
     logging.error("Could not import utility functions from utils.py. Some nodes may be limited.")
     # Define dummy functions or handle missing utilities within nodes if necessary
+    
+    # Fallback formatting functions
+    def format_research_report(content: str) -> str:
+        """Fallback formatting function"""
+        return content
+    
+    def enhance_report_readability(content: str) -> str:
+        """Fallback readability enhancement function"""
+        return content
 
 # Note: question_analyzer module is not needed as LLM-based query generation 
 # in create_queries() provides superior question analysis and query generation
@@ -1889,18 +1898,26 @@ Follow the template: Main Research Query → Research Results (with sub-queries 
     logging.info("Applying enhanced content deduplication...")
     final_report_content = await enhanced_deduplicate_content(final_report_content, "unified")
     
+    # Apply comprehensive formatting to improve readability BEFORE adding citations
+    logging.info("Applying comprehensive report formatting for improved readability...")
+    try:
+        final_report_content = enhance_report_readability(final_report_content)
+        logging.info("Report formatting applied successfully to main content")
+    except Exception as format_error:
+        logging.warning(f"Report formatting failed, using unformatted version: {format_error}")
+    
     # Add citations section (excluded from word count)
     citations_section, source_mapping = generate_citations_section(relevant_chunks)
     final_report_with_citations = final_report_content + citations_section
     logging.info("Added citations section with %d unique sources", len(source_mapping))
     
-    # Apply comprehensive formatting to improve readability
-    logging.info("Applying comprehensive report formatting for improved readability...")
+    # Apply final formatting pass to the complete report with citations
+    logging.info("Applying final formatting pass to complete report...")
     try:
-        final_report_with_citations = enhance_report_readability(final_report_with_citations)
-        logging.info("Report formatting applied successfully")
-    except Exception as format_error:
-        logging.warning(f"Report formatting failed, using unformatted version: {format_error}")
+        final_report_with_citations = format_research_report(final_report_with_citations)
+        logging.info("Final formatting pass completed successfully")
+    except Exception as final_format_error:
+        logging.warning(f"Final formatting pass failed: {final_format_error}")
     
     # Final word count check and truncation if necessary (excluding citations)
     final_words = _word_count(final_report_content)  # Count only main content, not citations
