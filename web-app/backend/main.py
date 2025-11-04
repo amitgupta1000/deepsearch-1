@@ -33,8 +33,9 @@ try:
     from src.graph import app as workflow_app
     from src.nodes import AgentState
     from src.config import GOOGLE_API_KEY, SERPER_API_KEY
-    from src.utils import get_current_date
+    from src.utils import get_current_date, enhance_report_readability, format_research_report
     INTELLISEARCH_AVAILABLE = True
+    FORMATTING_AVAILABLE = True
     logging.info("Successfully imported INTELLISEARCH modules")
     logging.info(f"GOOGLE_API_KEY available: {bool(GOOGLE_API_KEY)}")
     logging.info(f"SERPER_API_KEY available: {bool(SERPER_API_KEY)}")
@@ -42,10 +43,18 @@ try:
 except ImportError as e:
     logging.error(f"Failed to import INTELLISEARCH modules: {e}")
     INTELLISEARCH_AVAILABLE = False
+    FORMATTING_AVAILABLE = False
     
     # Fallback function
     def get_current_date():
         return datetime.now().strftime("%Y-%m-%d")
+    
+    # Fallback formatting functions
+    def enhance_report_readability(content: str) -> str:
+        return content
+    
+    def format_research_report(content: str) -> str:
+        return content
     
     # Define fallback classes for development
     class AgentState:
@@ -324,6 +333,24 @@ async def download_report(
         file_path = pdf_path
         media_type = "application/pdf"
         filename = f"intellisearch-report-{session_id[:8]}.pdf"
+        
+        # If PDF doesn't exist, try to generate it from the report content
+        if not os.path.exists(file_path) and session.get("report_content"):
+            try:
+                logger.info(f"PDF file not found, generating on-demand: {file_path}")
+                
+                # Import PDF generation function
+                from src.utils import generate_pdf_from_md
+                result = generate_pdf_from_md(session["report_content"], pdf_path)
+                
+                if "successfully" in result.lower():
+                    logger.info("PDF generated successfully on-demand")
+                else:
+                    logger.warning(f"PDF generation failed: {result}")
+                    
+            except Exception as pdf_error:
+                logger.error(f"Failed to generate PDF on-demand: {pdf_error}")
+        
     else:
         # Default to text file
         file_path = os.path.join("..", "..", session["report_filename"])
@@ -456,6 +483,26 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
                 session["updated_at"] = datetime.now()
                 return
             
+            # Apply safety formatting to ensure report is properly formatted
+            # (in case workflow formatting failed or wasn't applied)
+            if FORMATTING_AVAILABLE:
+                try:
+                    logger.info("Applying safety formatting to report content...")
+                    formatted_content = enhance_report_readability(report_content)
+                    final_formatted_content = format_research_report(formatted_content)
+                    
+                    # Only use formatted version if it's actually different and not empty
+                    if final_formatted_content and final_formatted_content != report_content:
+                        report_content = final_formatted_content
+                        logger.info("Safety formatting applied successfully")
+                    else:
+                        logger.info("Report was already properly formatted")
+                        
+                except Exception as format_error:
+                    logger.warning(f"Safety formatting failed, using original content: {format_error}")
+            else:
+                logger.warning("Formatting functions not available, using unformatted report")
+
         except Exception as workflow_error:
             logger.error(f"Workflow execution failed: {workflow_error}", exc_info=True)
             session["status"] = "failed"
