@@ -191,13 +191,24 @@ You are an expert editor tasked with improving a research report by eliminating 
 
     try:
         try:
-            from langchain_core.messages import SystemMessage, HumanMessage
+            # Try to use message classes from llm_utils first
+            from .llm_utils import SystemMessage, HumanMessage
         except ImportError:
-            # Fallback for when langchain_core is not available
-            class SystemMessage:
-                def __init__(self, content): self.content = content
-            class HumanMessage:
-                def __init__(self, content): self.content = content
+            try:
+                from langchain_core.messages import SystemMessage, HumanMessage
+            except ImportError:
+                # Fallback message classes
+                class SystemMessage:
+                    def __init__(self, content): 
+                        self.content = content
+                    def __str__(self):
+                        return f"SystemMessage(content='{self.content}')"
+                        
+                class HumanMessage:
+                    def __init__(self, content): 
+                        self.content = content
+                    def __str__(self):
+                        return f"HumanMessage(content='{self.content}')"
         
         messages = [
             SystemMessage(content="You are an expert research report editor focused on eliminating redundancy while preserving all important information."),

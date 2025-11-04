@@ -52,11 +52,23 @@ try:
     LANGCHAIN_MESSAGES_AVAILABLE = True
 except ImportError:
     logging.warning("langchain_core.messages not available. Using basic message classes.")
-    class AnyMessage: pass
-    class AIMessage: pass
-    class SystemMessage: pass
-    class HumanMessage: pass
-    class ToolMessage: pass
+    
+    # Create proper fallback message classes with content attribute
+    class BaseMessage:
+        def __init__(self, content: str = "", **kwargs):
+            self.content = content
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+        
+        def __str__(self):
+            return f"{self.__class__.__name__}(content='{self.content}')"
+    
+    class AnyMessage(BaseMessage): pass
+    class AIMessage(BaseMessage): pass
+    class SystemMessage(BaseMessage): pass
+    class HumanMessage(BaseMessage): pass
+    class ToolMessage(BaseMessage): pass
+    
     LANGCHAIN_MESSAGES_AVAILABLE = False
 
 
@@ -280,7 +292,36 @@ try:
 
 except ImportError:
     logging.error("Could not import necessary LangChain components. Embedding and indexing may fail.")
-    RecursiveCharacterTextSplitter, FAISS = None, None
+    
+    # Create fallback text splitter
+    class RecursiveCharacterTextSplitter:
+        def __init__(self, chunk_size=1000, chunk_overlap=200, **kwargs):
+            self.chunk_size = chunk_size
+            self.chunk_overlap = chunk_overlap
+        
+        def split_text(self, text: str) -> List[str]:
+            """Simple text splitting fallback."""
+            if not text:
+                return []
+            
+            chunks = []
+            for i in range(0, len(text), self.chunk_size - self.chunk_overlap):
+                chunk = text[i:i + self.chunk_size]
+                if chunk.strip():
+                    chunks.append(chunk)
+            return chunks
+        
+        def split_documents(self, documents):
+            """Split documents into chunks."""
+            result = []
+            for doc in documents:
+                text_chunks = self.split_text(doc.page_content)
+                for chunk in text_chunks:
+                    new_doc = Document(page_content=chunk, metadata=doc.metadata.copy())
+                    result.append(new_doc)
+            return result
+    
+    FAISS = None
 
 from typing import TypedDict, Union
 class AgentState(TypedDict):
@@ -391,9 +432,7 @@ async def create_queries(state: AgentState) -> AgentState:
     number_queries = MAX_SEARCH_QUERIES # Use config constant if available
 
     if new_query and llm_call_async: # Ensure llm_call_async is available
-        # Import SystemMessage and HumanMessage locally if needed
-        from langchain_core.messages import SystemMessage, HumanMessage
-
+        # Use the message classes (either LangChain or our fallback implementation)
         messages = [
             SystemMessage(content=query_writer_instructions.format(
                 number_queries=number_queries,

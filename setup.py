@@ -142,9 +142,8 @@ except ImportError:
     RED = GREEN = BLUE = YELLOW = ENDC = ''
 
 
-# Placeholder for embeddings and LLM models - initialized in llm_calling.py
+# Placeholder for embeddings - initialized in llm_calling.py
 embeddings = None # For embedding/indexing
-llm = None # For LLM Calling
 
 
 # Initialize cache here if using a global cache instance

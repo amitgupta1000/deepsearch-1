@@ -8,14 +8,6 @@ from pydantic import BaseModel
 # nest_asyncio removed - not needed for web deployment with FastAPI/uvicorn
 # FastAPI with uvicorn handles async execution properly without nested event loops
 
-# Try importing LangChain components with error handling
-try:
-    from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
-    LANGCHAIN_GOOGLE_AVAILABLE = True
-except ImportError as e:
-    logging.error(f"Could not import langchain_google_genai: {e}")
-    LANGCHAIN_GOOGLE_AVAILABLE = False
-
 try:
     from ratelimit import limits, sleep_and_retry
     RATELIMIT_AVAILABLE = True
@@ -24,10 +16,27 @@ except ImportError as e:
     RATELIMIT_AVAILABLE = False
 
 try:
+    # Try to import from LangChain first for compatibility
     from langchain_core.messages import AnyMessage, SystemMessage, HumanMessage, AIMessage
     LANGCHAIN_CORE_AVAILABLE = True
 except ImportError as e:
-    logging.error(f"Could not import langchain_core.messages: {e}")
+    logging.warning(f"LangChain core messages not available: {e}. Using fallback message classes.")
+    
+    # Create our own message classes that are compatible with the API
+    class BaseMessage:
+        def __init__(self, content: str = "", **kwargs):
+            self.content = content
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+        
+        def __str__(self):
+            return f"{self.__class__.__name__}(content='{self.content}')"
+    
+    class AnyMessage(BaseMessage): pass
+    class AIMessage(BaseMessage): pass
+    class SystemMessage(BaseMessage): pass
+    class HumanMessage(BaseMessage): pass
+    
     LANGCHAIN_CORE_AVAILABLE = False
 
 try:
@@ -89,14 +98,6 @@ try:
             )
             logging.info("Initialized Enhanced Google Embeddings with gemini-embedding-001 (task-optimized)")
         
-        elif LANGCHAIN_GOOGLE_AVAILABLE and 'GoogleGenerativeAIEmbeddings' in globals():
-            # Fallback to LangChain implementation
-            embeddings = GoogleGenerativeAIEmbeddings(
-                model="gemini-embedding-001", 
-                google_api_key=GOOGLE_API_KEY
-            )
-            logging.info("Initialized GoogleGenerativeAIEmbeddings with gemini-embedding-001 (fallback)")
-        
         else:
             embeddings = None
             logging.error("No embedding implementation available")
@@ -108,16 +109,6 @@ except Exception as e:
     embeddings = None
     logging.error(f"Failed to initialize embeddings model: {e}")
     
-    # Try fallback to older model
-    try:
-        if GOOGLE_API_KEY and LANGCHAIN_GOOGLE_AVAILABLE and 'GoogleGenerativeAIEmbeddings' in globals():
-            embeddings = GoogleGenerativeAIEmbeddings(
-                model="models/text-embedding-004", 
-                google_api_key=GOOGLE_API_KEY
-            )
-            logging.info("Fallback: Initialized with models/text-embedding-004")
-    except Exception as fallback_e:
-        logging.error(f"Fallback embedding initialization also failed: {fallback_e}")
 
 # --- LLM Model Initialization --- 
 
@@ -135,13 +126,8 @@ import asyncio
 import time
 from ratelimit import limits, RateLimitException, sleep_and_retry # Import rate limiting decorators
 import logging
-from langchain_core.messages import (
-    AnyMessage,
-    AIMessage,
-    SystemMessage,
-    HumanMessage,
-    ToolMessage,
-)
+
+# Message classes are now defined above - no need to import from LangChain
 
 # Configure the generative AI library with the API key
 gemini_api_key = GOOGLE_API_KEY
@@ -188,10 +174,14 @@ semaphore = asyncio.Semaphore(MAX_CONCURRENT_CALLS)
 @limits(calls=MAX_CALLS_PER_SECOND, period=1) # Apply rate limits
 async def llm_call_async(messages: List[AnyMessage], max_tokens: int = None): # Change parameter to accept a list of AnyMessage and added max_tokens
     """
-    Asynchronously call the Gemini API with the provided Langchain messages.
+    Asynchronously call the Gemini API with the provided message objects.
     Returns the content of the assistant's reply.
     Includes retry logic and rate limiting.
     Allows setting max_output_tokens.
+    
+    Args:
+        messages: List of message objects with .content attribute (SystemMessage, HumanMessage, AIMessage)
+        max_tokens: Maximum tokens to generate (optional)
     """
 
     if not gemini_api_key:
