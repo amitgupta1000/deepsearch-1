@@ -4,7 +4,6 @@ import json
 import logging
 import asyncio
 import time # Added time for cache timestamp
-import fpdf
 
 # Define SearchResult and PDF classes here for simplicity or ensure they are imported
 from dataclasses import dataclass, field
@@ -30,14 +29,28 @@ class SearchResult:
             "source": self.source
         }
 
-from fpdf import FPDF # Assuming fpdf is installed
+# Import FPDF from fpdf2 with proper error handling
+try:
+    from fpdf import FPDF # fpdf2 package
+    FPDF_AVAILABLE = True
+    logging.info("Successfully imported FPDF from fpdf2")
+except ImportError as e:
+    logging.error(f"Could not import FPDF from fpdf2: {e}")
+    FPDF_AVAILABLE = False
+    # Create a dummy FPDF class to prevent crashes
+    class FPDF:
+        def __init__(self, *args, **kwargs):
+            pass
+
 class PDF(FPDF):
     def header(self):
-        self.set_font("Arial", "B", 12)
-        self.cell(0, 10, "", 0, 1, "C")
+        if FPDF_AVAILABLE:
+            self.set_font("Arial", "B", 12)
+            self.cell(0, 10, "", 0, 1, "C")
 
     def footer(self):
-        self.set_y(-15)
+        if FPDF_AVAILABLE:
+            self.set_y(-15)
         self.set_font("Arial", "I", 8)
         self.cell(0, 10, f"Page {self.page_no()}", 0, 0, "C")
 
@@ -168,6 +181,10 @@ def generate_pdf_from_md(content, filename=REPORT_FILENAME_PDF):
     """Generates a PDF from Markdown-like content with enhanced error handling."""
     if content is None or not content.strip():
         return "Error generating PDF: No content provided"
+    
+    if not FPDF_AVAILABLE:
+        logging.warning("FPDF not available, skipping PDF generation")
+        return "PDF generation skipped: FPDF package not available"
 
     try:
         pdf = PDF()
