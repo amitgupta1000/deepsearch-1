@@ -89,7 +89,7 @@ try:
             )
             logging.info("Initialized Enhanced Google Embeddings with gemini-embedding-001 (task-optimized)")
         
-        elif LANGCHAIN_GOOGLE_AVAILABLE:
+        elif LANGCHAIN_GOOGLE_AVAILABLE and 'GoogleGenerativeAIEmbeddings' in globals():
             # Fallback to LangChain implementation
             embeddings = GoogleGenerativeAIEmbeddings(
                 model="gemini-embedding-001", 
@@ -110,7 +110,7 @@ except Exception as e:
     
     # Try fallback to older model
     try:
-        if GOOGLE_API_KEY and LANGCHAIN_GOOGLE_AVAILABLE:
+        if GOOGLE_API_KEY and LANGCHAIN_GOOGLE_AVAILABLE and 'GoogleGenerativeAIEmbeddings' in globals():
             embeddings = GoogleGenerativeAIEmbeddings(
                 model="models/text-embedding-004", 
                 google_api_key=GOOGLE_API_KEY
@@ -127,11 +127,15 @@ llm = None # The primary LLM for most tasks
 # --- Role-Based Message Serialization ---
 # --- LLM calling with langchain chat client ---
 try:
-    if GOOGLE_API_KEY:
+    if GOOGLE_API_KEY and LANGCHAIN_GOOGLE_AVAILABLE:
         llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash-lite", temperature=0, google_api_key=GOOGLE_API_KEY)
         logging.info("Initialized ChatGoogleGenerativeAI (llm) with gemini-2.0-flash-lite")
     else:
-         logging.error("No Google API key available for initializing llm.")
+        llm = None
+        if not GOOGLE_API_KEY:
+            logging.error("No Google API key available for initializing llm.")
+        if not LANGCHAIN_GOOGLE_AVAILABLE:
+            logging.warning("langchain_google_genai not available, LLM features will be limited.")
 
 except Exception as e:
     llm = None

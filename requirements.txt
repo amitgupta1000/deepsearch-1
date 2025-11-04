@@ -27,7 +27,6 @@ langgraph>=1.0.0
 # ============================================================================
 # Google AI (PRIMARY - tested and working)
 google-genai>=1.0.0
-langchain-google-genai>=3.0.0
 
 # ============================================================================
 # WEB SCRAPING & HTTP
