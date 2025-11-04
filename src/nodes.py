@@ -62,10 +62,10 @@ except ImportError:
 
 # Import necessary classes and functions from other modules
 try:
-    from .llm_calling import llm, llm_call_async, embeddings # Assuming these are initialized in llm_calling.py
+    from .llm_utils import llm_call_async, embeddings # Import only what we need - no llm variable
 except ImportError:
-    logging.error("Could not import LLM/Embeddings from llm_calling. Some nodes may not function.")
-    llm, llm_call_async, embeddings = None, None, None
+    logging.error("Could not import LLM/Embeddings from llm_utils. Some nodes may not function.")
+    llm_call_async, embeddings = None, None
 
 try:
     from .search import UnifiedSearcher, SearchResult # Assuming SearchResult and UnifiedSearcher are in search.py
@@ -390,7 +390,7 @@ async def create_queries(state: AgentState) -> AgentState:
 
     number_queries = MAX_SEARCH_QUERIES # Use config constant if available
 
-    if new_query and llm: # Ensure llm is available
+    if new_query and llm_call_async: # Ensure llm_call_async is available
         # Import SystemMessage and HumanMessage locally if needed
         from langchain_core.messages import SystemMessage, HumanMessage
 
@@ -405,11 +405,11 @@ async def create_queries(state: AgentState) -> AgentState:
 
         try:
             # Use the general llm_call_async utility
-            response = await llm.ainvoke(messages) # Use the primary llm
+            response = await llm_call_async(messages) # Use llm_call_async instead of llm.ainvoke
 
-            if response and isinstance(response.content, str):
+            if response and isinstance(response, str):
                 # Use a more robust regex to find the JSON block
-                json_match = re.search(r'```json\s*(\{.*\})\s*```|(\{.*\})', response.content, re.DOTALL)
+                json_match = re.search(r'```json\s*(\{.*\})\s*```|(\{.*\})', response, re.DOTALL)
 
                 if json_match:
                     json_string = json_match.group(1) if json_match.group(1) else json_match.group(2)
@@ -444,7 +444,7 @@ async def create_queries(state: AgentState) -> AgentState:
 
                 else:
                     error = "Could not find JSON block in LLM response for query generation."
-                    logging.error(f"{error} Response: {response.content}")
+                    logging.error(f"{error} Response: {response}")
 
 
             else:
@@ -704,8 +704,8 @@ async def evaluate_search_results(state: AgentState) -> AgentState:
         ]
 
         try:
-            response = await asyncio.wait_for(llm.ainvoke(messages), timeout=15)
-            answer = getattr(response, 'content', '') or ''
+            response = await asyncio.wait_for(llm_call_async(messages), timeout=15)
+            answer = response or ''
             answer_l = answer.strip().lower()
             verdict = "yes" if "yes" in answer_l else "no"
             snippet_cache[snippet_hash] = verdict
@@ -1252,7 +1252,7 @@ async def embed_index_and_extract(state: AgentState) -> AgentState:
     
     # Determine retrieval strategy
     if search_queries:
-        retrieval_queries = search_queries[:5]  # Limit to top 5 queries for performance
+        retrieval_queries = search_queries[:10]  # Limit to top 10 queries for performance
         retrieval_method = f"multi-query retrieval ({len(retrieval_queries)} queries)"
         logging.info(f"Using {len(retrieval_queries)} specific search queries for chunk retrieval")
     elif original_query:
@@ -1395,7 +1395,7 @@ async def AI_evaluate(state: AgentState) -> AgentState:
     errors = []
     state["proceed"] = True
 
-    if not llm:
+    if not llm_call_async:
         msg = "LLM not initialized. Skipping AI evaluation."
         errors.append(msg)
         logging.error(msg)
@@ -1430,8 +1430,8 @@ async def AI_evaluate(state: AgentState) -> AgentState:
     ]
 
     try:
-        response = await llm.ainvoke(messages)
-        response_text = getattr(response, "content", None)
+        response = await llm_call_async(messages)
+        response_text = response
 
         if not response_text:
             raise ValueError("No response received from LLM.")
@@ -1689,17 +1689,12 @@ Follow the template: Main Research Query → Research Results (with sub-queries 
 
     # Helper to call the LLM with flexible wrappers
     async def _call_llm(messages: List[Any]):
-        # Try llm_call_async first (may accept kwargs), then llm.ainvoke, then fallback to previously used llm_call_async(signature)
+        # Use llm_call_async for all LLM calls
         try:
             return await llm_call_async(messages)
         except Exception as e:
-            logging.debug("llm_call_async failed: %s", e2)
-            
-            try:
-                return await llm.ainvoke(messages)
-            except Exception as e2:
-                logging.debug("llm.ainvoke failed: %s", e)
-        return None
+            logging.debug("llm_call_async failed: %s", e)
+            return None
 
     # 1) Request an outline (JSON) specifying section titles and target word counts
     outline_prompt = f"""
@@ -1716,7 +1711,7 @@ Follow the template: Main Research Query → Research Results (with sub-queries 
 
     messages = [SystemMessage(content=outline_prompt), HumanMessage(content=f"Provide the outline for: {research_topic}")]
     outline_resp = await _call_llm(messages)
-    outline_text = getattr(outline_resp, 'content', None) if outline_resp is not None else None
+    outline_text = outline_resp if outline_resp is not None else None
 
     sections = None
     if outline_text:
@@ -1818,12 +1813,12 @@ Follow the template: Main Research Query → Research Results (with sub-queries 
         sec_resp = await _call_llm(messages)
         sec_content = None
         if sec_resp is not None:
-            sec_content = getattr(sec_resp, 'content', None)
-            # Some wrappers return a string directly
+            sec_content = sec_resp
+            # Response is a string directly
             if isinstance(sec_content, str):
                 section_texts.append(f"# {sec_title}\n\n" + sec_content.strip())
             else:
-                # If wrapper returns raw string
+                # Fallback - convert to string
                 section_texts.append(f"# {sec_title}\n\n" + str(sec_resp).strip())
         else:
             logging.warning("LLM did not return content for section %s. Inserting placeholder.", sec_title)
@@ -1878,7 +1873,7 @@ Follow the template: Main Research Query → Research Results (with sub-queries 
         """
         messages = [SystemMessage(content="You are an expert report writer. Your task is to ADD new relevant information to an existing report without duplicating content."), HumanMessage(content=expand_all_prompt)]
         expand_resp = await _call_llm(messages)
-        addition = getattr(expand_resp, 'content', None) if expand_resp is not None else None
+        addition = expand_resp if expand_resp is not None else None
         if addition:
             # APPEND new content instead of replacing (to avoid duplication)
             addition_clean = str(addition).strip()

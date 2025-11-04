@@ -121,25 +121,13 @@ except Exception as e:
 
 # --- LLM Model Initialization --- 
 
-# Consolidate LLM initialization into a single 'llm' variable
-llm = None # The primary LLM for most tasks
+# NOTE: We no longer use LangChain ChatGoogleGenerativeAI - use llm_call_async instead
+# Removing llm variable to catch any remaining usage of llm.ainvoke
 
 # --- Role-Based Message Serialization ---
 # --- LLM calling with langchain chat client ---
-try:
-    if GOOGLE_API_KEY and LANGCHAIN_GOOGLE_AVAILABLE:
-        llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash-lite", temperature=0, google_api_key=GOOGLE_API_KEY)
-        logging.info("Initialized ChatGoogleGenerativeAI (llm) with gemini-2.0-flash-lite")
-    else:
-        llm = None
-        if not GOOGLE_API_KEY:
-            logging.error("No Google API key available for initializing llm.")
-        if not LANGCHAIN_GOOGLE_AVAILABLE:
-            logging.warning("langchain_google_genai not available, LLM features will be limited.")
-
-except Exception as e:
-    llm = None
-    logging.error(f"Failed to initialize llm model: {e}")
+# DEPRECATED: LangChain chat client removed - use llm_call_async function instead
+logging.info("LangChain ChatGoogleGenerativeAI client disabled - using direct Gemini API via llm_call_async")
 
 #=================================================
 from google import genai
