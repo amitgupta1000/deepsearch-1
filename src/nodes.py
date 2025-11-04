@@ -332,8 +332,10 @@ class AgentState(TypedDict):
     rationale: Optional[str]
     data: Optional[List[SearchResult]] # List of SearchResult objects after evaluation
     relevant_contexts: Optional[Dict[str, Dict[str, str]]] # Extracted content and metadata from relevant URLs
-    relevant_chunks: Optional[List[Document]] # Relevant chunks extracted from contexts per query
+    relevant_chunks: Optional[List[Document]] # Relevant chunks extracted from contexts per query (deprecated in favor of qa_pairs)
     retriever_responses: Optional[Dict[str, str]] # Query-answer pairs from retrieval process
+    qa_pairs: Optional[List[Dict]] # Q&A pairs with citations for appendix section
+    all_citations: Optional[List[Dict]] # All citations used in the report
     proceed: Optional[bool] # Flag for conditional transitions (e.g., proceed to next stage or loop)
     visited_urls: Optional[List[str]] # List of URLs that have been visited/processed
     failed_urls: Optional[List[str]] # List of URLs that have failed and should not be revisited
@@ -415,7 +417,7 @@ async def create_queries(state: AgentState) -> AgentState:
 
     # If there are suggested follow-up queries from a previous AI evaluation and we haven't exceeded max iterations,
     # use them directly instead of asking the LLM to generate new ones based on the original query.
-    if suggested_queries and current_iteration < MAX_AI_ITERATIONS and state.get("relevant_chunks"):
+    if suggested_queries and current_iteration < MAX_AI_ITERATIONS and state.get("qa_pairs"):
          logging.info("Using %d suggested follow-up queries from previous iteration.", len(suggested_queries))
          generated_search_queries.update(suggested_queries)
          rationale = f"Refining search based on the previous evaluation's suggested queries ({len(suggested_queries)} queries)."
@@ -1416,12 +1418,77 @@ async def embed_index_and_extract(state: AgentState) -> AgentState:
     # Add logging to inspect the final state["relevant_chunks"]
     logging.info("embed_index_and_extract: Final state['relevant_chunks'] contains %d items.", len(state.get('relevant_chunks', [])))
 
+    # Create Q&A pairs with citations for each search query after chunks are available
+    search_queries = state.get("search_queries", [])
+    if relevant_chunks and search_queries:
+        qa_pairs = []
+        all_citations = []
+        citation_counter = 1
+        
+        for i, query in enumerate(search_queries):
+            # Find relevant chunks for this specific query
+            query_words = set(word.lower() for word in query.split() if len(word) > 3)
+            query_chunks = []
+            
+            # Score chunks based on relevance to this query
+            chunk_scores = []
+            for chunk in relevant_chunks:
+                content_words = set(word.lower() for word in chunk.page_content.split())
+                overlap = len(query_words.intersection(content_words))
+                chunk_scores.append((overlap, chunk))
+            
+            # Sort by relevance and take top chunks for this query
+            chunk_scores.sort(key=lambda x: x[0], reverse=True)
+            query_chunks = [chunk for score, chunk in chunk_scores[:3] if score > 0]  # Top 3 relevant chunks
+            
+            if not query_chunks:
+                # Fallback: use some chunks even if no direct word overlap
+                query_chunks = relevant_chunks[i:i+2] if i < len(relevant_chunks) else relevant_chunks[:2]
+            
+            # Create answer with citations for this query
+            answer_parts = []
+            query_citations = []
+            
+            for chunk in query_chunks:
+                # Create citation
+                citation = {
+                    "number": citation_counter,
+                    "source": chunk.metadata.get('source', 'Unknown'),
+                    "title": chunk.metadata.get('title', 'Untitled'),
+                    "url": chunk.metadata.get('source', ''),
+                    "content_preview": chunk.page_content[:200] + "..." if len(chunk.page_content) > 200 else chunk.page_content
+                }
+                all_citations.append(citation)
+                query_citations.append(citation)
+                
+                # Add chunk content with citation reference
+                answer_parts.append(f"{chunk.page_content[:400]}{'...' if len(chunk.page_content) > 400 else ''} [{citation_counter}]")
+                citation_counter += 1
+            
+            # Create the Q&A pair
+            qa_pair = {
+                "question": query,
+                "answer": " ".join(answer_parts) if answer_parts else "No specific information found for this query.",
+                "citations": query_citations
+            }
+            qa_pairs.append(qa_pair)
+        
+        # Store Q&A pairs and all citations in state
+        state["qa_pairs"] = qa_pairs
+        state["all_citations"] = all_citations
+        logging.info(f"Created {len(qa_pairs)} Q&A pairs with {len(all_citations)} total citations.")
+    else:
+        state["qa_pairs"] = []
+        state["all_citations"] = []
+        logging.warning("No Q&A pairs created - missing relevant chunks or search queries.")
+
     return state
 
 async def AI_evaluate(state: AgentState) -> AgentState:
     """
-    Evaluates extracted relevant_chunks using an LLM to determine if the info is sufficient.
-    Updates 'proceed' based on AI assessment. Suggests follow-up queries if needed.
+    Evaluates the Q&A pairs to determine if they provide sufficient depth to answer the original user query.
+    Updates 'proceed' based on AI assessment of Q&A pair coverage.
+    Suggests follow-up queries if the Q&A pairs don't adequately address the original question.
     Tracks search_iteration_count to prevent infinite loops.
     """
 
@@ -1432,8 +1499,11 @@ async def AI_evaluate(state: AgentState) -> AgentState:
         ENDC = '\033[0m'
         YELLOW = '\033[93m'
 
-    relevant_chunks = state.get("relevant_chunks", [])
-    logging.info("AI Evaluation started: evaluating %d relevant chunks.", len(relevant_chunks))
+    qa_pairs = state.get("qa_pairs", [])
+    original_query = state.get("new_query", "")
+    search_queries = state.get("search_queries", [])
+    
+    logging.info("AI Evaluation started: evaluating %d Q&A pairs for original query coverage.", len(qa_pairs))
 
     state["search_iteration_count"] = state.get("search_iteration_count", 0) + 1
     max_iterations = MAX_AI_ITERATIONS
@@ -1447,31 +1517,53 @@ async def AI_evaluate(state: AgentState) -> AgentState:
         state['error'] = msg
         return state
 
-    if not relevant_chunks:
-        msg = f"No relevant chunks found ({state['search_iteration_count']}/{max_iterations})."
+    if not qa_pairs:
+        msg = f"No Q&A pairs available for evaluation ({state['search_iteration_count']}/{max_iterations})."
         logging.warning(msg)
         if state["search_iteration_count"] < max_iterations:
             state["proceed"] = False
             state['suggested_follow_up_queries'] = []
-            state['knowledge_gap'] = "No relevant info extracted this round."
+            state['knowledge_gap'] = "No Q&A pairs generated this round."
         else:
             state["proceed"] = True
-            state['knowledge_gap'] = "Max iterations reached. Proceeding with current info."
+            state['knowledge_gap'] = "Max iterations reached. Proceeding with current Q&A pairs."
         state['error'] = msg
         return state
 
-    chunks_text = "\n---\n".join(
-        [f"Source: {doc.metadata.get('source', 'Unknown')}\nContent:\n{doc.page_content}" for doc in relevant_chunks]
-    )
+    # Format Q&A pairs for evaluation
+    qa_text = "\n\n".join([
+        f"**Q{i+1}: {pair['question']}**\n**A{i+1}:** {pair['answer']}"
+        for i, pair in enumerate(qa_pairs)
+    ])
+
+    # Create evaluation prompt focused on Q&A coverage
+    evaluation_prompt = f"""
+    Analyze whether the following Q&A pairs provide sufficient depth and coverage to comprehensively answer the original user query.
+
+    **Original User Query:** {original_query}
+
+    **Available Q&A Pairs:**
+    {qa_text}
+
+    **Evaluation Criteria:**
+    1. Do the Q&A pairs collectively address all key aspects of the original query?
+    2. Is there sufficient depth of information to provide a comprehensive answer?
+    3. Are there any critical information gaps that would prevent a complete response?
+
+    Respond with a JSON object containing:
+    {{
+        "is_sufficient": boolean,
+        "knowledge_gap": "string describing any gaps if not sufficient",
+        "follow_up_queries": ["list of specific queries needed to fill gaps"],
+        "coverage_assessment": "string explaining how well the Q&A pairs address the original query"
+    }}
+    """
 
     from .prompt import reflection_instructions_modified
 
     messages = [
-        SystemMessage(content=reflection_instructions_modified.format(
-            research_topic=state.get("new_query", ""),
-            extracted_info_json=chunks_text
-        )),
-        HumanMessage(content=f"User Question: {state.get('new_query', '')}\n\nExtracted Information:\n{chunks_text}")
+        SystemMessage(content="You are an expert research analyst evaluating whether Q&A pairs provide sufficient coverage for answering a user's original query."),
+        HumanMessage(content=evaluation_prompt)
     ]
 
     try:
@@ -1494,12 +1586,12 @@ async def AI_evaluate(state: AgentState) -> AgentState:
                 state["proceed"] = True
                 state["suggested_follow_up_queries"] = []
                 state["knowledge_gap"] = ""
-                logging.debug("AI_evaluate: info sufficient, proceeding to report.")
+                logging.info("AI_evaluate: Q&A pairs provide sufficient coverage, proceeding to report.")
             else:
                 state["proceed"] = False
                 state["suggested_follow_up_queries"] = eval_result.follow_up_queries
                 state["knowledge_gap"] = eval_result.knowledge_gap
-                logging.debug("AI_evaluate: not sufficient, looping back with follow-ups.")
+                logging.info("AI_evaluate: Q&A pairs insufficient, generating follow-up queries.")
 
         else:
             raise ValueError("JSON block not found in response.")
@@ -1513,10 +1605,10 @@ async def AI_evaluate(state: AgentState) -> AgentState:
 
     # Final check for iteration cap
     if not state["proceed"] and state["search_iteration_count"] >= max_iterations:
-        logging.warning("Max iterations reached. Forcing report.")
+        logging.warning("Max iterations reached. Forcing report generation.")
         state["proceed"] = True
         state["suggested_follow_up_queries"] = []
-        state["knowledge_gap"] = "Max iterations hit. Report generated with partial info."
+        state["knowledge_gap"] = "Max iterations hit. Report generated with available Q&A pairs."
 
     # Error handling
     if errors:
@@ -1527,16 +1619,20 @@ async def AI_evaluate(state: AgentState) -> AgentState:
 
 #=============================================================================================
 unified_report_instruction = (
-    "Generate a comprehensive research report with the following structure: "
-    "1) Main Research Query (the original question), "
-    "2) Research Results section where you address each sub-query individually with detailed answers, "
-    "3) Conclusion that synthesizes all findings, and "
-    "4) Citations and Sources. "
-    "For each sub-query in the Research Results section, provide: the query itself, a comprehensive answer based on sources, "
-    "supporting evidence, and relevant citations [1], [2], etc. "
-    "Ensure every sub-query from the search generation phase is explicitly addressed. "
-    "Aim for 500-2000 words with balanced coverage. Target 100-200 words per sub-query answer. "
-    "Use clear markdown formatting with proper headings and structure."
+    "Generate a comprehensive research report with the following THREE-PART structure: "
+    "\n\n**PART 1: Original User Query**\n"
+    "Present the original user question exactly as submitted."
+    "\n\n**PART 2: IntelliSearch Response**\n"
+    "Provide an LLM-driven analysis that directly answers the user's query by synthesizing information from the Q&A pairs. "
+    "This should be a cohesive, analytical response that covers all search queries without duplication. "
+    "Focus on answering the user's original question comprehensively using insights from the collected data. "
+    "Target 400-1000 words for this main analytical section."
+    "\n\n**PART 3: Appendix - Q&A Pairs with Citations**\n"
+    "Present each search query as a question-answer pair with enclosed citations and sources. "
+    "Format each pair as: **Q: [search query]** followed by **A: [detailed answer with citations [1], [2], etc.]**. "
+    "Include all sources and citations at the end. "
+    "This appendix serves as supporting evidence for the main IntelliSearch response."
+    "\n\nTotal length: 500-3000 words. Use clear markdown formatting with proper headings."
 )
 #=============================================================================================
 
@@ -1578,46 +1674,12 @@ def deduplicate_content(text: str) -> str:
     return ' '.join(unique_sentences)
 
 
-def generate_citations_section(relevant_chunks) -> tuple[str, dict]:
-    """
-    Generate a citations section from the relevant chunks, excluding it from word counts.
-    Returns (citations_text, source_mapping) where source_mapping maps URLs to citation numbers.
-    """
-    if not relevant_chunks:
-        return "", {}
-    
-    # Extract unique sources
-    sources = {}
-    source_mapping = {}
-    
-    for chunk in relevant_chunks:
-        source_url = chunk.metadata.get('source', 'Unknown URL')
-        
-        # Avoid duplicate sources
-        if source_url not in sources:
-            citation_number = len(sources) + 1
-            sources[source_url] = {
-                'index': citation_number,
-                'url': source_url
-            }
-            source_mapping[source_url] = citation_number
-    
-    # Format citations section
-    citations_text = "\n\n---\n\n# 📚 Sources and References\n\n"
-        
-    for source in sources.values():
-        citations_text += f"[{source['index']}] {source['url']}\n\n"
-    
-    citations_text += f"*Total sources referenced: {len(sources)}*\n"
-    citations_text += f"*Research conducted on: {get_current_date()}*"
-    
-    return citations_text, source_mapping
-
-
 async def write_report(state: AgentState):
     """
-    Generates the final report and saves to text and PDF.
-    Supports concise (600-1200 words) and detailed (800-3000 words) reports.
+    Generates the final report using the new three-part structure:
+    1) Original User Query
+    2) IntelliSearch Response (LLM analysis) 
+    3) Appendix with Q&A pairs and citations
     """
     # Use color constants from setup if available
     try:
@@ -1631,52 +1693,22 @@ async def write_report(state: AgentState):
 
     # Config and state
     prompt_type = state.get("prompt_type", "general")
-    # Remove reasoning_mode and report_type dependencies - use unified approach
     
-    logging.info("Using prompt type '%s' with unified report generation (500-2000 words).", prompt_type)
+    logging.info("Using prompt type '%s' with new three-part report structure.", prompt_type)
 
-    # Set unified word limits (500-2000 words)
-    max_words = 2000
-    min_sections = 3
-    max_sections = 6
-    default_section_words = 400
-    logging.info("Generating unified report (500-2000 words)")
-
-    report_writer_instructions = report_writer_instructions_general
-    if prompt_type == "legal":
-        report_writer_instructions = report_writer_instructions_legal
-    elif prompt_type == "macro":
-        report_writer_instructions = report_writer_instructions_macro
-    elif prompt_type == "deepsearch":
-        report_writer_instructions = report_writer_instructions_deepsearch
-    elif prompt_type == "person_search":
-        report_writer_instructions = report_writer_instructions_person_search
-    elif prompt_type == "investment":
-        report_writer_instructions = report_writer_instructions_investment
-
-    relevant_chunks = state.get('relevant_chunks', [])
     research_topic = state.get('new_query', 'the topic')
     search_queries = state.get('search_queries', [])
-    retriever_responses = state.get('retriever_responses', {})
+    qa_pairs = state.get('qa_pairs', [])
 
-    if not relevant_chunks:
-        final_report_content = f"Could not generate a report. No relevant information was found for the topic: '{research_topic}'."
+    if not qa_pairs:
+        final_report_content = f"Could not generate a report. No Q&A pairs were created for the topic: '{research_topic}'."
         errors.append(final_report_content)
         logging.warning(final_report_content)
 
         # Save and update state as before
         text_filename = save_report_to_text(final_report_content, REPORT_FILENAME_TEXT)
-        if not text_filename:
-            errors.append(f"Failed to save report to text file: {REPORT_FILENAME_TEXT}.")
-            logging.error(errors[-1])
-
         pdf_result_message = generate_pdf_from_md(final_report_content, REPORT_FILENAME_PDF)
-        if "Error generating PDF" in pdf_result_message:
-            errors.append(pdf_result_message)
-            logging.error(pdf_result_message)
-        else:
-            logging.info(pdf_result_message)
-
+        
         state["report"] = final_report_content
         state["report_filename"] = text_filename
         current_error = state.get('error', '') or ''
@@ -1684,352 +1716,151 @@ async def write_report(state: AgentState):
         state['error'] = None if state['error'] == "" else state['error']
         return state
 
-    # Prepare search queries context for report instructions
-    search_queries_context = ""
-    if search_queries:
-        # Prepare query-response pairs for better structure
-        query_response_sections = []
-        for i, query in enumerate(search_queries):
-            response = retriever_responses.get(query, "[No specific response captured for this query]")
-            query_response_sections.append(f"### Sub-Query {i+1}: {query}")
-            query_response_sections.append(f"**Retriever Response:** {response[:300]}..." if len(response) > 300 else f"**Retriever Response:** {response}")
-            query_response_sections.append("- [Provide detailed analysis based on retrieved content and sources]")
-            query_response_sections.append("- [Include supporting evidence and citations [1], [2], etc.]")
-            query_response_sections.append("")
-        
-        search_queries_context = f"""
+    # PART 1: Original User Query
+    part1_query = f"# Research Report\n\n## 1. Original User Query\n\n**{research_topic}**\n\n---\n\n"
 
-**REPORT STRUCTURE REQUIRED:**
-
-## Main Research Query
-**{research_topic}**
-
-## Research Results
-For each sub-query below, analyze the retriever response and expand with comprehensive research from the sources:
-
-{chr(10).join(query_response_sections)}
-
-## Conclusion
-- Synthesize findings from all sub-queries and retriever responses
-- Address the main research question comprehensively
-- Highlight key insights and implications
-
-## Citations and Sources
-- List all sources used with [1], [2], etc. format
-
-CRITICAL: Each sub-query listed above MUST be explicitly addressed in the Research Results section with its own subsection, building upon the retriever response provided.
-"""
+    # PART 2: Generate IntelliSearch Response using LLM analysis
+    logging.info("Generating IntelliSearch Response (Part 2)...")
+    
+    # Prepare context from Q&A pairs for LLM analysis
+    qa_context = ""
+    if qa_pairs:
+        qa_context = "Based on the following Q&A analysis:\n\n"
+        for i, qa in enumerate(qa_pairs):
+            qa_context += f"Q{i+1}: {qa['question']}\n"
+            qa_context += f"A{i+1}: {qa['answer'][:300]}...\n\n"
     else:
-        search_queries_context = """
+        qa_context = "No structured Q&A data available for analysis."
 
-**REPORT STRUCTURE REQUIRED:**
-Follow the template: Main Research Query → Research Results (with sub-queries and answers) → Conclusion → Citations and Sources
-"""
+    intellisearch_prompt = f"""
+    You are an expert research analyst. Provide a comprehensive, analytical response to the user's query by synthesizing information from the collected research data.
 
-    # Prepare the combined chunk context (keep it reasonably sized to avoid extremely long prompts)
-    formatted_chunks = "\n---\n".join([
-        f"Source: {chunk.metadata.get('source', 'Unknown URL')}\nContent:\n{chunk.page_content}"
-        for chunk in relevant_chunks
-    ])
+    USER QUERY: "{research_topic}"
 
-    selected_instruction = unified_report_instruction
-    
-    # Simplified instruction focusing on key requirements
-    enhanced_instruction = f"""
-    {selected_instruction}
-    
-    Answer: "{research_topic}"
-    Focus on specific data from content chunks. Include relevant citations [1], [2], etc.
-    {search_queries_context}
+    RESEARCH DATA:
+    {qa_context}
+
+    INSTRUCTIONS:
+    - Provide a direct, analytical answer to the user's original question
+    - Synthesize insights from all the research data
+    - Focus on creating a cohesive, analytical response
+    - Target 400-800 words for this response
+    - Use clear, professional language with proper markdown formatting
+    - Include key insights and implications
+    - Do not repeat the individual Q&A pairs (they will be in the appendix)
+    - Focus on answering the user's question comprehensively
+    - Use bullet points, subheadings, or numbered lists where appropriate
+
+    Generate the IntelliSearch Response:
     """
 
-    # Helper to call the LLM with flexible wrappers
-    async def _call_llm(messages: List[Any]):
-        # Use llm_call_async for all LLM calls
-        try:
-            return await llm_call_async(messages)
-        except Exception as e:
-            logging.debug("llm_call_async failed: %s", e)
-            return None
-
-    # 1) Request an outline (JSON) specifying section titles and target word counts
-    outline_prompt = f"""
-    Create an outline for a research report answering: "{research_topic}"
-    
-    {report_writer_instructions.format(research_topic=research_topic, summaries=formatted_chunks, current_date=get_current_date())}
-    {search_queries_context}
-
-    Provide JSON outline with {min_sections}-{max_sections} sections, maximum {max_words} words total.
-    
-    JSON format:
-    {{"sections": [{{"title": "Section Name", "target_words": {default_section_words}}}]}}
-    """
-
-    messages = [SystemMessage(content=outline_prompt), HumanMessage(content=f"Provide the outline for: {research_topic}")]
-    outline_resp = await _call_llm(messages)
-    outline_text = outline_resp if outline_resp is not None else None
-
-    sections = None
-    if outline_text:
-        # Try to extract JSON block
-        m = re.search(r'```json\s*(\{.*\})\s*```|(\{.*\})', str(outline_text), re.DOTALL)
-        json_string = m.group(1) if m and m.group(1) else (m.group(2) if m else None)
-        if json_string:
-            try:
-                parsed = json.loads(json_string)
-                if isinstance(parsed, dict) and 'sections' in parsed and isinstance(parsed['sections'], list):
-                    sections = parsed['sections']
-            except Exception as e:
-                logging.debug("Outline JSON parse error: %s", e)
-
-    # Fallback simple outline if parsing failed
-    if not sections:
-        logging.warning("Could not parse outline from LLM. Falling back to unified report structure.")
-        # Calculate words per query based on number of search queries
-        num_queries = len(search_queries) if search_queries else 3
-        words_per_query = min(200, max(100, 1200 // num_queries))  # 100-200 words per query
-        
-        sections = [
-            {"title": "Main Research Query", "target_words": 100},
-            {"title": "Research Results", "target_words": words_per_query * num_queries},
-            {"title": "Conclusion", "target_words": 400},
-            {"title": "Citations and Sources", "target_words": 100}
+    try:
+        messages = [
+            SystemMessage(content=intellisearch_prompt),
+            HumanMessage(content=f"Analyze and answer: {research_topic}")
         ]
-
-    # Clamp and sanitize sections based on unified report type
-    sanitized_sections = []
-    total_target = 0
-    max_section_words = max_words // 3  # For unified reports
-    
-    for s in sections[:max_sections]:
-        title = s.get('title') if isinstance(s, dict) else str(s)
-        try:
-            tw = int(s.get('target_words', default_section_words)) if isinstance(s, dict) else default_section_words
-        except Exception:
-            tw = default_section_words
         
-        # Adjust word count for unified reports
-        tw = max(100, min(tw, max_section_words))  # Standard sections for unified reports
+        if llm_call_async:
+            intellisearch_response = await llm_call_async(messages)
+            if not intellisearch_response:
+                intellisearch_response = "Unable to generate analysis due to LLM unavailability."
+        else:
+            intellisearch_response = "Unable to generate analysis due to LLM unavailability."
             
-        sanitized_sections.append({"title": title.strip(), "target_words": tw})
-        total_target += tw
-        
-        # Stop if we're approaching the limit
-        if total_target >= max_words * 0.9:
-            break
+    except Exception as e:
+        logging.error(f"Error generating IntelliSearch response: {e}")
+        intellisearch_response = f"Error generating analysis: {str(e)}"
 
-    # Adjust if total exceeds limit
-    if total_target > max_words:
-        scale_factor = max_words / total_target
-        for section in sanitized_sections:
-            section["target_words"] = max(50, int(section["target_words"] * scale_factor))
+    part2_response = f"## 2. IntelliSearch Response\n\n{intellisearch_response}\n\n---\n\n"
 
-    # Generate citation mapping for use in sections
-    _, source_mapping = generate_citations_section(relevant_chunks)
-
-    # 2) Expand each section individually with content distribution
-    section_texts = []
-    total_chunks = len(relevant_chunks)
-    chunks_per_section = max(1, total_chunks // len(sanitized_sections)) if sanitized_sections else 1
+    # PART 3: Appendix with Q&A pairs and citations
+    logging.info("Generating Appendix (Part 3)...")
     
-    for i, sec in enumerate(sanitized_sections):
-        sec_title = sec['title']
-        target_words = sec['target_words']
+    part3_appendix = "## 3. Appendix: Research Q&A and Sources\n\n"
+    
+    all_citations = []
+    citation_counter = 1
+    
+    if qa_pairs:
+        part3_appendix += "### Research Questions and Detailed Answers\n\n"
+        
+        for i, qa in enumerate(qa_pairs):
+            part3_appendix += f"#### Q{i+1}: {qa['question']}\n\n"
+            
+            # Process answer and update citation numbers
+            answer = qa['answer']
+            for citation in qa.get('citations', []):
+                # Replace local citation numbers with global ones
+                old_ref = f"[{citation['number']}]"
+                new_ref = f"[{citation_counter}]"
+                answer = answer.replace(old_ref, new_ref)
+                
+                # Add to global citations list
+                all_citations.append({
+                    'number': citation_counter,
+                    'source': citation['source'],
+                    'url': citation.get('url', ''),
+                    'content': citation.get('content', '')
+                })
+                citation_counter += 1
+            
+            part3_appendix += f"**Answer:** {answer}\n\n"
+            if i < len(qa_pairs) - 1:  # Add separator except for last item
+                part3_appendix += "---\n\n"
 
-        # Distribute content chunks to avoid repetition across sections
-        start_idx = i * chunks_per_section
-        end_idx = min(start_idx + chunks_per_section + 1, total_chunks)  # +1 for overlap
-        section_chunks = relevant_chunks[start_idx:end_idx]
-        
-        # If last section, include any remaining chunks
-        if i == len(sanitized_sections) - 1:
-            section_chunks = relevant_chunks[start_idx:]
-        
-        # Format section-specific chunks with citation numbers
-        section_formatted_chunks = "\n---\n".join([
-            f"[Citation {source_mapping.get(chunk.metadata.get('source', ''), 'N/A')}] Source: {chunk.metadata.get('source', 'Unknown URL')}\nContent:\n{chunk.page_content}"
-            for chunk in section_chunks
-        ])
-
-        # Add retriever responses context if available
-        retriever_context = ""
-        if retriever_responses and sec_title == "Research Results":
-            retriever_context = f"""
-        
-        **Retriever Query Responses to Build Upon:**
-        {chr(10).join(f"- Query: {query}" + chr(10) + f"  Response: {response[:200]}..." if len(response) > 200 else f"  Response: {response}" for query, response in retriever_responses.items())}
-        
-        Use these retriever responses as a foundation and expand with detailed analysis from the content chunks.
-        """
-
-        expand_prompt = f"""
-        Section: {sec_title}
-        Target: ~{target_words} words for unified research report
-        Research Question: "{research_topic}"
-        
-        Extract specific information from content chunks to answer the research question.
-        Use citations [1], [2], etc. from the content below.
-        Focus on unique data for this section.
-        {search_queries_context}
-        {retriever_context}
-        
-        Content chunks:
-        {section_formatted_chunks}
-        """
-
-        messages = [SystemMessage(content=report_writer_instructions.format(research_topic=research_topic, summaries=section_formatted_chunks, current_date=get_current_date()) + "\n\n" + enhanced_instruction), HumanMessage(content=expand_prompt)]
-        sec_resp = await _call_llm(messages)
-        sec_content = None
-        if sec_resp is not None:
-            sec_content = sec_resp
-            # Response is a string directly
-            if isinstance(sec_content, str):
-                section_texts.append(f"# {sec_title}\n\n" + sec_content.strip())
+    # Add citations section with better formatting
+    if all_citations:
+        part3_appendix += "\n### Sources and Citations\n\n"
+        for citation in all_citations:
+            source_info = citation['source']
+            if citation.get('url') and citation['url'] != citation['source']:
+                part3_appendix += f"**[{citation['number']}]** [{citation['source']}]({citation['url']})\n\n"
             else:
-                # Fallback - convert to string
-                section_texts.append(f"# {sec_title}\n\n" + str(sec_resp).strip())
-        else:
-            logging.warning("LLM did not return content for section %s. Inserting placeholder.", sec_title)
-            section_texts.append(f"# {sec_title}\n\n" + "[No content generated for this section due to LLM failure.]")
+                part3_appendix += f"**[{citation['number']}]** {source_info}\n\n"
 
-    final_report_content = "\n\n".join(section_texts)
+    # Combine all parts
+    final_report_content = part1_query + part2_response + part3_appendix
 
-    # Post-generation checks: if the result is shorter than intended, ask for expansion
-    def _word_count(text: str) -> int:
-        return len(text.split())
+    # Add professional metadata footer
+    final_report_content += f"\n---\n\n*📅 Report generated on {get_current_date()}*  \n*🔬 Powered by INTELLISEARCH Research Platform*\n"
 
-    expected_words = sum(s['target_words'] for s in sanitized_sections)
-    actual_words = _word_count(final_report_content)
-    logging.info("Initial generated report: target_words=%d actual_words=%d max_words=%d", expected_words, actual_words, max_words)
+    logging.info("Three-part report generated successfully.")
 
-    # For unified reports, use moderate expansion threshold 
-    min_threshold = 0.6  # Moderate threshold for expansion
-    min_expected_words = max(int(expected_words * min_threshold), 500)  # Minimum 500 words
-
-    expansion_attempts = 0
-    max_expansions = 1  # Allow one expansion attempt
-    
-    # If actual words are significantly less than expected and under the max limit, request an expansion pass
-    while actual_words < min_expected_words and actual_words < max_words * 0.8 and expansion_attempts < max_expansions:
-        deficit = max(0, min(expected_words - actual_words, max_words - actual_words))
-        logging.warning("Report shorter than expected (have=%d want=%d max=%d). Requesting focused expansion #%d.", actual_words, expected_words, max_words, expansion_attempts+1)
-
-        # Focus on adding NEW information rather than rewriting existing content
-        expand_all_prompt = f"""
-        The current research report below needs approximately {deficit} additional words but must not exceed {max_words} words total.
-        
-        CRITICAL: Add NEW specific information that answers this research question: "{research_topic}"
-        
-        EXPANSION INSTRUCTIONS - ADD NEW CONTENT ONLY:
-        1. Review what information is MISSING from the current report that would better answer the research question
-        2. Look through the original content chunks for ADDITIONAL unused data, values, or facts
-        3. ADD approximately {deficit} words of NEW information while preserving the existing structure
-        4. Focus on COMPLEMENTARY information that wasn't already covered
-        5. Add more specific data points, quotes, or other relevant details
-        6. DO NOT restate or rephrase information already in the report
-        {search_queries_context}
-        
-        APPEND NEW SECTIONS OR EXPAND EXISTING ONES - Do not rewrite the entire report.
-        
-        Original content chunks for reference:
-        {formatted_chunks}
-
-        Current report to ADD TO (do not replace):
-        {final_report_content}
-        
-        ADD new specific information that complements the existing content and better answers "{research_topic}":
-        """
-        messages = [SystemMessage(content="You are an expert report writer. Your task is to ADD new relevant information to an existing report without duplicating content."), HumanMessage(content=expand_all_prompt)]
-        expand_resp = await _call_llm(messages)
-        addition = expand_resp if expand_resp is not None else None
-        if addition:
-            # APPEND new content instead of replacing (to avoid duplication)
-            addition_clean = str(addition).strip()
-            if addition_clean and not addition_clean.lower().startswith(final_report_content[:100].lower()):
-                final_report_content = final_report_content + "\n\n" + addition_clean
-                actual_words = _word_count(final_report_content)
-                logging.info("After expansion #%d actual_words=%d (added content)", expansion_attempts+1, actual_words)
-            else:
-                logging.warning("Expansion attempt returned duplicate content, skipping.")
-                break
-        else:
-            logging.warning("Expansion attempt returned no content.")
-            break
-        expansion_attempts += 1
-
-    # Apply enhanced deduplication to reduce repetitive content
-    logging.info("Applying enhanced content deduplication...")
-    final_report_content = await enhanced_deduplicate_content(final_report_content, "unified")
-    
-    # Apply comprehensive formatting to improve readability BEFORE adding citations
-    logging.info("Applying comprehensive report formatting for improved readability...")
-    try:
-        final_report_content = enhance_report_readability(final_report_content)
-        logging.info("Report formatting applied successfully to main content")
-    except Exception as format_error:
-        logging.warning(f"Report formatting failed, using unformatted version: {format_error}")
-    
-    # Add citations section (excluded from word count)
-    citations_section, source_mapping = generate_citations_section(relevant_chunks)
-    final_report_with_citations = final_report_content + citations_section
-    logging.info("Added citations section with %d unique sources", len(source_mapping))
-    
-    # Apply final formatting pass to the complete report with citations
-    logging.info("Applying final formatting pass to complete report...")
-    try:
-        final_report_with_citations = format_research_report(final_report_with_citations)
-        logging.info("Final formatting pass completed successfully")
-    except Exception as final_format_error:
-        logging.warning(f"Final formatting pass failed: {final_format_error}")
-    
-    # Final word count check and truncation if necessary (excluding citations)
-    final_words = _word_count(final_report_content)  # Count only main content, not citations
-    if final_words > max_words:
-        logging.warning("Report exceeds %d word limit (%d words). Truncating.", max_words, final_words)
-        words = final_report_content.split()
-        final_report_content = ' '.join(words[:max_words])
-        final_words = max_words
-        # Regenerate citations after truncation
-        citations_section, source_mapping = generate_citations_section(relevant_chunks)
-        final_report_with_citations = final_report_content + citations_section
-
-    # Final logging and saving (including citations in saved files)
-    total_chars = len(final_report_content or "")
-    total_chars_with_citations = len(final_report_with_citations or "")
-    logging.info("Final unified report size: %d chars, %d words (limit: %d words) + %d chars for citations", 
-                 total_chars, final_words, max_words, total_chars_with_citations - total_chars)
-
-    # Save to files (with citations)
-    text_filename = save_report_to_text(final_report_with_citations, REPORT_FILENAME_TEXT)
+    # Save to files
+    text_filename = save_report_to_text(final_report_content, REPORT_FILENAME_TEXT)
     if not text_filename:
-         errors.append(f"Failed to save report to text file: {REPORT_FILENAME_TEXT}.")
-         logging.error(errors[-1])
+        errors.append(f"Failed to save report to text file: {REPORT_FILENAME_TEXT}.")
+        logging.error(errors[-1])
 
-    pdf_result_message = generate_pdf_from_md(final_report_with_citations, REPORT_FILENAME_PDF)
+    pdf_result_message = generate_pdf_from_md(final_report_content, REPORT_FILENAME_PDF)
     if "Error generating PDF" in pdf_result_message:
-         errors.append(pdf_result_message)
-         logging.error(pdf_result_message)
+        errors.append(pdf_result_message)
+        logging.error(pdf_result_message)
     else:
-         logging.info(pdf_result_message)
+        logging.info(pdf_result_message)
 
-    # Update state and return (with citations)
-    state["report"] = final_report_with_citations
+    # Update state
+    state["report"] = final_report_content
     state["report_filename"] = text_filename
-
+    
+    # Handle errors
     current_error = state.get('error', '') or ''
     state['error'] = (current_error + "\n" + "\n".join(errors)).strip() if errors else current_error.strip()
     state['error'] = None if state['error'] == "" else state['error']
 
-    # Clear intermediate data
-    state['data'] = []
-    state['relevant_contexts'] = {}
-    state['relevant_chunks'] = []
-    state['search_queries'] = []
-    state['suggested_follow_up_queries'] = []
-    state['knowledge_gap'] = ""
-    state['rationale'] = ""
-    state['iteration_count'] = 0
+    # Clean up intermediate data that's no longer needed
+    # Keep qa_pairs and all_citations for potential future use (e.g., follow-up queries)
+    state['data'] = []  # Clear search results
+    state['relevant_contexts'] = {}  # Clear extracted content
+    state['relevant_chunks'] = []  # Clear deprecated chunks
+    state['suggested_follow_up_queries'] = []  # Clear follow-up queries
+    state['knowledge_gap'] = ""  # Clear gap information
+    state['rationale'] = ""  # Clear rationale
+    state['iteration_count'] = 0  # Reset iteration counter
 
-    return state # Return the updated state
+    logging.info("Report generation completed. State updated with final report and Q&A data preserved.")
+    
+    return state
+
 
 logging.info("nodes.py loaded with LangGraph node functions.")
