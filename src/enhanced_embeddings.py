@@ -10,6 +10,20 @@ from typing import List, Dict, Any, Optional, Union
 import numpy as np
 from dataclasses import dataclass
 
+# LangChain base class import
+try:
+    from langchain_core.embeddings import Embeddings
+    LANGCHAIN_EMBEDDINGS_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"LangChain Embeddings base class not available: {e}")
+    LANGCHAIN_EMBEDDINGS_AVAILABLE = False
+    # Fallback base class
+    class Embeddings:
+        def embed_documents(self, texts: List[str]) -> List[List[float]]:
+            raise NotImplementedError
+        def embed_query(self, text: str) -> List[float]:
+            raise NotImplementedError
+
 # Google AI imports
 try:
     from google import genai
@@ -39,10 +53,11 @@ class EmbeddingTask:
     CODE_RETRIEVAL_QUERY = "CODE_RETRIEVAL_QUERY" # For code search queries
 
 
-class EnhancedGoogleEmbeddings:
+class EnhancedGoogleEmbeddings(Embeddings):
     """
     Enhanced Google Embeddings using direct genai.Client with task type specification.
     Supports the latest gemini-embedding-001 model with optimized configurations.
+    Inherits from LangChain Embeddings base class for compatibility.
     """
     
     def __init__(
@@ -229,30 +244,111 @@ class EnhancedGoogleEmbeddings:
             logging.error(f"Failed to embed query: {e}")
             return [0.0] * self.output_dimensionality
     
+    # LangChain-compatible interface methods (required for FAISS compatibility)
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        """
+        LangChain-compatible method for embedding documents.
+        Uses default RETRIEVAL_DOCUMENT task type.
+        """
+        return self.embed_documents_with_task(texts, self.default_task_type)
+    
+    def embed_query(self, text: str) -> List[float]:
+        """
+        LangChain-compatible method for embedding queries.
+        Uses RETRIEVAL_QUERY task type for optimal query embedding.
+        """
+        return self.embed_query_with_task(text, "RETRIEVAL_QUERY")
+    
+    def embed_documents_with_task(
+        self,
+        texts: List[str],
+        task_type: str = "RETRIEVAL_DOCUMENT"
+    ) -> List[List[float]]:
+        """
+        Embed documents for retrieval/indexing with specified task type.
+        
+        Args:
+            texts: List of texts to embed
+            task_type: Task type for optimization (default: RETRIEVAL_DOCUMENT)
+            
+        Returns:
+            List of embedding vectors
+        """
+        if not texts:
+            return []
+        
+        all_embeddings = []
+        
+        # Process in batches
+        for i in range(0, len(texts), self.batch_size):
+            batch_texts = texts[i:i + self.batch_size]
+            
+            try:
+                batch_embeddings = self._embed_with_retry(batch_texts, task_type)
+                all_embeddings.extend(batch_embeddings)
+                
+                if len(batch_texts) > 1:
+                    logging.info(f"Embedded batch {i//self.batch_size + 1} "
+                               f"({len(batch_texts)} documents) with task_type={task_type}")
+                
+            except Exception as e:
+                logging.error(f"Failed to embed batch {i//self.batch_size + 1}: {e}")
+                # Add empty embeddings for failed batch
+                empty_embedding = [0.0] * self.output_dimensionality
+                all_embeddings.extend([empty_embedding] * len(batch_texts))
+        
+        return all_embeddings
+    
+    def embed_query_with_task(
+        self,
+        text: str,
+        task_type: str = "RETRIEVAL_QUERY"
+    ) -> List[float]:
+        """
+        Embed a query for search/retrieval with specified task type.
+        
+        Args:
+            text: Query text to embed
+            task_type: Task type for optimization (default: RETRIEVAL_QUERY)
+            
+        Returns:
+            Embedding vector
+        """
+        if not text:
+            return [0.0] * self.output_dimensionality
+        
+        try:
+            embeddings = self._embed_with_retry([text], task_type)
+            return embeddings[0] if embeddings else [0.0] * self.output_dimensionality
+            
+        except Exception as e:
+            logging.error(f"Failed to embed query: {e}")
+            return [0.0] * self.output_dimensionality
+    
     # Specialized methods for different use cases
     def embed_for_semantic_similarity(self, texts: List[str]) -> List[List[float]]:
         """Embed texts for semantic similarity comparison."""
-        return self.embed_documents(texts, task_type="SEMANTIC_SIMILARITY")
+        return self.embed_documents_with_task(texts, task_type="SEMANTIC_SIMILARITY")
     
     def embed_for_classification(self, texts: List[str]) -> List[List[float]]:
         """Embed texts for classification tasks."""
-        return self.embed_documents(texts, task_type="CLASSIFICATION")
+        return self.embed_documents_with_task(texts, task_type="CLASSIFICATION")
     
     def embed_for_clustering(self, texts: List[str]) -> List[List[float]]:
         """Embed texts for clustering analysis."""
-        return self.embed_documents(texts, task_type="CLUSTERING")
+        return self.embed_documents_with_task(texts, task_type="CLUSTERING")
     
     def embed_question(self, question: str) -> List[float]:
         """Embed a question for QA systems."""
-        return self.embed_query(question, task_type="QUESTION_ANSWERING")
+        return self.embed_query_with_task(question, task_type="QUESTION_ANSWERING")
     
     def embed_code_query(self, query: str) -> List[float]:
         """Embed a natural language query for code retrieval."""
-        return self.embed_query(query, task_type="CODE_RETRIEVAL_QUERY")
+        return self.embed_query_with_task(query, task_type="CODE_RETRIEVAL_QUERY")
     
     def embed_fact_verification(self, statement: str) -> List[float]:
         """Embed a statement for fact verification."""
-        return self.embed_query(statement, task_type="FACT_VERIFICATION")
+        return self.embed_query_with_task(statement, task_type="FACT_VERIFICATION")
     
     async def aembed_documents(
         self,
@@ -263,7 +359,7 @@ class EnhancedGoogleEmbeddings:
         # For now, run sync version in executor
         # TODO: Implement true async when Google AI supports it
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self.embed_documents, texts, task_type)
+        return await loop.run_in_executor(None, self.embed_documents_with_task, texts, task_type)
     
     async def aembed_query(
         self,
@@ -272,7 +368,7 @@ class EnhancedGoogleEmbeddings:
     ) -> List[float]:
         """Async version of embed_query."""
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self.embed_query, text, task_type)
+        return await loop.run_in_executor(None, self.embed_query_with_task, text, task_type)
     
     def get_embedding_info(self) -> Dict[str, Any]:
         """Get information about the embedding configuration."""
