@@ -111,6 +111,7 @@ class ResearchSession(BaseModel):
     query: str
     status: str  # "pending", "running", "completed", "failed"
     prompt_type: str
+    report_type: str = "concise"  # Default report type
     created_at: datetime
     updated_at: datetime
     progress: int = 0  # 0-100
@@ -209,6 +210,7 @@ async def start_research(
             "status": "pending",
             "prompt_type": request.prompt_type,
             "automation_level": request.automation_level,
+            "report_type": "concise",  # Default report type
             "created_at": datetime.now(),
             "updated_at": datetime.now(),
             "progress": 0,
