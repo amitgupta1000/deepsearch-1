@@ -7,14 +7,15 @@ import logging
 
 # Import LLM and embeddings from llm_utils.py
 try:
-    from .llm_utils import llm, embeddings, llm_call_async
-    logging.info("Successfully imported LLMs, embeddings, and llm_call_async from llm_utils.py")
+    from .llm_utils import embeddings, llm_call_async
+    logging.info("Successfully imported embeddings and llm_call_async from llm_utils.py")
 except ImportError:
-    logging.error("Could not import LLMs, embeddings, or llm_call_async from llm_utils.py. LLM functionality will be limited.")
+    logging.error("Could not import embeddings or llm_call_async from llm_utils.py. LLM functionality will be limited.")
     # Define dummy variables to prevent NameError later, but warn the user
-    llm, embeddings = None, None
+    embeddings = None
     async def llm_call_async(messages):
         logging.error("llm_call_async is not available.")
+        return None
         return None
 
 logging.info("llm_calling.py loaded and attempted to import llm utilities.")
