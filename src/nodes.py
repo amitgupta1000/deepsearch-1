@@ -389,8 +389,6 @@ async def create_queries(state: AgentState) -> AgentState:
         query_writer_instructions = query_writer_instructions_legal
     elif prompt_type == "macro":
          query_writer_instructions = query_writer_instructions_macro
-    elif prompt_type == "general":
-         query_writer_instructions = query_writer_instructions_general
     elif prompt_type == "deepsearch":
          query_writer_instructions = query_writer_instructions_deepsearch
     elif prompt_type == "person_search":
@@ -1077,10 +1075,11 @@ async def extract_content(state: AgentState) -> AgentState:
     return state
 
 
-async def embed_index_and_extract(state: AgentState) -> AgentState:
+async def embed_and_retrieve(state: AgentState) -> AgentState:
     """
     Enhanced embedding, indexing, and retrieval using hybrid approach.
     Combines BM25 (sparse) and vector search (dense) for improved relevance.
+    Focuses only on creating relevant_chunks from relevant_contexts.
     """
     # Use color constants from setup if available
     try:
@@ -1092,7 +1091,7 @@ async def embed_index_and_extract(state: AgentState) -> AgentState:
     relevant_contexts = state.get("relevant_contexts", {})
     relevant_chunks = [] # Initialize relevant_chunks as a list of Documents
     errors = []
-    N_CHUNKS = 20 # Increased from 10 to 20 for better context coverage
+    N_CHUNKS = 30 # Increased from 10 to 30 for better context coverage
 
     # Retrieve current error state safely
     current_error_state = state.get('error')
@@ -1167,30 +1166,17 @@ async def embed_index_and_extract(state: AgentState) -> AgentState:
             logging.error(f"Hybrid retriever failed: {e}, falling back to standard approach")
             errors.append(f"Hybrid retriever error: {str(e)}")
 
-    # Fallback to existing FAISS-only approach
-    logging.info("Using fallback vector search approach")
-    
-    # Ensure necessary components are available
-    if not embeddings or not Document or not RecursiveCharacterTextSplitter:
-         errors.append("Required components for embedding/indexing (embeddings, Document, RecursiveCharacterTextSplitter) are not available.")
-         logging.error(errors[-1])
-         new_error = (str(current_error_state or '') + "\n" + "\n".join(errors)).strip() if errors else (current_error_state.strip() if current_error_state is not None else None)
-         state['error'] = None if new_error is None or new_error == "" else new_error
-         return state
+    # If hybrid retriever failed, there's no fallback chunking needed
+    # The hybrid retriever should handle both vector and BM25 internally
+    logging.error("Hybrid retriever failed and no fallback available")
+    errors.append("Hybrid retriever failed to build indices")
+    new_error = (str(current_error_state or '') + "\n" + "\n".join(errors)).strip() if errors else (current_error_state.strip() if current_error_state is not None else None)
+    state['error'] = None if new_error is None or new_error == "" else new_error
+    state["relevant_chunks"] = []
+    return state
 
-    # Check if FAISS is available
-    faiss_available = FAISS is not None
-    if not faiss_available:
-        logging.warning("FAISS not available. Using fallback text-based similarity search.")
 
-    # --- Embedding and Indexing Logic (with FAISS fallback) ---
-    logging.info("Processing %d relevant contexts for embedding and indexing%s.", 
-                 len(relevant_contexts), " using FAISS" if faiss_available else " using fallback method")
-
-    documents_content = []
-    document_metadatas = []
-
-    try:
+async def create_qa_pairs(state: AgentState) -> AgentState:
         # Initialize embedding model (already imported as embeddings)
         if not embeddings:
             error_msg = "Embeddings model not available - check Google API key configuration"
@@ -1402,11 +1388,42 @@ async def embed_index_and_extract(state: AgentState) -> AgentState:
 
 
     # Add logging to inspect the final state["relevant_chunks"]
-    logging.info("embed_index_and_extract: Final state['relevant_chunks'] contains %d items.", len(state.get('relevant_chunks', [])))
+    logging.info("embed_and_retrieve: Final state['relevant_chunks'] contains %d items.", len(state.get('relevant_chunks', [])))
 
-    # Create Q&A pairs with citations for each search query after chunks are available
+    return state
+
+async def create_qa_pairs(state: AgentState) -> AgentState:
+    """
+    Creates Q&A pairs with citations from relevant chunks for each search query.
+    Takes relevant_chunks from previous embedding/retrieval step and generates
+    structured Q&A pairs that will be used in the report appendix.
+    """
+    # Get relevant chunks and search queries from state
+    relevant_chunks = state.get("relevant_chunks", [])
     search_queries = state.get("search_queries", [])
-    if relevant_chunks and search_queries:
+    
+    # Retrieve current error state safely
+    current_error_state = state.get('error')
+    
+    logging.info(f"Creating Q&A pairs from {len(relevant_chunks)} chunks for {len(search_queries)} queries.")
+    
+    if not relevant_chunks:
+        logging.warning("No relevant chunks available for Q&A creation.")
+        state["qa_pairs"] = []
+        state["all_citations"] = []
+        new_error = (str(current_error_state or '') + "\nNo relevant chunks available for Q&A creation.").strip()
+        state['error'] = None if new_error == "" else new_error
+        return state
+    
+    if not search_queries:
+        logging.warning("No search queries available for Q&A creation.")
+        state["qa_pairs"] = []
+        state["all_citations"] = []
+        new_error = (str(current_error_state or '') + "\nNo search queries available for Q&A creation.").strip()
+        state['error'] = None if new_error == "" else new_error
+        return state
+    
+    try:
         qa_pairs = []
         all_citations = []
         citation_counter = 1
@@ -1463,11 +1480,15 @@ async def embed_index_and_extract(state: AgentState) -> AgentState:
         state["qa_pairs"] = qa_pairs
         state["all_citations"] = all_citations
         logging.info(f"Created {len(qa_pairs)} Q&A pairs with {len(all_citations)} total citations.")
-    else:
+        
+    except Exception as e:
+        error_msg = f"Error creating Q&A pairs: {e}"
+        logging.error(error_msg, exc_info=True)
         state["qa_pairs"] = []
         state["all_citations"] = []
-        logging.warning("No Q&A pairs created - missing relevant chunks or search queries.")
-
+        new_error = (str(current_error_state or '') + "\n" + error_msg).strip()
+        state['error'] = None if new_error == "" else new_error
+    
     return state
 
 async def AI_evaluate(state: AgentState) -> AgentState:
