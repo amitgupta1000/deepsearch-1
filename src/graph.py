@@ -40,7 +40,8 @@ try:
         user_approval_for_queries,
         evaluate_search_results,
         extract_content,
-        embed_index_and_extract,
+        embed_and_retrieve,
+        create_qa_pairs,
         AI_evaluate,
         choose_report_type,
         write_report,
@@ -62,8 +63,10 @@ if 'evaluate_search_results' in locals():
     workflow.add_node("evaluate_search_results", evaluate_search_results)
 if 'extract_content' in locals():
     workflow.add_node("extract_content", extract_content)
-if 'embed_index_and_extract' in locals():
-    workflow.add_node("embed_index_and_extract", embed_index_and_extract)
+if 'embed_and_retrieve' in locals():
+    workflow.add_node("embed_and_retrieve", embed_and_retrieve)
+if 'create_qa_pairs' in locals():
+    workflow.add_node("create_qa_pairs", create_qa_pairs)
 if 'AI_evaluate' in locals():
     workflow.add_node("AI_evaluate", AI_evaluate)
 if 'choose_report_type' in locals():
@@ -93,11 +96,14 @@ workflow.add_conditional_edges(
 if "evaluate_search_results" in workflow.nodes and "extract_content" in workflow.nodes:
     workflow.add_edge("evaluate_search_results", "extract_content")
 
-if "extract_content" in workflow.nodes and "embed_index_and_extract" in workflow.nodes:
-    workflow.add_edge("extract_content", "embed_index_and_extract")
+if "extract_content" in workflow.nodes and "embed_and_retrieve" in workflow.nodes:
+    workflow.add_edge("extract_content", "embed_and_retrieve")
 
-if "embed_index_and_extract" in workflow.nodes and "AI_evaluate" in workflow.nodes:
-    workflow.add_edge("embed_index_and_extract", "AI_evaluate")
+if "embed_and_retrieve" in workflow.nodes and "create_qa_pairs" in workflow.nodes:
+    workflow.add_edge("embed_and_retrieve", "create_qa_pairs")
+
+if "create_qa_pairs" in workflow.nodes and "AI_evaluate" in workflow.nodes:
+    workflow.add_edge("create_qa_pairs", "AI_evaluate")
 
 
 from .conditions import route_ai_evaluate
