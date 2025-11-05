@@ -28,6 +28,15 @@ except ImportError as e:
         def split_text(self, text): return [text]
     FAISS, BM25Retriever = None, None
 
+# Cross-encoder imports for semantic reranking
+try:
+    from sentence_transformers import CrossEncoder
+    CROSS_ENCODER_AVAILABLE = True
+except ImportError:
+    logging.warning("sentence-transformers not available. Cross-encoder reranking disabled.")
+    CrossEncoder = None
+    CROSS_ENCODER_AVAILABLE = False
+
 try:
     from rank_bm25 import BM25Okapi
 except ImportError:
@@ -123,6 +132,13 @@ class HybridRetrieverConfig:
     # Fusion strategy
     fusion_method: str = "rrf"  # "rrf" (Reciprocal Rank Fusion) or "weighted"
     rrf_k: int = 60  # RRF parameter
+    
+    # Cross-encoder reranking parameters
+    use_cross_encoder: bool = False  # Enable semantic reranking (disabled by default for performance)
+    cross_encoder_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"  # Fast model
+    cross_encoder_top_k: int = 50  # Retrieve fewer docs before reranking (was 100)
+    rerank_top_k: int = 20  # Final number after reranking
+    cross_encoder_batch_size: int = 32  # Process documents in batches
 
 
 class HybridRetriever:
@@ -139,6 +155,17 @@ class HybridRetriever:
         self.ensemble_retriever = None
         self.documents = []
         self.logger = logging.getLogger(__name__)
+        
+        # Initialize cross-encoder for semantic reranking
+        self.cross_encoder = None
+        if self.config.use_cross_encoder and CROSS_ENCODER_AVAILABLE:
+            try:
+                self.logger.info(f"Loading cross-encoder model: {self.config.cross_encoder_model}")
+                self.cross_encoder = CrossEncoder(self.config.cross_encoder_model)
+                self.logger.info("Cross-encoder loaded successfully")
+            except Exception as e:
+                self.logger.warning(f"Failed to load cross-encoder: {e}")
+                self.cross_encoder = None
         
     def build_index(self, relevant_contexts: Dict[str, Dict[str, str]]) -> bool:
         """
@@ -363,7 +390,10 @@ class HybridRetriever:
     
     def retrieve_with_query_responses(self, queries: List[str]) -> Tuple[List[Document], Dict[str, str]]:
         """
-        Retrieve documents and capture individual query responses.
+        OPTIMIZED: Retrieve documents using BATCHED query embeddings for better performance.
+        
+        Batches all query embeddings into a single API call instead of individual calls,
+        reducing API overhead and network latency significantly.
         
         Args:
             queries: List of search queries to use for retrieval
@@ -372,70 +402,195 @@ class HybridRetriever:
             Tuple of (all_documents, query_responses_dict)
         """
         try:
-            all_results = []
-            query_responses = {}
-            seen_docs = set()
+            if not queries:
+                return [], {}
+                
+            # Filter out empty queries
+            valid_queries = [q.strip() for q in queries if q.strip()]
+            if not valid_queries:
+                return [], {}
             
-            # Retrieve documents for each query and capture responses
-            for query in queries:
-                if not query.strip():
-                    continue
-                    
-                query_results = self.retrieve(query)
+            # 🚀 OPTIMIZATION: Try batched query embedding first
+            if len(valid_queries) > 1 and hasattr(self.embeddings, 'embed_documents'):
+                try:
+                    return self._retrieve_with_batched_queries(valid_queries)
+                except Exception as e:
+                    self.logger.warning(f"Batch query embedding failed, falling back to individual: {e}")
+                    # Fallback to individual processing
+            
+            # Fallback to original individual processing
+            return self._retrieve_individual_queries(valid_queries)
+            
+        except Exception as e:
+            self.logger.error(f"Error during multi-query retrieval with responses: {e}")
+            # Final fallback to single query
+            fallback_docs = self.retrieve(valid_queries[0] if valid_queries else "")
+            fallback_responses = {valid_queries[0]: "Fallback response due to error"} if valid_queries else {}
+            return fallback_docs, fallback_responses
+    
+    def _retrieve_with_batched_queries(self, valid_queries: List[str]) -> Tuple[List[Document], Dict[str, str]]:
+        """
+        Retrieve documents using batched query embeddings (1 API call instead of N).
+        """
+        self.logger.info(f"Using BATCHED query embedding for {len(valid_queries)} queries")
+        
+        all_results = []
+        query_responses = {}
+        seen_docs = set()
+        
+        # Batch embed all queries at once
+        if hasattr(self.embeddings, 'default_task_type'):
+            # Enhanced embeddings with task type support
+            original_task = getattr(self.embeddings, 'default_task_type', "RETRIEVAL_QUERY")
+            self.embeddings.default_task_type = "RETRIEVAL_QUERY"
+            query_embeddings = self.embeddings.embed_documents(valid_queries)
+            self.embeddings.default_task_type = original_task
+        else:
+            # Standard embeddings
+            query_embeddings = self.embeddings.embed_documents(valid_queries)
+        
+        self.logger.info(f"Successfully batch embedded {len(valid_queries)} queries in 1 API call")
+        
+        # Process each query with its pre-computed embedding
+        for i, query in enumerate(valid_queries):
+            query_embedding = query_embeddings[i]
+            query_results = self._retrieve_with_precomputed_embedding(query, query_embedding)
+            
+            # Create response summary for this query
+            if query_results:
+                top_docs = query_results[:3]  # Top 3 for concise response
+                response_parts = []
                 
-                # Create response summary for this query
-                if query_results:
-                    # Take top documents for this query's response
-                    top_docs = query_results[:3]  # Top 3 for concise response
-                    response_parts = []
-                    
-                    for doc in top_docs:
-                        # Extract key information from document
-                        content = doc.page_content[:200]  # First 200 chars
-                        source = doc.metadata.get('source', 'Unknown')
-                        title = doc.metadata.get('title', 'Untitled')
-                        
-                        response_parts.append(f"From {title} ({source}): {content}...")
-                    
-                    query_responses[query] = "\n\n".join(response_parts)
-                else:
-                    query_responses[query] = "No relevant information found for this query."
+                for doc in top_docs:
+                    content = doc.page_content[:200]  # First 200 chars
+                    source = doc.metadata.get('source', 'Unknown')
+                    title = doc.metadata.get('title', 'Untitled')
+                    response_parts.append(f"From {title} ({source}): {content}...")
                 
-                # Add documents to combined results (with deduplication)
-                for doc in query_results:
-                    doc_key = self._get_doc_key(doc)
-                    
-                    if doc_key not in seen_docs:
-                        all_results.append(doc)
-                        seen_docs.add(doc_key)
-                    
-                    # Stop if we have enough results
-                    if len(all_results) >= self.config.top_k:
-                        break
+                query_responses[query] = "\n\n".join(response_parts)
+            else:
+                query_responses[query] = "No relevant information found for this query."
+            
+            # Add documents to combined results (with deduplication)
+            for doc in query_results:
+                doc_key = self._get_doc_key(doc)
+                if doc_key not in seen_docs:
+                    all_results.append(doc)
+                    seen_docs.add(doc_key)
                 
                 if len(all_results) >= self.config.top_k:
                     break
             
-            # Re-rank combined results if we have more than needed
-            if len(all_results) > self.config.top_k:
-                primary_query = queries[0] if queries else ""
-                ranked_results = self._rerank_multi_query_results(primary_query, all_results)
-                all_results = ranked_results[:self.config.top_k]
+            if len(all_results) >= self.config.top_k:
+                break
+        
+        # Re-rank combined results if needed
+        if len(all_results) > self.config.top_k:
+            primary_query = valid_queries[0]
+            ranked_results = self._rerank_multi_query_results(primary_query, all_results)
+            all_results = ranked_results[:self.config.top_k]
+        
+        self.logger.info(f"Batched multi-query retrieval returned {len(all_results)} documents and {len(query_responses)} query responses")
+        return all_results, query_responses
+    
+    def _retrieve_with_precomputed_embedding(self, query: str, query_embedding: List[float]) -> List[Document]:
+        """
+        Retrieve documents using pre-computed query embedding (no additional API call).
+        """
+        try:
+            vector_results = []
+            bm25_results = []
             
-            self.logger.info(f"Multi-query retrieval with responses returned {len(all_results)} documents and {len(query_responses)} query responses")
-            return all_results, query_responses
+            # Vector search with pre-computed embedding
+            if self.vector_store and hasattr(self.vector_store, 'similarity_search_by_vector'):
+                try:
+                    vector_docs = self.vector_store.similarity_search_by_vector(
+                        query_embedding,
+                        k=self.config.top_k * 2  # Get more candidates for fusion
+                    )
+                    vector_results = [(doc, 1.0) for doc in vector_docs]  # Placeholder scores
+                except Exception as e:
+                    self.logger.warning(f"Vector search with pre-computed embedding failed: {e}")
+            
+            # BM25 search (doesn't need embedding)
+            if self.bm25_retriever:
+                try:
+                    bm25_docs = self.bm25_retriever.invoke(query)
+                    bm25_results = [(doc, 1.0) for doc in bm25_docs]
+                except Exception as e:
+                    self.logger.warning(f"BM25 search failed: {e}")
+            
+            # Fuse results
+            if self.config.fusion_method == "rrf":
+                fused_results = self._reciprocal_rank_fusion(vector_results, bm25_results)
+            else:
+                fused_results = self._weighted_fusion(vector_results, bm25_results)
+            
+            return fused_results[:self.config.top_k]
             
         except Exception as e:
-            self.logger.error(f"Error during multi-query retrieval with responses: {e}")
-            # Fallback to single query
-            fallback_docs = self.retrieve(queries[0] if queries else "")
-            fallback_responses = {queries[0]: "Fallback response due to error"} if queries else {}
-            return fallback_docs, fallback_responses
+            self.logger.error(f"Error in _retrieve_with_precomputed_embedding: {e}")
+            return []
+    
+    def _retrieve_individual_queries(self, valid_queries: List[str]) -> Tuple[List[Document], Dict[str, str]]:
+        """
+        Fallback method: retrieve queries individually (original behavior).
+        """
+        self.logger.info(f"Using INDIVIDUAL query processing for {len(valid_queries)} queries")
+        
+        all_results = []
+        query_responses = {}
+        seen_docs = set()
+        
+        # Process each query individually (original logic)
+        for query in valid_queries:
+            query_results = self.retrieve(query)
+            
+            # Create response summary for this query
+            if query_results:
+                top_docs = query_results[:3]
+                response_parts = []
+                
+                for doc in top_docs:
+                    content = doc.page_content[:200]
+                    source = doc.metadata.get('source', 'Unknown')
+                    title = doc.metadata.get('title', 'Untitled')
+                    response_parts.append(f"From {title} ({source}): {content}...")
+                
+                query_responses[query] = "\n\n".join(response_parts)
+            else:
+                query_responses[query] = "No relevant information found for this query."
+            
+            # Add documents to combined results (with deduplication)
+            for doc in query_results:
+                doc_key = self._get_doc_key(doc)
+                if doc_key not in seen_docs:
+                    all_results.append(doc)
+                    seen_docs.add(doc_key)
+                
+                if len(all_results) >= self.config.top_k:
+                    break
+            
+            if len(all_results) >= self.config.top_k:
+                break
+        
+        # Re-rank combined results if needed
+        if len(all_results) > self.config.top_k:
+            primary_query = valid_queries[0]
+            ranked_results = self._rerank_multi_query_results(primary_query, all_results)
+            all_results = ranked_results[:self.config.top_k]
+        
+        self.logger.info(f"Individual multi-query retrieval returned {len(all_results)} documents and {len(query_responses)} query responses")
+        return all_results, query_responses
     
     def _rerank_multi_query_results(self, primary_query: str, documents: List[Document]) -> List[Document]:
         """Re-rank results from multiple queries using the primary query."""
         try:
-            # Simple scoring based on primary query keyword overlap
+            # Use cross-encoder semantic reranking if available
+            if self.cross_encoder is not None:
+                return self._rerank_with_cross_encoder(primary_query, documents)
+            
+            # Fallback to simple scoring based on primary query keyword overlap
             query_words = set(primary_query.lower().split())
             
             scored_docs = []
@@ -460,6 +615,48 @@ class HybridRetriever:
         except Exception as e:
             self.logger.error(f"Error re-ranking multi-query results: {e}")
             return documents
+    
+    def _rerank_with_cross_encoder(self, query: str, documents: List[Document]) -> List[Document]:
+        """Re-rank documents using cross-encoder semantic scoring with batch processing."""
+        try:
+            if not documents:
+                return documents
+            
+            self.logger.debug(f"Cross-encoder reranking {len(documents)} documents")
+            
+            # Limit documents to cross_encoder_top_k to reduce processing time
+            docs_to_process = documents[:self.config.cross_encoder_top_k]
+            
+            # Create query-document pairs for cross-encoder
+            pairs = [(query, doc.page_content) for doc in docs_to_process]
+            
+            # Process in batches for better performance
+            all_scores = []
+            batch_size = self.config.cross_encoder_batch_size
+            
+            for i in range(0, len(pairs), batch_size):
+                batch_pairs = pairs[i:i + batch_size]
+                batch_scores = self.cross_encoder.predict(batch_pairs)
+                
+                if hasattr(batch_scores, 'tolist'):
+                    batch_scores = batch_scores.tolist()
+                
+                all_scores.extend(batch_scores)
+            
+            # Combine documents with scores and sort by relevance
+            scored_docs = list(zip(all_scores, docs_to_process))
+            scored_docs.sort(key=lambda x: x[0], reverse=True)
+            
+            # Return top documents (limit to rerank_top_k)
+            top_docs = [doc for score, doc in scored_docs[:self.config.rerank_top_k]]
+            
+            self.logger.debug(f"Cross-encoder reranking completed: {len(docs_to_process)} -> {len(top_docs)} documents")
+            return top_docs
+            
+        except Exception as e:
+            self.logger.error(f"Error in cross-encoder reranking: {e}")
+            # Fallback to original order
+            return documents[:self.config.rerank_top_k]
     
     def _retrieve_ensemble(self, query: str) -> List[Document]:
         """Retrieve using LangChain ensemble retriever."""

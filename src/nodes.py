@@ -167,6 +167,12 @@ try:
             MIN_WORD_COUNT,
             USE_RERANKING,
             RERANKER_CANDIDATES_MULTIPLIER,
+            # Cross-encoder reranking configuration
+            USE_CROSS_ENCODER_RERANKING,
+            CROSS_ENCODER_MODEL,
+            CROSS_ENCODER_TOP_K,
+            RERANK_TOP_K,
+            CROSS_ENCODER_BATCH_SIZE,
             # Enhanced embedding configuration
             USE_ENHANCED_EMBEDDINGS,
             EMBEDDING_TASK_TYPE,
@@ -1120,7 +1126,13 @@ async def embed_and_retrieve(state: AgentState) -> AgentState:
                 chunk_overlap=CHUNK_OVERLAP,
                 score_threshold=VECTOR_SCORE_THRESHOLD,
                 min_chunk_length=MIN_CHUNK_LENGTH,
-                min_word_count=MIN_WORD_COUNT
+                min_word_count=MIN_WORD_COUNT,
+                # Cross-encoder reranking configuration
+                use_cross_encoder=USE_CROSS_ENCODER_RERANKING,
+                cross_encoder_model=CROSS_ENCODER_MODEL,
+                cross_encoder_top_k=CROSS_ENCODER_TOP_K,
+                rerank_top_k=RERANK_TOP_K,
+                cross_encoder_batch_size=CROSS_ENCODER_BATCH_SIZE
             )
             
             # Build indices
@@ -1166,8 +1178,6 @@ async def embed_and_retrieve(state: AgentState) -> AgentState:
             logging.error(f"Hybrid retriever failed: {e}, falling back to standard approach")
             errors.append(f"Hybrid retriever error: {str(e)}")
 
-    # If hybrid retriever failed, there's no fallback chunking needed
-    # The hybrid retriever should handle both vector and BM25 internally
     logging.error("Hybrid retriever failed and no fallback available")
     errors.append("Hybrid retriever failed to build indices")
     new_error = (str(current_error_state or '') + "\n" + "\n".join(errors)).strip() if errors else (current_error_state.strip() if current_error_state is not None else None)
@@ -1423,7 +1433,7 @@ unified_report_instruction = (
     "Format each pair as: **Q: [search query]** followed by **A: [detailed answer with citations [1], [2], etc.]**. "
     "Include all sources and citations at the end. "
     "This appendix serves as supporting evidence for the main IntelliSearch response."
-    "\n\nTotal length: 500-3000 words. Use clear markdown formatting with proper headings."
+    "\n\n Use clear markdown formatting with proper headings."
 )
 #=============================================================================================
 

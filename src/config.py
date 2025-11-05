@@ -149,8 +149,15 @@ QUERY_CHUNK_DISTRIBUTION = get_env_bool("QUERY_CHUNK_DISTRIBUTION", True)     # 
 
 # Enable/disable features
 USE_HYBRID_RETRIEVAL = get_env_bool("USE_HYBRID_RETRIEVAL", True)  # Enable hybrid approach
-USE_RERANKING = get_env_bool("USE_RERANKING", False)               # Post-retrieval reranking
+USE_RERANKING = get_env_bool("USE_RERANKING", True)                # Post-retrieval reranking (now enabled)
 RERANKER_CANDIDATES_MULTIPLIER = get_env_int("RERANKER_CANDIDATES_MULTIPLIER", 3)
+
+# Cross-encoder reranking configuration
+USE_CROSS_ENCODER_RERANKING = get_env_bool("USE_CROSS_ENCODER_RERANKING", False)  # Disabled by default (performance)
+CROSS_ENCODER_MODEL = os.getenv("CROSS_ENCODER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")  # Fast model
+CROSS_ENCODER_TOP_K = get_env_int("CROSS_ENCODER_TOP_K", 50)       # Fewer docs to rerank (was 100)
+RERANK_TOP_K = get_env_int("RERANK_TOP_K", 20)                     # Final docs after reranking
+CROSS_ENCODER_BATCH_SIZE = get_env_int("CROSS_ENCODER_BATCH_SIZE", 32)  # Process in batches
 
 # Legacy support
 MAX_RESULTS = MAX_SEARCH_RESULTS  # Backward compatibility
@@ -317,6 +324,7 @@ __all__ = [
     'HYBRID_FUSION_METHOD', 'HYBRID_RRF_K', 'VECTOR_SCORE_THRESHOLD',
     'RETRIEVAL_TOP_K', 'USE_HYBRID_RETRIEVAL', 'USE_RERANKING',
     'USE_MULTI_QUERY_RETRIEVAL', 'MAX_RETRIEVAL_QUERIES', 'QUERY_CHUNK_DISTRIBUTION',
+    'USE_CROSS_ENCODER_RERANKING', 'CROSS_ENCODER_MODEL', 'CROSS_ENCODER_TOP_K', 'RERANK_TOP_K', 'CROSS_ENCODER_BATCH_SIZE',
     
     # Reports
     'REPORT_FORMAT', 'REPORT_FILENAME_TEXT', 'REPORT_FILENAME_PDF',

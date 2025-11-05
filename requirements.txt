@@ -52,6 +52,9 @@ faiss-cpu>=1.7.4
 # Cross-encoder reranking for enhanced retrieval quality
 sentence-transformers>=3.0.0 
 
+# Hugging Face optimized downloads (improves model download performance)
+hf_xet>=1.2.0
+
 # ============================================================================
 # UTILITIES & PERFORMANCE
 # ============================================================================
