@@ -43,11 +43,8 @@ except ImportError:
 
 try:
     from langchain_core.messages import (
-        AnyMessage,
-        AIMessage,
         SystemMessage,
         HumanMessage,
-        ToolMessage,
     )
     LANGCHAIN_MESSAGES_AVAILABLE = True
 except ImportError:
@@ -63,11 +60,8 @@ except ImportError:
         def __str__(self):
             return f"{self.__class__.__name__}(content='{self.content}')"
     
-    class AnyMessage(BaseMessage): pass
-    class AIMessage(BaseMessage): pass
     class SystemMessage(BaseMessage): pass
     class HumanMessage(BaseMessage): pass
-    class ToolMessage(BaseMessage): pass
     
     LANGCHAIN_MESSAGES_AVAILABLE = False
 
@@ -326,13 +320,11 @@ except ImportError:
 from typing import TypedDict, Union
 class AgentState(TypedDict):
     new_query: Optional[str]
-    reasoning_mode: bool
-    new_queries: Optional[List[str]] # Not used in current flow, consider removal
     search_queries: Optional[List[str]] # The primary list of queries
     rationale: Optional[str]
     data: Optional[List[SearchResult]] # List of SearchResult objects after evaluation
     relevant_contexts: Optional[Dict[str, Dict[str, str]]] # Extracted content and metadata from relevant URLs
-    relevant_chunks: Optional[List[Document]] # Relevant chunks extracted from contexts per query (deprecated in favor of qa_pairs)
+    relevant_chunks: Optional[List[Document]] # Relevant chunks used for Q&A pair creation
     retriever_responses: Optional[Dict[str, str]] # Query-answer pairs from retrieval process
     qa_pairs: Optional[List[Dict]] # Q&A pairs with citations for appendix section
     all_citations: Optional[List[Dict]] # All citations used in the report
@@ -575,7 +567,6 @@ async def user_approval_for_queries(state: AgentState) -> AgentState:
                 state['search_queries'] = []
                 state['data'] = []
                 state['relevant_contexts'] = {}
-                state['relevant_chunks'] = []
                 state['visited_urls'] = []
                 state['iteration_count'] = 0
                 state['approval_iteration_count'] = 0
@@ -616,7 +607,6 @@ async def user_approval_for_queries(state: AgentState) -> AgentState:
                 state['search_queries'] = []
                 state['data'] = []
                 state['relevant_contexts'] = {}
-                state['relevant_chunks'] = []
                 state['visited_urls'] = []
                 state['iteration_count'] = 0
                 state['approval_iteration_count'] = 0
@@ -642,7 +632,6 @@ async def user_approval_for_queries(state: AgentState) -> AgentState:
         state['search_queries'] = []
         state['data'] = []
         state['relevant_contexts'] = {}
-        state['relevant_chunks'] = []
         state['visited_urls'] = []
         state['iteration_count'] = 0
         state['approval_iteration_count'] = 0
@@ -1111,7 +1100,6 @@ async def embed_index_and_extract(state: AgentState) -> AgentState:
     # Check if we have contexts to process
     if not relevant_contexts:
         logging.warning("No relevant contexts found for embedding and retrieval.")
-        state["relevant_chunks"] = []
         new_error = (str(current_error_state or '') + "\nNo relevant contexts found for embedding and retrieval.").strip()
         state['error'] = None if new_error == "" else new_error
         return state
@@ -1186,7 +1174,6 @@ async def embed_index_and_extract(state: AgentState) -> AgentState:
     if not embeddings or not Document or not RecursiveCharacterTextSplitter:
          errors.append("Required components for embedding/indexing (embeddings, Document, RecursiveCharacterTextSplitter) are not available.")
          logging.error(errors[-1])
-         state["relevant_chunks"] = [] # Ensure relevant_chunks is initialized
          new_error = (str(current_error_state or '') + "\n" + "\n".join(errors)).strip() if errors else (current_error_state.strip() if current_error_state is not None else None)
          state['error'] = None if new_error is None or new_error == "" else new_error
          return state
@@ -1209,7 +1196,6 @@ async def embed_index_and_extract(state: AgentState) -> AgentState:
             error_msg = "Embeddings model not available - check Google API key configuration"
             errors.append(error_msg)
             logging.error(error_msg)
-            state["relevant_chunks"] = []
             new_error = (str(current_error_state or '') + "\n" + error_msg).strip()
             state['error'] = None if new_error == "" else new_error
             return state
@@ -1852,7 +1838,6 @@ async def write_report(state: AgentState):
     # Keep qa_pairs and all_citations for potential future use (e.g., follow-up queries)
     state['data'] = []  # Clear search results
     state['relevant_contexts'] = {}  # Clear extracted content
-    state['relevant_chunks'] = []  # Clear deprecated chunks
     state['suggested_follow_up_queries'] = []  # Clear follow-up queries
     state['knowledge_gap'] = ""  # Clear gap information
     state['rationale'] = ""  # Clear rationale

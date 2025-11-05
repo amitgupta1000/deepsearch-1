@@ -29,7 +29,6 @@ async def test_run_degraded_workflow(monkeypatch, tmp_path):
 
     initial_state: AgentState = {
         "new_query": "test query",
-        "reasoning_mode": True,
         "search_queries": [],
         "rationale": None,
         "data": [],
@@ -64,7 +63,6 @@ async def test_investment_research_prompts():
     
     investment_state: AgentState = {
         "new_query": "Investment analysis of Reliance Industries Ltd",
-        "reasoning_mode": True,
         "search_queries": [],
         "rationale": None,
         "data": [],

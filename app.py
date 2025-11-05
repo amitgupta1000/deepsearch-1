@@ -114,7 +114,6 @@ async def run_workflow(
     # Define the initial state for the graph
     initial_state = {
         "new_query": initial_query,
-        "reasoning_mode": True,  # Set to True by default for unified approach
         "search_queries": [],
         "rationale": None,
         "data": [],
