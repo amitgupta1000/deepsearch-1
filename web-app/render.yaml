@@ -13,6 +13,14 @@ services:
         sync: false
       - key: ENVIRONMENT
         value: production
+      - key: USE_CROSS_ENCODER_RERANKING
+        value: true
+      - key: CROSS_ENCODER_MODEL
+        value: cross-encoder/ms-marco-MiniLM-L-6-v2
+      - key: CROSS_ENCODER_TOP_K
+        value: 30
+      - key: RERANK_TOP_K
+        value: 15
     
   - type: static
     name: intellisearch-frontend

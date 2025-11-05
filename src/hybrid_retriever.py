@@ -30,11 +30,12 @@ except ImportError as e:
 
 # Cross-encoder imports for semantic reranking
 try:
-    from sentence_transformers import CrossEncoder
+    from .cross_encoder import create_cross_encoder, OptimizedCrossEncoder
     CROSS_ENCODER_AVAILABLE = True
 except ImportError:
-    logging.warning("sentence-transformers not available. Cross-encoder reranking disabled.")
-    CrossEncoder = None
+    logging.warning("Optimized cross-encoder not available. Cross-encoder reranking disabled.")
+    create_cross_encoder = None
+    OptimizedCrossEncoder = None
     CROSS_ENCODER_AVAILABLE = False
 
 try:
@@ -156,15 +157,38 @@ class HybridRetriever:
         self.documents = []
         self.logger = logging.getLogger(__name__)
         
-        # Initialize cross-encoder for semantic reranking
+        # Initialize optimized cross-encoder for semantic reranking
         self.cross_encoder = None
         if self.config.use_cross_encoder and CROSS_ENCODER_AVAILABLE:
             try:
-                self.logger.info(f"Loading cross-encoder model: {self.config.cross_encoder_model}")
-                self.cross_encoder = CrossEncoder(self.config.cross_encoder_model)
-                self.logger.info("Cross-encoder loaded successfully")
+                self.logger.info(f"Initializing optimized cross-encoder: {self.config.cross_encoder_model}")
+                
+                # Map model name to tier
+                model_tier = "fast"  # Default
+                if "L-12" in self.config.cross_encoder_model:
+                    model_tier = "balanced"
+                elif "electra" in self.config.cross_encoder_model:
+                    model_tier = "quality"
+                
+                # Create optimized cross-encoder with caching
+                self.cross_encoder = create_cross_encoder(
+                    model_tier=model_tier,
+                    top_k=self.config.cross_encoder_top_k,
+                    final_k=self.config.rerank_top_k,
+                    batch_size=self.config.cross_encoder_batch_size,
+                    enable_caching=True  # Enable model caching for performance
+                )
+                
+                if self.cross_encoder.is_available():
+                    self.logger.info("Optimized cross-encoder initialized successfully")
+                    model_info = self.cross_encoder.get_model_info()
+                    self.logger.info(f"Model info: {model_info['model_name']} ({model_info['estimated_size_mb']}MB)")
+                else:
+                    self.logger.warning("Optimized cross-encoder not available")
+                    self.cross_encoder = None
+                    
             except Exception as e:
-                self.logger.warning(f"Failed to load cross-encoder: {e}")
+                self.logger.warning(f"Failed to initialize optimized cross-encoder: {e}")
                 self.cross_encoder = None
         
     def build_index(self, relevant_contexts: Dict[str, Dict[str, str]]) -> bool:
@@ -617,45 +641,23 @@ class HybridRetriever:
             return documents
     
     def _rerank_with_cross_encoder(self, query: str, documents: List[Document]) -> List[Document]:
-        """Re-rank documents using cross-encoder semantic scoring with batch processing."""
+        """Re-rank documents using optimized cross-encoder."""
         try:
-            if not documents:
+            if not documents or not self.cross_encoder:
                 return documents
             
-            self.logger.debug(f"Cross-encoder reranking {len(documents)} documents")
+            self.logger.debug(f"Optimized cross-encoder reranking {len(documents)} documents")
             
-            # Limit documents to cross_encoder_top_k to reduce processing time
-            docs_to_process = documents[:self.config.cross_encoder_top_k]
+            # Use the optimized cross-encoder's rerank_documents method
+            # It handles batching, scoring, and result limiting internally
+            reranked_docs = self.cross_encoder.rerank_documents(query, documents)
             
-            # Create query-document pairs for cross-encoder
-            pairs = [(query, doc.page_content) for doc in docs_to_process]
-            
-            # Process in batches for better performance
-            all_scores = []
-            batch_size = self.config.cross_encoder_batch_size
-            
-            for i in range(0, len(pairs), batch_size):
-                batch_pairs = pairs[i:i + batch_size]
-                batch_scores = self.cross_encoder.predict(batch_pairs)
-                
-                if hasattr(batch_scores, 'tolist'):
-                    batch_scores = batch_scores.tolist()
-                
-                all_scores.extend(batch_scores)
-            
-            # Combine documents with scores and sort by relevance
-            scored_docs = list(zip(all_scores, docs_to_process))
-            scored_docs.sort(key=lambda x: x[0], reverse=True)
-            
-            # Return top documents (limit to rerank_top_k)
-            top_docs = [doc for score, doc in scored_docs[:self.config.rerank_top_k]]
-            
-            self.logger.debug(f"Cross-encoder reranking completed: {len(docs_to_process)} -> {len(top_docs)} documents")
-            return top_docs
+            self.logger.debug(f"Cross-encoder reranking completed: {len(documents)} -> {len(reranked_docs)} documents")
+            return reranked_docs
             
         except Exception as e:
-            self.logger.error(f"Error in cross-encoder reranking: {e}")
-            # Fallback to original order
+            self.logger.error(f"Error in optimized cross-encoder reranking: {e}")
+            # Fallback to original order with limit
             return documents[:self.config.rerank_top_k]
     
     def _retrieve_ensemble(self, query: str) -> List[Document]:
