@@ -21,6 +21,10 @@
     @apply bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md;
   }
   
+  .btn-secondary-sm {
+    @apply bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-1 px-2 rounded-md transition-all duration-200 shadow-sm hover:shadow-md text-xs;
+  }
+  
   .card {
     @apply bg-white rounded-xl shadow-sm border border-gray-200 transition-all duration-200 hover:shadow-md;
   }

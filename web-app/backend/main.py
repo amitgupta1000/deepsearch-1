@@ -306,6 +306,7 @@ async def get_research_result(
 async def download_report(
     session_id: str, 
     format: str = "txt",
+    content_type: str = "full",  # New parameter: "full", "analysis", or "appendix"
     user_id: str = Depends(verify_api_key_with_rate_limit)
 ):
     """Download the research report as a text or PDF file (requires API key authentication)"""
@@ -324,24 +325,45 @@ async def download_report(
     # Validate format parameter
     if format not in ["txt", "pdf"]:
         raise HTTPException(status_code=400, detail="Format must be either 'txt' or 'pdf'")
+        
+    # Validate content_type parameter
+    if content_type not in ["full", "analysis", "appendix"]:
+        raise HTTPException(status_code=400, detail="Content type must be 'full', 'analysis', or 'appendix'")
+    
+    # Determine content and filename based on content_type
+    if content_type == "appendix":
+        content_source = session.get("appendix_content") or session.get("report_content", "")
+        filename_suffix = "appendix"
+        file_suffix = "_appendix"
+    elif content_type == "analysis":
+        content_source = session.get("analysis_content") or session.get("report_content", "")
+        filename_suffix = "analysis"  
+        file_suffix = "_analysis"
+    else:  # full
+        content_source = session.get("full_report_content") or session.get("report_content", "")
+        filename_suffix = "report"
+        file_suffix = ""
     
     # Determine file path and media type based on format
     if format == "pdf":
-        # Look for PDF file (replace .txt extension with .pdf)
+        # Look for PDF file
         text_path = os.path.join("..", "..", session["report_filename"])
-        pdf_path = text_path.replace(".txt", ".pdf")
+        if file_suffix:
+            pdf_path = text_path.replace(".txt", f"{file_suffix}.pdf")
+        else:
+            pdf_path = text_path.replace(".txt", ".pdf")
         file_path = pdf_path
         media_type = "application/pdf"
-        filename = f"intellisearch-report-{session_id[:8]}.pdf"
+        filename = f"intellisearch-{filename_suffix}-{session_id[:8]}.pdf"
         
-        # If PDF doesn't exist, try to generate it from the report content
-        if not os.path.exists(file_path) and session.get("report_content"):
+        # If PDF doesn't exist, try to generate it from the content
+        if not os.path.exists(file_path) and content_source:
             try:
                 logger.info(f"PDF file not found, generating on-demand: {file_path}")
                 
                 # Import PDF generation function
                 from src.utils import generate_pdf_from_md
-                result = generate_pdf_from_md(session["report_content"], pdf_path)
+                result = generate_pdf_from_md(content_source, pdf_path)
                 
                 if "successfully" in result.lower():
                     logger.info("PDF generated successfully on-demand")
@@ -352,10 +374,14 @@ async def download_report(
                 logger.error(f"Failed to generate PDF on-demand: {pdf_error}")
         
     else:
-        # Default to text file
-        file_path = os.path.join("..", "..", session["report_filename"])
+        # Text file
+        text_path = os.path.join("..", "..", session["report_filename"])
+        if file_suffix:
+            file_path = text_path.replace(".txt", f"{file_suffix}.txt")
+        else:
+            file_path = text_path
         media_type = "text/plain"
-        filename = f"intellisearch-report-{session_id[:8]}.txt"
+        filename = f"intellisearch-{filename_suffix}-{session_id[:8]}.txt"
     
     if os.path.exists(file_path):
         return FileResponse(
@@ -365,7 +391,7 @@ async def download_report(
         )
     else:
         format_name = "PDF" if format == "pdf" else "text"
-        raise HTTPException(status_code=404, detail=f"Report {format_name} file not found")
+        raise HTTPException(status_code=404, detail=f"{filename_suffix.title()} {format_name} file not found")
 
 # List all research sessions
 @app.get("/api/research/sessions")
@@ -472,7 +498,10 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
             logger.info(f"Workflow completed successfully")
             
             # Extract results from the final state
-            report_content = final_state.get("report", "No report generated")
+            report_content = final_state.get("report", "No report generated")  # Display content (analysis only)
+            full_report_content = final_state.get("full_report_content", report_content)  # Full report for download
+            appendix_content = final_state.get("appendix_content", "")  # Appendix for separate download
+            analysis_content = final_state.get("analysis_content", report_content)  # Analysis for separate download
             sources = final_state.get("sources", [])
             citations = final_state.get("citations", [])
             
@@ -514,7 +543,10 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
         session["status"] = "completed"
         session["progress"] = 100
         session["current_step"] = "Research completed successfully"
-        session["report_content"] = report_content
+        session["report_content"] = report_content  # Display content (analysis only)
+        session["full_report_content"] = full_report_content  # Full report for download
+        session["appendix_content"] = appendix_content  # Appendix for separate download  
+        session["analysis_content"] = analysis_content  # Analysis for separate download
         session["sources"] = sources
         session["citations"] = citations
         session["updated_at"] = datetime.now()

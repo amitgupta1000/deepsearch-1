@@ -124,6 +124,19 @@ except ImportError:
     def enhance_report_readability(content: str) -> str:
         """Fallback readability enhancement function"""
         return content
+    
+    def get_current_date() -> str:
+        """Fallback current date function"""
+        from datetime import datetime
+        return datetime.now().strftime("%B %d, %Y")
+    
+    def save_report_to_text(content: str, filename: str) -> str:
+        """Fallback save function"""
+        return filename
+    
+    def generate_pdf_from_md(content: str, filename: str) -> str:
+        """Fallback PDF generation function"""
+        return "PDF generation not available"
 
 # Note: question_analyzer module is not needed as LLM-based query generation 
 # in create_queries() provides superior question analysis and query generation
@@ -1619,30 +1632,72 @@ async def write_report(state: AgentState):
             else:
                 part3_appendix += f"**[{citation['number']}]** {source_info}\n\n"
 
-    # Combine all parts
-    final_report_content = part1_query + part2_response + part3_appendix
+    # Create separate content for display vs download
+    # For display: Show User Query (Part 1) + IntelliSearch Analysis (Part 2)
+    display_content = part1_query + part2_response
+    display_content += f"\n---\n\n*📅 Analysis generated on {get_current_date()}*  \n*🔬 Powered by INTELLISEARCH Research Platform*\n"
+    
+    # For download: Full report with all parts
+    full_report_content = part1_query + part2_response + part3_appendix
+    full_report_content += f"\n---\n\n*📅 Report generated on {get_current_date()}*  \n*🔬 Powered by INTELLISEARCH Research Platform*\n"
+    
+    # For appendix download: Just the appendix section
+    appendix_content = part3_appendix
+    appendix_content += f"\n---\n\n*📅 Appendix generated on {get_current_date()}*  \n*🔬 Powered by INTELLISEARCH Research Platform*\n"
 
-    # Add professional metadata footer
-    final_report_content += f"\n---\n\n*📅 Report generated on {get_current_date()}*  \n*🔬 Powered by INTELLISEARCH Research Platform*\n"
+    logging.info("Three-part report generated successfully with separate display and download content.")
 
-    logging.info("Three-part report generated successfully.")
-
-    # Save to files
-    text_filename = save_report_to_text(final_report_content, REPORT_FILENAME_TEXT)
+    # Save full report to files (for backward compatibility and full downloads)
+    text_filename = save_report_to_text(full_report_content, REPORT_FILENAME_TEXT)
     if not text_filename:
         errors.append(f"Failed to save report to text file: {REPORT_FILENAME_TEXT}.")
         logging.error(errors[-1])
 
-    pdf_result_message = generate_pdf_from_md(final_report_content, REPORT_FILENAME_PDF)
+    pdf_result_message = generate_pdf_from_md(full_report_content, REPORT_FILENAME_PDF)
     if "Error generating PDF" in pdf_result_message:
         errors.append(pdf_result_message)
         logging.error(pdf_result_message)
     else:
         logging.info(pdf_result_message)
 
-    # Update state
-    state["report"] = final_report_content
-    state["report_filename"] = text_filename
+    # Save appendix separately for download
+    appendix_filename_text = REPORT_FILENAME_TEXT.replace(".txt", "_appendix.txt")
+    appendix_text_filename = save_report_to_text(appendix_content, appendix_filename_text)
+    if not appendix_text_filename:
+        errors.append(f"Failed to save appendix to text file: {appendix_filename_text}.")
+        logging.error(errors[-1])
+
+    appendix_filename_pdf = REPORT_FILENAME_PDF.replace(".pdf", "_appendix.pdf")
+    appendix_pdf_result = generate_pdf_from_md(appendix_content, appendix_filename_pdf)
+    if "Error generating PDF" in appendix_pdf_result:
+        errors.append(appendix_pdf_result)
+        logging.error(appendix_pdf_result)
+    else:
+        logging.info(appendix_pdf_result)
+
+    # Save analysis separately for download
+    analysis_filename_text = REPORT_FILENAME_TEXT.replace(".txt", "_analysis.txt")
+    analysis_text_filename = save_report_to_text(display_content, analysis_filename_text)
+    if not analysis_text_filename:
+        errors.append(f"Failed to save analysis to text file: {analysis_filename_text}.")
+        logging.error(errors[-1])
+
+    analysis_filename_pdf = REPORT_FILENAME_PDF.replace(".pdf", "_analysis.pdf")
+    analysis_pdf_result = generate_pdf_from_md(display_content, analysis_filename_pdf)
+    if "Error generating PDF" in analysis_pdf_result:
+        errors.append(analysis_pdf_result)
+        logging.error(analysis_pdf_result)
+    else:
+        logging.info(analysis_pdf_result)
+
+    # Update state - use display content for what the user sees
+    state["report"] = display_content  # Only analysis for display
+    state["report_filename"] = text_filename  # Full report filename for backward compatibility
+    state["full_report_content"] = full_report_content  # Full report for downloads
+    state["appendix_content"] = appendix_content  # Appendix for separate download
+    state["analysis_content"] = display_content  # Analysis for separate download
+    state["appendix_filename"] = appendix_text_filename  # Appendix filename
+    state["analysis_filename"] = analysis_text_filename  # Analysis filename
     
     # Handle errors
     current_error = state.get('error', '') or ''
