@@ -1,0 +1,54 @@
+# Dockerfile optimized for Google Cloud Run
+FROM python:3.10-slim
+
+# Set environment variables for Cloud Run
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_DEFAULT_TIMEOUT=100 \
+    PORT=8080
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    libc6-dev \
+    libffi-dev \
+    libssl-dev \
+    curl \
+    procps \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Create non-root user for security
+RUN useradd --create-home --shell /bin/bash cloudrun
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements and install dependencies
+COPY requirements-cloudrun.txt .
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements-cloudrun.txt
+
+# Copy application code
+COPY --chown=cloudrun:cloudrun . .
+
+# Create necessary directories and set permissions
+RUN mkdir -p /app/logs /app/data /app/reports && \
+    chown -R cloudrun:cloudrun /app && \
+    chmod +x /app/*.py
+
+# Switch to non-root user
+USER cloudrun
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:$PORT/health || exit 1
+
+# Expose port
+EXPOSE $PORT
+
+# Command to run the application
+CMD exec python app_cloudrun.py
