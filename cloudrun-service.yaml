@@ -39,7 +39,7 @@ spec:
       
       containers:
       - name: intellisearch-container
-        image: gcr.io/PROJECT_ID/intellisearch:latest
+        image: gcr.io/gen-lang-client-0665888431/intellisearch:latest
         
         ports:
         - name: http1

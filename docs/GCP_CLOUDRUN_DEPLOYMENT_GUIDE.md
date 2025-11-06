@@ -16,8 +16,8 @@ This guide covers deploying INTELLISEARCH directly to Google Cloud Run from your
    # Authenticate
    gcloud auth login
    
-   # Set your project
-   gcloud config set project YOUR_PROJECT_ID
+   # Set your project (gen-lang-client-0665888431)
+   gcloud config set project gen-lang-client-0665888431
    ```
 
 3. **API Keys**
@@ -28,6 +28,20 @@ This guide covers deploying INTELLISEARCH directly to Google Cloud Run from your
 
 ### Option 1: Automated Deployment (Recommended)
 
+**For your project (gen-lang-client-0665888431):**
+
+**Windows:**
+```cmd
+deploy-gen-lang-client.bat
+```
+
+**Linux/Mac:**
+```bash
+chmod +x deploy-gen-lang-client.sh
+./deploy-gen-lang-client.sh
+```
+
+**Generic (any project):**
 **Windows:**
 ```cmd
 deploy-cloudrun.bat YOUR_PROJECT_ID
