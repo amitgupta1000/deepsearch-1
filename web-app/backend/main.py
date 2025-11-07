@@ -90,10 +90,13 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000", 
+        "http://localhost:3000",
         "http://localhost:5173",  # React dev servers
         "https://intellisearch-frontend-kdqh.onrender.com",  # Production frontend (actual)
-        "https://*.onrender.com"  # Allow all Render subdomains
+        "https://*.onrender.com",  # Allow all Render subdomains
+        "https://storage.googleapis.com",  # GCP Cloud Storage
+        # Example for bucket-specific: uncomment and set your bucket name
+        # "https://<your-bucket-name>.storage.googleapis.com"
     ],
     allow_credentials=True,
     allow_methods=["*"],
