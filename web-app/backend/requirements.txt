@@ -1,4 +1,69 @@
+
+
+# ============================================================================
+# CORE PACKAGES (install first)
+# ============================================================================
+requests>=2.0.0
+python-dotenv>=1.0.0
+pydantic>=2.8.0
+nest_asyncio>=1.5.6
+
+# ============================================================================
+# LANGCHAIN CORE PACKAGES (critical for functionality) - Tested compatible versions
+# ============================================================================
+langchain>=0.1.16
+langchain-core>=0.1.35
+langchain-community>=0.0.34
+langchain-text-splitters==0.0.1
+
+# LangGraph workflow engine - Latest stable
+langgraph>=0.0.30
+
+# ============================================================================
+# LLM PROVIDER PACKAGES (provider-specific)
+# ============================================================================
+# Google AI (PRIMARY - tested and working)
+google-genai>=1.0.0
+
+# ============================================================================
+# WEB SCRAPING & HTTP
+# ============================================================================
+aiohttp>=3.9.0
+beautifulsoup4>=4.12.2
+requests-html>=0.10.0
+lxml>=5.0.0
+trafilatura>=2.0.0
+
+# ============================================================================
+# DOCUMENT PROCESSING (tested and working)
+# ============================================================================
+PyMuPDF>=1.26.0
+fpdf2>=2.8.0
+
+# ============================================================================
+# SEARCH & RANKING (tested and working)
+# ============================================================================
+rank-bm25>=0.2.2
+faiss-cpu>=1.7.4
+
+# Cross-encoder reranking for enhanced retrieval quality
+sentence-transformers>=3.0.0 
+
+# Hugging Face optimized downloads (improves model download performance)
+hf_xet>=1.2.0
+
+# ============================================================================
+# UTILITIES & PERFORMANCE
+# ============================================================================
+ratelimit>=2.2.1
+
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 pydantic==2.5.2
 # Add other required dependencies below
+
+# ============================================================================
+# DEVELOPMENT & TESTING (optional)
+# ============================================================================
+# pytest>=7.4.0
+
