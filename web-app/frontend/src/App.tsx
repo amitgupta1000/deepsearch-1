@@ -6,28 +6,10 @@ import ResultsDisplay from './components/ResultsDisplay';
 import WelcomeSection from './components/WelcomeSection';
 import ActivityLog from './components/ActivityLog';
 import Footer from './components/Footer';
-import { ApiKeyAuth } from './components/ApiKeyAuth';
+
 import { ResearchProvider } from './context/ResearchContext';
-import { AuthProvider, useAuth } from './context/AuthContext';
 
-// Main app content that requires authentication
-const AuthenticatedApp = () => {
-  const { authState } = useAuth();
-
-  if (!authState.isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex flex-col">
-        <Header />
-        <main className="flex-1 container mx-auto px-4 py-8">
-          <div className="max-w-md mx-auto">
-            <ApiKeyAuth />
-          </div>
-        </main>
-        <Footer />
-      </div>
-    );
-  }
-
+function App() {
   return (
     <ResearchProvider>
       <Router>
@@ -66,14 +48,6 @@ const AuthenticatedApp = () => {
         </div>
       </Router>
     </ResearchProvider>
-  );
-};
-
-function App() {
-  return (
-    <AuthProvider>
-      <AuthenticatedApp />
-    </AuthProvider>
   );
 }
 

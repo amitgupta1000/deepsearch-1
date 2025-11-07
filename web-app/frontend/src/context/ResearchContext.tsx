@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useReducer } from 'react';
 import type { ReactNode } from 'react';
 import type { ResearchState, ResearchRequest, ResearchResult } from '../types';
-import { useAuthenticatedFetch } from './AuthContext';
+// import { useAuthenticatedFetch } from './AuthContext';
 
 type ActivityLog = {
   id: string;
@@ -61,7 +61,7 @@ const ResearchContext = createContext<ResearchContextType | undefined>(undefined
 
 export const ResearchProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(researchReducer, initialState);
-  const authenticatedFetch = useAuthenticatedFetch();
+  // Direct fetch, no authentication required
 
   const addLog = (level: ActivityLog['level'], message: string, details?: any) => {
     const log: ActivityLog = {
@@ -84,10 +84,9 @@ export const ResearchProvider: React.FC<{ children: ReactNode }> = ({ children }
     addLog('info', 'Research session started', { query: request.query, promptType: request.promptType });
     
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const apiUrl = 'https://intellisearch-451921002283.asia-south2.run.app';
       addLog('info', `Connecting to API: ${apiUrl}`);
       updateProgress(5, 'Connecting to research backend...');
-      
       // Health check first
       try {
         addLog('info', 'Performing health check...');
@@ -97,18 +96,19 @@ export const ResearchProvider: React.FC<{ children: ReactNode }> = ({ children }
       } catch (healthError) {
         addLog('warning', 'Health check failed, proceeding anyway', healthError);
       }
-      
-      // Step 1: Start the research (requires authentication)
+      // Step 1: Start the research
       updateProgress(10, 'Initializing research pipeline...');
-      addLog('info', 'Sending authenticated research request to backend...');
-      
-      const startResponse = await authenticatedFetch('/api/research/start', {
+      addLog('info', 'Sending research request to backend...');
+      const startResponse = await fetch(`${apiUrl}/api/research/start`, {
         method: 'POST',
         body: JSON.stringify({
           query: request.query,
           prompt_type: request.promptType || 'general',
           automation_level: 'full'
         }),
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
 
       addLog('info', `Research start response: ${startResponse.status}`);
@@ -143,7 +143,7 @@ export const ResearchProvider: React.FC<{ children: ReactNode }> = ({ children }
           addLog('info', `Checking research progress (${attempts}/${maxAttempts})`);
           updateProgress(progressPercent, 'Research in progress, analyzing sources...');
           
-          const statusResponse = await authenticatedFetch(`/api/research/${sessionId}/status`);
+          const statusResponse = await fetch(`${apiUrl}/api/research/${sessionId}/status`);
           
           if (!statusResponse.ok) {
             addLog('error', `Failed to check status: ${statusResponse.status}`);
@@ -165,7 +165,7 @@ export const ResearchProvider: React.FC<{ children: ReactNode }> = ({ children }
             updateProgress(95, 'Retrieving final report...');
             
             // Get the final result
-            const resultResponse = await authenticatedFetch(`/api/research/${sessionId}/result`);
+            const resultResponse = await fetch(`${apiUrl}/api/research/${sessionId}/result`);
             if (!resultResponse.ok) {
               addLog('error', `Failed to get result: ${resultResponse.status}`);
               throw new Error(`Failed to get research result: ${resultResponse.status}`);

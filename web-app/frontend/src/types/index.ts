@@ -39,27 +39,3 @@ export interface Citation {
   title: string;
 }
 
-// Authentication types
-export interface AuthState {
-  isAuthenticated: boolean;
-  apiKey: string | null;
-  userInfo: UserInfo | null;
-  error: string | null;
-}
-
-export interface UserInfo {
-  user_id: string;
-  is_admin: boolean;
-  rate_limits: {
-    requests_per_hour: number;
-    requests_per_minute: number;
-  };
-  authenticated_at: string;
-}
-
-export interface AuthContextType {
-  authState: AuthState;
-  setApiKey: (apiKey: string) => Promise<boolean>;
-  clearAuth: () => void;
-  checkAuth: () => Promise<boolean>;
-}

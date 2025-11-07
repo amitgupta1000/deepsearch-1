@@ -14,8 +14,7 @@ import uuid
 from datetime import datetime
 import json
 
-# Import authentication module
-from auth import verify_api_key_with_rate_limit, get_user_info, log_api_usage
+
 
 # Add the parent src directory to the path to import our existing modules
 import sys
@@ -185,27 +184,17 @@ async def get_config():
         }
     }
 
-# Authentication info endpoint
-@app.get("/api/auth/info")
-async def get_auth_info(user_id: str = Depends(verify_api_key_with_rate_limit)):
-    """Get current user authentication information"""
-    return {
-        "authenticated": True,
-        "user": get_user_info(user_id),
-        "message": f"Successfully authenticated as {user_id}"
-    }
+
 
 # Start research endpoint
 @app.post("/api/research/start", response_model=APIResponse)
 async def start_research(
     request: ResearchRequest, 
-    background_tasks: BackgroundTasks,
-    user_id: str = Depends(verify_api_key_with_rate_limit)
+    background_tasks: BackgroundTasks
 ):
-    """Start a new research session (requires API key authentication)"""
+    """Start a new research session"""
     try:
-        # Log API usage for monitoring
-        log_api_usage(user_id, "/api/research/start", success=True)
+
         
         # Validate request
         if len(request.query.strip()) < 10:
@@ -213,11 +202,12 @@ async def start_research(
         
 
         
+
         # Create new session
         session_id = str(uuid.uuid4())
         session = {
             "session_id": session_id,
-            "user_id": user_id,  # Track which user owns this session
+            # "user_id": user_id,  # Track which user owns this session (removed auth)
             "query": request.query.strip(),
             "status": "pending",
             "prompt_type": request.prompt_type,
@@ -231,20 +221,15 @@ async def start_research(
             "report_filename": None,
             "error_message": None
         }
-        
         research_sessions[session_id] = session
-        
         # Start background research task
         background_tasks.add_task(run_research_pipeline, session_id, request)
-        
-        logger.info(f"Started research session {session_id} for user {user_id} with query: {request.query[:100]}...")
-        
+        logger.info(f"Started research session {session_id} with query: {request.query[:100]}...")
         return APIResponse(
             success=True,
             message="Research session started successfully",
             data={
-                "session_id": session_id,
-                "user_info": get_user_info(user_id)
+                "session_id": session_id
             }
         )
         
@@ -255,18 +240,15 @@ async def start_research(
 # Get research status
 @app.get("/api/research/{session_id}/status", response_model=ResearchStatus)
 async def get_research_status(
-    session_id: str,
-    user_id: str = Depends(verify_api_key_with_rate_limit)
+    session_id: str
 ):
-    """Get the current status of a research session (requires API key authentication)"""
+    """Get the current status of a research session"""
     if session_id not in research_sessions:
         raise HTTPException(status_code=404, detail="Research session not found")
     
     session = research_sessions[session_id]
     
-    # Verify user owns this session
-    if session.get("user_id") != user_id:
-        raise HTTPException(status_code=403, detail="Access denied: You can only access your own research sessions")
+
     
     return ResearchStatus(
         session_id=session_id,
@@ -279,18 +261,15 @@ async def get_research_status(
 # Get research results
 @app.get("/api/research/{session_id}/result")
 async def get_research_result(
-    session_id: str,
-    user_id: str = Depends(verify_api_key_with_rate_limit)
+    session_id: str
 ):
-    """Get the completed research report (requires API key authentication)"""
+    """Get the completed research report"""
     if session_id not in research_sessions:
         raise HTTPException(status_code=404, detail="Research session not found")
     
     session = research_sessions[session_id]
     
-    # Verify user owns this session
-    if session.get("user_id") != user_id:
-        raise HTTPException(status_code=403, detail="Access denied: You can only access your own research sessions")
+
     
     if session["status"] != "completed":
         raise HTTPException(status_code=400, detail=f"Research not completed. Status: {session['status']}")
@@ -309,18 +288,15 @@ async def get_research_result(
 async def download_report(
     session_id: str, 
     format: str = "txt",
-    content_type: str = "full",  # New parameter: "full", "analysis", or "appendix"
-    user_id: str = Depends(verify_api_key_with_rate_limit)
+    content_type: str = "full"  # New parameter: "full", "analysis", or "appendix"
 ):
-    """Download the research report as a text or PDF file (requires API key authentication)"""
+    """Download the research report as a text or PDF file"""
     if session_id not in research_sessions:
         raise HTTPException(status_code=404, detail="Research session not found")
     
     session = research_sessions[session_id]
     
-    # Verify user owns this session
-    if session.get("user_id") != user_id:
-        raise HTTPException(status_code=403, detail="Access denied: You can only access your own research sessions")
+
     
     if session["status"] != "completed" or not session["report_filename"]:
         raise HTTPException(status_code=400, detail="Report not available for download")
