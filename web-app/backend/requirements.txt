@@ -59,7 +59,7 @@ ratelimit>=2.2.1
 
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
-pydantic==2.5.2
+
 # Add other required dependencies below
 
 # ============================================================================
