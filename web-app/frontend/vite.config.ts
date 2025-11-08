@@ -7,7 +7,7 @@ export default defineConfig({
   define: {
     'import.meta.env.VITE_API_URL': JSON.stringify('https://intellisearch-451921002283.asia-south2.run.app'),
   },
-  base: '/intellisearch-frontend/',
+  base: './',
   server: {
     port: 3000,
     host: true,
