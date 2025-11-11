@@ -1,0 +1,172 @@
+import asyncio
+import logging
+import argparse
+from typing import Dict, Any, List
+
+# Basic logging configuration in case setup.py didn't configure it
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Startup validation
+def validate_startup():
+    """Quick startup validation to ensure critical imports work."""
+    try:
+        # Test critical imports
+        from src.config import validate_config
+        from src.graph import app
+
+        if not validate_config():
+            logging.warning("Configuration validation failed - check .env file")
+
+        if app is None:
+            logging.error("LangGraph app failed to compile - check LangChain imports")
+            return False
+
+        return True
+
+    except ImportError as e:
+        logging.error(f"Critical import failed: {e}")
+        logging.error("Run 'python startup_validation.py' for detailed diagnostics")
+        return False
+    except Exception as e:
+        logging.error(f"Startup validation error: {e}")
+        return False
+
+# RunnableConfig is optional (depends on langchain_core availability)
+try:
+    from langchain_core.runnables import RunnableConfig
+    config = RunnableConfig(recursion_limit=100)
+except Exception:
+    logging.debug("langchain_core.runnables not available; continuing without RunnableConfig.")
+    config = None
+
+
+# Import the compiled LangGraph application
+from src.graph import app
+
+
+async def run_workflow(
+    initial_query: str,
+    prompt_type: str
+):
+    """
+    Runs the LangGraph workflow with an initial query and research type.
+    Args:
+        initial_query: The user's initial research query.
+        prompt_type: Type of prompt to use.
+    """
+    if app is None:
+        logging.error("LangGraph app is not compiled or imported. Cannot run workflow.")
+        print("Workflow cannot be run due to errors in graph compilation or imports.")
+        return None
+
+    logging.info(f"Starting workflow for query: '{initial_query}'")
+
+    # Define the initial state for the graph
+    initial_state = {
+        "new_query": initial_query,
+        "search_queries": [],
+        "rationale": None,
+        "data": [],
+        "relevant_contexts": {},
+        "relevant_chunks": [],
+        "proceed": True,
+        "visited_urls": [],
+        "failed_urls": [],
+        "iteration_count": 0,
+        "report": None,
+        "report_filename": "IntelliSearchReport",
+        "error": None,
+        "evaluation_response": None,
+        "suggested_follow_up_queries": [],
+        "prompt_type": prompt_type,
+        "approval_iteration_count": 0,
+        "search_iteration_count": 0,
+        "report_type": None
+    }
+
+    # Run the compiled workflow
+    try:
+        if config is not None:
+            astream = app.astream(initial_state, config=config)
+        else:
+            astream = app.astream(initial_state)
+
+        # Track execution progress
+        executed_nodes = []
+        async for step in astream:
+            for key, value in step.items():
+                logging.info("Node executed: %s", key)
+                executed_nodes.append(key)
+
+        logging.info("Workflow finished successfully.")
+        final_report_filename = initial_state.get("report_filename", "No report file generated.")
+        logging.info("Check for report file: %s.txt", final_report_filename)
+
+        # Check for any errors in the final state
+        final_error_state = initial_state.get('error')
+        if final_error_state:
+            logging.warning("Workflow completed with errors: %s", final_error_state)
+        else:
+            logging.info("Workflow completed successfully without errors.")
+
+        return initial_state
+
+    except Exception as e:
+        logging.exception(f"An error occurred during workflow execution: {e}")
+        return None
+
+
+
+
+
+def simple_cli():
+    """
+    Simplified CLI: prompt for query and research type, generate standard report and appendix.
+    """
+    print("INTELLISEARCH Research Tool")
+    print("=" * 50)
+    user_research_query = input("Enter your Research Query: ")
+
+    print("\nSelect research type:")
+    print("1: Legal")
+    print("2: General")
+    print("3: Macro")
+    print("4: DeepSearch")
+    print("5: Person Search")
+    print("6: Investment Research")
+    prompt_type_choice = input("Enter the number for your desired research type: ")
+
+    prompt_type_mapping = {
+        "1": "legal",
+        "2": "general",
+        "3": "macro",
+        "4": "deepsearch",
+        "5": "person_search",
+        "6": "investment"
+    }
+    selected_prompt_type = prompt_type_mapping.get(prompt_type_choice, "general")
+    print(f"Selected research type: {selected_prompt_type}")
+
+    print("\n🚀 Generating standard report and appendix...")
+    result = asyncio.run(run_workflow(
+        user_research_query,
+        selected_prompt_type
+    ))
+    # Output summary
+    if result and result.get("report"):
+        print("\nReport generated successfully!")
+        print("Report filename:", result.get("report_filename", "IntelliSearchReport"))
+    else:
+        print("\nReport generation failed or incomplete.")
+
+
+
+# --- Main Execution Block ---
+if __name__ == "__main__":
+    # Perform startup validation
+    if not validate_startup():
+        print("\n💥 Startup validation failed!")
+        print("   Run 'python startup_validation.py' for detailed diagnostics")
+        print("   Or run 'run_setup_and_interactive.bat' to fix environment")
+        exit(1)
+    simple_cli()
