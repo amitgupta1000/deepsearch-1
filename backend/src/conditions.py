@@ -49,7 +49,6 @@ def route_ai_evaluate(state: dict) -> str:
     if state.get("search_iteration_count", 0) >= max_loops:
         return "write_report"
     elif state.get("proceed", False):
-        return "write_report"
-    else:
         return "evaluate_search_results"
-
+    else:
+        return "write_report"

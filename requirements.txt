@@ -1,3 +1,4 @@
+
 aiohappyeyeballs==2.6.1
 aiohttp
 aiosignal==1.4.0
@@ -103,3 +104,4 @@ fake-useragent
 requests-html
 playwright
 selenium
+fastapi

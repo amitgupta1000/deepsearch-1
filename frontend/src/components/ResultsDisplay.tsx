@@ -1,13 +1,11 @@
 import React from 'react';
-import { 
-  DocumentTextIcon, 
-  ClockIcon, 
-  ArrowTopRightOnSquareIcon, 
-  ArrowDownTrayIcon, 
-  ExclamationCircleIcon, 
+import {
+  DocumentTextIcon,
+  ClockIcon,
+  ArrowTopRightOnSquareIcon,
+  ExclamationCircleIcon,
   CheckCircleIcon,
-  ClipboardDocumentIcon,
-  ShareIcon 
+  ShareIcon
 } from '@heroicons/react/24/outline';
 import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import { useResearch } from '../context/ResearchContext';
@@ -16,12 +14,12 @@ const ResultsDisplay: React.FC = () => {
   const { state, clearResults } = useResearch();
   const { isLoading, result, error } = state;
 
-  const ClipboardDocumentIconToClipboard = async (text: string) => {
+  const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
       // You could add a toast notification here
     } catch (err) {
-      console.error('Failed to ClipboardDocumentIcon text: ', err);
+      console.error('Failed to copy text: ', err);
     }
   };
 
@@ -93,44 +91,25 @@ const ResultsDisplay: React.FC = () => {
     return null;
   }
 
-  const downloadReport = () => {
-    const blob = new Blob([result.report], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `intellisearch-report-${new Date().toISOString().split('T')[0]}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const downloadReportAs = async (format: 'txt' | 'pdf', contentType: 'full' | 'analysis' | 'appendix' = 'full') => {
+  const downloadReportAs = async (format: 'txt', contentType: 'analysis' | 'appendix') => {
     if (!result.sessionId) {
-      // Fallback to local download for results without session ID
-      downloadReport();
+      alert('Session ID not found, cannot download file.');
       return;
     }
 
     try {
       const response = await fetch(`/api/research/${result.sessionId}/download?format=${format}&content_type=${contentType}`);
-      
+
       if (!response.ok) {
         throw new Error(`Failed to download ${format.toUpperCase()} file`);
       }
-      
+
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      
-      // Determine filename based on content type
-      let filePrefix = 'intellisearch-report';
-      if (contentType === 'analysis') {
-        filePrefix = 'intellisearch-analysis';
-      } else if (contentType === 'appendix') {
-        filePrefix = 'intellisearch-appendix';
-      }
-      
+
+      let filePrefix = contentType === 'analysis' ? 'intellisearch-analysis' : 'intellisearch-appendix';
+
       a.href = url;
       a.download = `${filePrefix}-${new Date().toISOString().split('T')[0]}.${format}`;
       document.body.appendChild(a);
@@ -139,12 +118,7 @@ const ResultsDisplay: React.FC = () => {
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error(`Error downloading ${format.toUpperCase()} file:`, error);
-      // Fallback to local text download
-      if (format === 'txt' && contentType === 'full') {
-        downloadReport();
-      } else {
-        alert(`Failed to download ${format.toUpperCase()} file. Please try again.`);
-      }
+      alert(`Failed to download ${format.toUpperCase()} file. Please try again.`);
     }
   };
 
@@ -159,7 +133,7 @@ const ResultsDisplay: React.FC = () => {
             <p className="text-gray-600">Your comprehensive report is ready</p>
           </div>
         </div>
-        
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
           <div className="text-center">
             <div className="text-2xl font-bold text-primary-600">{result.wordCount}</div>
@@ -198,13 +172,6 @@ const ResultsDisplay: React.FC = () => {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => ClipboardDocumentIconToClipboard(result.report)}
-              className="btn-secondary flex items-center space-x-1"
-            >
-              <ClipboardDocumentIcon className="w-4 h-4" />
-              <span>ClipboardDocumentIcon</span>
-            </button>
             {'share' in navigator && (
               <button
                 onClick={shareResults}
@@ -215,70 +182,23 @@ const ResultsDisplay: React.FC = () => {
               </button>
             )}
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-gray-600 font-medium">Download Options:</span>
-              
-              {/* Full Report Downloads */}
-              <div className="flex items-center space-x-1 border-r border-gray-300 pr-2">
-                <span className="text-xs text-gray-500">Complete Report:</span>
-                <button
-                  onClick={() => downloadReportAs('txt', 'full')}
-                  className="btn-secondary-sm flex items-center space-x-1"
-                  title="Download complete report (query + analysis + appendix) as TXT"
-                >
-                  <DocumentTextIcon className="w-3 h-3" />
-                  <span>TXT</span>
-                </button>
-                <button
-                  onClick={() => downloadReportAs('pdf', 'full')}
-                  className="btn-secondary-sm flex items-center space-x-1"
-                  title="Download complete report (query + analysis + appendix) as PDF"
-                >
-                  <ArrowDownTrayIcon className="w-3 h-3" />
-                  <span>PDF</span>
-                </button>
-              </div>
-              
-              {/* Analysis Downloads (Query + Analysis only) */}
-              <div className="flex items-center space-x-1 border-r border-gray-300 pr-2">
-                <span className="text-xs text-gray-500">Main Analysis:</span>
-                <button
-                  onClick={() => downloadReportAs('txt', 'analysis')}
-                  className="btn-secondary-sm flex items-center space-x-1"
-                  title="Download query and analysis (what you see above) as TXT"
-                >
-                  <DocumentTextIcon className="w-3 h-3" />
-                  <span>TXT</span>
-                </button>
-                <button
-                  onClick={() => downloadReportAs('pdf', 'analysis')}
-                  className="btn-secondary-sm flex items-center space-x-1"
-                  title="Download query and analysis (what you see above) as PDF"
-                >
-                  <ArrowDownTrayIcon className="w-3 h-3" />
-                  <span>PDF</span>
-                </button>
-              </div>
-              
-              {/* Appendix Downloads */}
-              <div className="flex items-center space-x-1">
-                <span className="text-xs text-gray-500">Research Appendix:</span>
-                <button
-                  onClick={() => downloadReportAs('txt', 'appendix')}
-                  className="btn-secondary-sm flex items-center space-x-1"
-                  title="Download detailed Q&A pairs and citations as TXT"
-                >
-                  <DocumentTextIcon className="w-3 h-3" />
-                  <span>TXT</span>
-                </button>
-                <button
-                  onClick={() => downloadReportAs('pdf', 'appendix')}
-                  className="btn-secondary-sm flex items-center space-x-1"
-                  title="Download detailed Q&A pairs and citations as PDF"
-                >
-                  <ArrowDownTrayIcon className="w-3 h-3" />
-                  <span>PDF</span>
-                </button>
-              </div>
+              <span className="text-sm text-gray-600 font-medium">Download:</span>
+              <button
+                onClick={() => downloadReportAs('txt', 'analysis')}
+                className="btn-secondary-sm flex items-center space-x-1"
+                title="Download analysis as TXT"
+              >
+                <DocumentTextIcon className="w-3 h-3" />
+                <span>Analysis (TXT)</span>
+              </button>
+              <button
+                onClick={() => downloadReportAs('txt', 'appendix')}
+                className="btn-secondary-sm flex items-center space-x-1"
+                title="Download appendix as TXT"
+              >
+                <DocumentTextIcon className="w-3 h-3" />
+                <span>Appendix (TXT)</span>
+              </button>
             </div>
             <button
               onClick={clearResults}
@@ -295,39 +215,6 @@ const ResultsDisplay: React.FC = () => {
         <div className="prose prose-lg max-w-none">
           <div className="whitespace-pre-wrap text-gray-900 leading-relaxed font-medium">
             {result.report}
-          </div>
-        </div>
-      </div>
-
-      {/* Appendix Information */}
-      <div className="card p-6 bg-blue-50 border-blue-200 shadow-lg">
-        <div className="flex items-start space-x-4">
-          <div className="flex-shrink-0">
-            <DocumentTextIcon className="w-6 h-6 text-blue-600" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-blue-900 mb-2">Research Appendix Available</h3>
-            <p className="text-blue-800 mb-4">
-              A detailed research appendix containing all Q&A pairs, citations, and source materials used to generate this analysis is available for download.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => downloadReportAs('txt', 'appendix')}
-                className="btn-secondary flex items-center space-x-2"
-                title="Download research appendix as TXT"
-              >
-                <DocumentTextIcon className="w-4 h-4" />
-                <span>Download Appendix (TXT)</span>
-              </button>
-              <button
-                onClick={() => downloadReportAs('pdf', 'appendix')}
-                className="btn-secondary flex items-center space-x-2"
-                title="Download research appendix as PDF"
-              >
-                <ArrowDownTrayIcon className="w-4 h-4" />
-                <span>Download Appendix (PDF)</span>
-              </button>
-            </div>
           </div>
         </div>
       </div>
@@ -352,11 +239,11 @@ const ResultsDisplay: React.FC = () => {
                   <p className="text-sm text-gray-900 break-words leading-relaxed">{citation}</p>
                 </div>
                 <button
-                  onClick={() => ClipboardDocumentIconToClipboard(citation)}
+                  onClick={() => copyToClipboard(citation)}
                   className="flex-shrink-0 p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                  title="ClipboardDocumentIcon citation"
+                  title="Copy citation"
                 >
-                  <ClipboardDocumentIcon className="w-4 h-4" />
+                  <ShareIcon className="w-4 h-4" />
                 </button>
               </div>
             ))}

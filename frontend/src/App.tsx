@@ -23,23 +23,14 @@ function App() {
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div className="lg:col-span-2">
                       <ResearchForm />
-                      <ActivityLog />
+                      <ResultsDisplay />
                     </div>
                     <div className="lg:col-span-1">
                       <div className="sticky top-8">
-                        <div className="card p-6">
-                          <h3 className="text-lg font-semibold text-gray-900 mb-4">Research Tips</h3>
-                          <ul className="space-y-2 text-sm text-gray-600">
-                            <li>• Be specific in your research query</li>
-                            <li>• Choose the appropriate report type</li>
-                            <li>• Detailed reports provide comprehensive analysis</li>
-                            <li>• Concise reports offer quick insights</li>
-                          </ul>
-                        </div>
+                        <ActivityLog />
                       </div>
                     </div>
                   </div>
-                  <ResultsDisplay />
                 </div>
               } />
             </Routes>

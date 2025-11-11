@@ -29,12 +29,15 @@ logger = logging.getLogger(__name__)
 
 async def run_workflow(
     initial_query: str,
-    prompt_type: str
+    prompt_type: str,
+    session_id: str
 ):
     if workflow_app is None:
         logging.error("LangGraph app is not compiled or imported. Cannot run workflow.")
         print("Workflow cannot be run due to errors in graph compilation or imports.")
         return None
+    
+    session = research_sessions[session_id]
     logging.info(f"Starting workflow for query: '{initial_query}'")
     initial_state = {
         "new_query": initial_query,
@@ -57,28 +60,41 @@ async def run_workflow(
         "search_iteration_count": 0,
         "report_type": None
     }
+    
+    progress_map = {
+        "create_queries": 10,
+        "evaluate_search_results": 30,
+        "extract_content": 50,
+        "embed_and_retrieve": 70,
+        "create_qa_pairs": 80,
+        "AI_evaluate": 90,
+        "write_report": 95
+    }
+
     try:
         if config is not None:
             astream = workflow_app.astream(initial_state, config=config)
         else:
             astream = workflow_app.astream(initial_state)
-        executed_nodes = []
+        
         async for step in astream:
             for key, value in step.items():
                 logging.info("Node executed: %s", key)
-                executed_nodes.append(key)
-        logging.info("Workflow finished successfully.")
-        final_report_filename = initial_state.get("report_filename", "No report file generated.")
-        logging.info("Check for report file: %s.txt", final_report_filename)
-        final_error_state = initial_state.get('error')
-        if final_error_state:
-            logging.warning("Workflow completed with errors: %s", final_error_state)
-        else:
-            logging.info("Workflow completed successfully without errors.")
-        return initial_state
+                session["current_step"] = f"Executing step: {key}"
+                session["progress"] = progress_map.get(key, session["progress"])
+                session["updated_at"] = datetime.now()
+
+        final_state = await astream.get_final_output()
+        return final_state
+
     except Exception as e:
         logging.exception(f"An error occurred during workflow execution: {e}")
+        session["status"] = "failed"
+        session["error_message"] = str(e)
+        session["current_step"] = f"Workflow error: {str(e)}"
+        session["updated_at"] = datetime.now()
         return None
+
 
 
 import sys
@@ -312,6 +328,58 @@ async def delete_research_session(session_id: str):
     del research_sessions[session_id]
     return APIResponse(success=True, message="Research session deleted successfully")
 
+@app.post("/api/research/test-workflow")
+async def test_research_workflow(request: ResearchRequest):
+    """
+    Runs the research workflow synchronously for testing purposes and returns the final state.
+    """
+    initial_state = {
+        "new_query": request.query,
+        "prompt_type": request.prompt_type,
+        "search_queries": [],
+        "rationale": None,
+        "data": [],
+        "relevant_contexts": {},
+        "relevant_chunks": [],
+        "proceed": True,
+        "visited_urls": [],
+        "failed_urls": [],
+        "iteration_count": 0,
+        "report": None,
+        "report_filename": "TestReport",
+        "error": None,
+        "evaluation_response": None,
+        "suggested_follow_up_queries": [],
+        "approval_iteration_count": 0,
+        "search_iteration_count": 0,
+        "report_type": None
+    }
+    
+    final_state = None
+    try:
+        if config is not None:
+            astream = workflow_app.astream(initial_state, config=config)
+        else:
+            astream = workflow_app.astream(initial_state)
+
+        # Aynchronously iterate through the stream to execute the graph
+        async for step in astream:
+            # log steps for visibility during run
+            for key, value in step.items():
+                logger.info(f"Executing node: {key}")
+        
+        # Get the final state
+        final_state = await astream.get_final_output()
+
+    except Exception as e:
+        logger.exception(f"An error occurred during workflow test execution: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    if final_state:
+        return final_state
+    else:
+        raise HTTPException(status_code=500, detail="Workflow did not produce a final state.")
+
 async def run_research_pipeline(session_id: str, request: ResearchRequest):
     try:
         session = research_sessions[session_id]
@@ -320,16 +388,7 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
         session["progress"] = 5
 
         # Use local run_workflow function
-        result = None
-        try:
-            result = await run_workflow(request.query, request.prompt_type)
-        except Exception as wf_error:
-            session["status"] = "failed"
-            session["error_message"] = str(wf_error)
-            session["current_step"] = f"Workflow error: {str(wf_error)}"
-            session["updated_at"] = datetime.now()
-            logger.error(f"Workflow failed for session {session_id}: {wf_error}")
-            return
+        result = await run_workflow(request.query, request.prompt_type, session_id)
 
         # After workflow completes
         if result:
