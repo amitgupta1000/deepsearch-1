@@ -84,7 +84,7 @@ export const ResearchProvider: React.FC<{ children: ReactNode }> = ({ children }
     addLog('info', 'Research session started', { query: request.query, promptType: request.promptType });
     
     try {
-      const apiUrl = 'https://intellisearch-451921002283.asia-south2.run.app';
+      const apiUrl = import.meta.env.VITE_API_URL;
       addLog('info', `Connecting to API: ${apiUrl}`);
       updateProgress(5, 'Connecting to research backend...');
       // Health check first

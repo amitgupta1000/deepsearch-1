@@ -4,9 +4,6 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  define: {
-    'import.meta.env.VITE_API_URL': JSON.stringify('https://intellisearch-451921002283.asia-south2.run.app'),
-  },
   base: './',
   server: {
     port: 3000,
