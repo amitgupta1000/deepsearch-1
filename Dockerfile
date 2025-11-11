@@ -4,11 +4,9 @@ WORKDIR /app
 # Copy only requirements first for better caching
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
-# Copy only source code and necessary files
-COPY backend/src/ ./src/
+# Copy application code, preserving the directory structure
 COPY main.py ./
-COPY backend/app.py ./
-COPY backend/auth.py ./
-# If you need config files, copy them explicitly
-# COPY config.yaml ./
+COPY backend/ ./backend/
+# This __init__.py file makes 'backend' a Python package
+RUN touch backend/__init__.py
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
