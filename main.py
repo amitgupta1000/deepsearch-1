@@ -118,7 +118,7 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:5173",
         "http://localhost:8000",
-        "https://deepsearch-56755551-95627.web.app"
+        "https://deepsearch-56755551-95627.web.app",
         "*"
     ],
     allow_credentials=True,
@@ -194,6 +194,19 @@ async def start_research(request: ResearchRequest, background_tasks: BackgroundT
     # Run pipeline in background
     background_tasks.add_task(run_research_pipeline, session_id, request)
     return {"session_id": session_id, "status": "started"}
+
+@app.get("/api/research/{session_id}/status")
+async def get_research_status(session_id: str):
+    if session_id not in research_sessions:
+        raise HTTPException(status_code=404, detail="Research session not found")
+    session = research_sessions[session_id]
+    return {
+        "session_id": session_id,
+        "status": session["status"],
+        "progress": session["progress"],
+        "current_step": session["current_step"],
+        "updated_at": session["updated_at"]
+    }
 
 @app.get("/api/health")
 async def health_check():
@@ -351,4 +364,3 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
     reload = os.getenv("ENVIRONMENT") != "production"
     uvicorn.run(app, host="0.0.0.0", port=port, reload=reload, loop="asyncio")
-

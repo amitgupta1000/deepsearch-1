@@ -99,12 +99,11 @@ export const ResearchProvider: React.FC<{ children: ReactNode }> = ({ children }
       // Step 1: Start the research
       updateProgress(10, 'Initializing research pipeline...');
       addLog('info', 'Sending research request to backend...');
-      const startResponse = await fetch(`${apiUrl}/api/research/start`, {
+      const startResponse = await fetch(`${apiUrl}/api/research`, {
         method: 'POST',
         body: JSON.stringify({
           query: request.query,
-          prompt_type: request.promptType || 'general',
-          automation_level: 'full'
+          prompt_type: request.promptType || 'general'
         }),
         headers: {
           'Content-Type': 'application/json'
@@ -122,12 +121,12 @@ export const ResearchProvider: React.FC<{ children: ReactNode }> = ({ children }
       const startResult = await startResponse.json();
       addLog('success', 'Research request accepted', startResult);
       
-      if (!startResult.success || !startResult.data?.session_id) {
+      if (!startResult.session_id) {
         addLog('error', 'Invalid server response', startResult);
         throw new Error('Invalid response from server: missing session_id');
       }
       
-      const sessionId = startResult.data.session_id;
+      const sessionId = startResult.session_id;
       addLog('info', `Research session created: ${sessionId}`);
       updateProgress(15, 'Research pipeline started, monitoring progress...');
 
