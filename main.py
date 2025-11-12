@@ -18,8 +18,12 @@ except Exception:
     config = None
 from backend.src.graph import app as workflow_app
 
+
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 SERPER_API_KEY = os.getenv("SERPER_API_KEY", "")
+
+print(f"[main.py] GOOGLE_API_KEY: {GOOGLE_API_KEY}")
+print(f"[main.py] SERPER_API_KEY: {SERPER_API_KEY}")
 
 def get_current_date():
     return datetime.now().strftime("%Y-%m-%d")
@@ -94,8 +98,6 @@ async def run_workflow(
         session["current_step"] = f"Workflow error: {str(e)}"
         session["updated_at"] = datetime.now()
         return None
-
-
 
 import sys
 import os

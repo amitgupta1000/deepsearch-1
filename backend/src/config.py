@@ -49,8 +49,12 @@ def get_env_list(key: str, default: List[str] = None, separator: str = ',') -> L
 # =============================================================================
 # API KEYS  
 # =============================================================================
+
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
-SERPER_API_KEY = os.getenv("SERPER_API", "")
+SERPER_API_KEY = os.getenv("SERPER_API_KEY", "")
+
+print(f"[config.py] GOOGLE_API_KEY: {GOOGLE_API_KEY}")
+print(f"[config.py] SERPER_API_KEY: {SERPER_API_KEY}")
 
 # =============================================================================
 # LLM CONFIGURATION
