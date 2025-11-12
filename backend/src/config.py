@@ -128,7 +128,7 @@ USE_HYBRID_RETRIEVAL = get_env_bool("USE_HYBRID_RETRIEVAL", True)
 USE_RERANKING = get_env_bool("USE_RERANKING", True)
 RERANKER_CANDIDATES_MULTIPLIER = get_env_int("RERANKER_CANDIDATES_MULTIPLIER", 3)
 USE_CROSS_ENCODER_RERANKING = get_env_bool("USE_CROSS_ENCODER_RERANKING", False)
-'
+
 # Only the fast cross-encoder model is supported
 CROSS_ENCODER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 CROSS_ENCODER_TOP_K = get_env_int("CROSS_ENCODER_TOP_K", 50)
