@@ -2,6 +2,20 @@
 # This file contains the individual nodes (functions) for the LangGraph workflow.
 # Using llm call from Langchain-ChatGoogleGenerativeAI for generating search strings, evaluations etc., and Google GenAI for report writing for verbosity
 
+print("nodes.py loaded: starting import checks...")
+
+try:
+    from backend.src.config import *
+    print("Successfully imported from config.py")
+except Exception as e:
+    print(f"Failed to import from config.py: {e}")
+
+try:
+    from backend.src.utils import *
+    print("Successfully imported from utils.py")
+except Exception as e:
+    print(f"Failed to import from utils.py: {e}")
+
 import logging
 import json
 import re
@@ -71,12 +85,14 @@ try:
     from .llm_utils import llm_call_async, embeddings # Import only what we need - no llm variable
 except ImportError:
     logging.error("Could not import LLM/Embeddings from llm_utils. Some nodes may not function.")
+    print("Could not import LLM/Embeddings from llm_utils. Some nodes may not function.")   
     llm_call_async, embeddings = None, None
 
 try:
     from .search import UnifiedSearcher, SearchResult # Assuming SearchResult and UnifiedSearcher are in search.py
 except ImportError:
     logging.error("Could not import search components from search.py. Search node will not function.")
+    print("Could not import search components from search.py. Search node will not function.")
     UnifiedSearcher, SearchResult = None, None
 
 # Fallback to lightweight types if SearchResult or Document not available
@@ -114,7 +130,8 @@ try:
     )
 except ImportError:
     logging.error("Could not import utility functions from utils.py. Some nodes may be limited.")
-    # Define dummy functions or handle missing utilities within nodes if necessary
+    
+    print("Could not import utility functions from utils.py. Some nodes may be limited.")
     
     # Fallback formatting functions
     def format_research_report(content: str) -> str:
@@ -198,7 +215,8 @@ try:
     from .enhanced_deduplication import enhanced_deduplicate_content
 except ImportError:
     logging.warning("Could not import config settings. Using defaults.")
-    # Fallback defaults to ensure nodes run in degraded mode
+    
+    print("Imports from config and enhanced_deduplication failed. Using defaults.")
     USE_PERSISTENCE = False
     MAX_RESULTS = 5
     CACHE_TTL = 3600
@@ -213,7 +231,7 @@ except ImportError:
     MAX_USER_QUERY_LOOPS = 3
     DEFAULT_USER_AGENT = "intellISearch-bot/1.0"
     DEFAULT_REFERER = "https://example.com"
-    URL_TIMEOUT = 10
+    URL_TIMEOUT = 45
     SKIP_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mp3', '.zip', '.exe']
     BLOCKED_DOMAINS = []
     # Hybrid retrieval fallback defaults
