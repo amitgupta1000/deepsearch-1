@@ -1152,6 +1152,9 @@ async def create_qa_pairs(state: AgentState) -> AgentState:
         state["all_citations"] = []
         new_error = (str(current_error_state or '') + "\nNo relevant chunks available for Q&A creation.").strip()
         state['error'] = None if new_error == "" else new_error
+        print(f"[DEBUG][create_qa_pairs] state['qa_pairs'] length: {len(state['qa_pairs'])}")
+        if state['qa_pairs']:
+            print(f"[DEBUG][create_qa_pairs] First QA: {state['qa_pairs'][0]}")
         return state
     
     if not search_queries:
@@ -1247,6 +1250,9 @@ async def AI_evaluate(state: AgentState) -> AgentState:
     Tracks search_iteration_count to prevent infinite loops.
     """
 
+    print(f"[DEBUG][AI_evaluate] state['qa_pairs'] length: {len(state.get('qa_pairs', []))}")
+    if state.get('qa_pairs'):
+        print(f"[DEBUG][AI_evaluate] First QA: {state['qa_pairs'][0]}")
     try:
         from setup import RED, ENDC, YELLOW
     except ImportError:
@@ -1261,7 +1267,7 @@ async def AI_evaluate(state: AgentState) -> AgentState:
     logging.info("AI Evaluation started: evaluating %d Q&A pairs for original query coverage.", len(qa_pairs))
 
     state["search_iteration_count"] = state.get("search_iteration_count", 0) + 1
-    max_iterations = MAX_AI_ITERATIONS
+    max_iterations = 3  # Limit to 3 AI-driven iterations
     errors = []
     state["proceed"] = True
 
@@ -1454,16 +1460,17 @@ async def write_report(state: AgentState):
     research_topic = state.get('new_query', 'the topic')
     search_queries = state.get('search_queries', [])
     qa_pairs = state.get('qa_pairs', [])
+    print(f"[DEBUG][write_report] state['qa_pairs'] length: {len(qa_pairs)}")
+    if qa_pairs:
+        print(f"[DEBUG][write_report] First QA: {qa_pairs[0]}")
 
     if not qa_pairs:
         final_report_content = f"Could not generate a report. No Q&A pairs were created for the topic: '{research_topic}'."
         errors.append(final_report_content)
         logging.warning(final_report_content)
-
+        print("[DEBUG] No Q&A pairs found. Report will be blank. Check upstream nodes for chunk extraction and Q&A generation.")
         # Save and update state as before
         text_filename = save_report_to_text(final_report_content, REPORT_FILENAME_TEXT)
-    # PDF generation removed
-        
         state["report"] = final_report_content
         state["report_filename"] = text_filename
         current_error = state.get('error', '') or ''
@@ -1574,25 +1581,29 @@ async def write_report(state: AgentState):
                 part3_appendix += f"**[{citation['number']}]** {source_info}\n\n"
 
     # Create separate content for display vs download
+    # Deduplicate content in the report
+    deduped_part2 = deduplicate_content(part2_response)
+    deduped_appendix = deduplicate_content(part3_appendix)
+
     # For display: Show User Query (Part 1) + IntelliSearch Analysis (Part 2)
-    display_content = part1_query + part2_response
+    display_content = part1_query + deduped_part2
     display_content += f"\n---\n\n*📅 Analysis generated on {get_current_date()}*  \n*🔬 Powered by INTELLISEARCH Research Platform*\n"
-    
+
     # For download: Full report with all parts
-    full_report_content = part1_query + part2_response + part3_appendix
+    full_report_content = part1_query + deduped_part2 + deduped_appendix
     full_report_content += f"\n---\n\n*📅 Report generated on {get_current_date()}*  \n*🔬 Powered by INTELLISEARCH Research Platform*\n"
-    
+
     # For appendix download: Just the appendix section
-    appendix_content = part3_appendix
+    appendix_content = deduped_appendix
     appendix_content += f"\n---\n\n*📅 Appendix generated on {get_current_date()}*  \n*🔬 Powered by INTELLISEARCH Research Platform*\n"
 
     logging.info("Three-part report generated successfully with separate display and download content.")
     print("[DEBUG] Display Content Sample:\n", display_content[:500])
     print("[DEBUG] Appendix Content Sample:\n", appendix_content[:500])
-    print(f"[DEBUG] Analysis Filename: {analysis_filename_text}")
-    print(f"[DEBUG] Appendix Filename: {appendix_text_filename}")
 
     # Save appendix to text file
+    REPORT_FILENAME_TEXT = "CrystalSearchReport.txt"
+
     appendix_filename_text = REPORT_FILENAME_TEXT.replace(".txt", "_appendix.txt")
     appendix_text_filename = save_report_to_text(appendix_content, appendix_filename_text)
     if not appendix_text_filename:
@@ -1630,9 +1641,6 @@ async def write_report(state: AgentState):
 
     logging.info("Report generation completed. State updated with final report and Q&A data preserved.")
     print("[DEBUG] Final state['report'] sample:\n", state.get("report", "")[:500])
-    print("[DEBUG] Final state['report_filename']:", state.get("report_filename", ""))
-    print("[DEBUG] Final state['appendix_filename']:", state.get("appendix_filename", ""))
-    
     return state
 
 

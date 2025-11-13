@@ -1,0 +1,19 @@
+# Research Report
+
+## 1. Original User Query
+
+**why sky blue**
+
+---
+
+## 2. IntelliSearch Response
+
+The sky appears blue primarily due to a phenomenon called Rayleigh scattering. Sunlight, which appears white, is actually composed of all colors of the rainbow, each with a different wavelength. Blue and violet light have shorter wavelengths, while red and orange light have longer wavelengths. As sunlight enters the Earth's atmosphere, it collides with air molecules (primarily nitrogen and oxygen). This collision causes the light to scatter in different directions. Here's a breakdown of the key aspects:
+
+*   **Rayleigh Scattering:** This type of scattering is more effective at shorter wavelengths. Therefore, blue and violet light are scattered much more strongly than other colors. This is why we see a blue sky. *   **Why Not Violet?** Although violet light is scattered even more than blue light, our eyes are more sensitive to blue. Additionally, some violet light is absorbed by the upper atmosphere. These two factors contribute to the sky appearing blue rather than violet. *   **Sunsets and Sunrises:** When the sun is near the horizon (during sunrise and sunset), sunlight has to travel through a greater distance of the atmosphere to reach our eyes. During this longer path, most of the blue light is scattered away, leaving the longer wavelengths like red and orange to dominate. This is why sunsets and sunrises often appear red or orange. *   **Atmospheric Conditions:** The presence of pollutants, dust, and other particles in the air can affect the color of the sky. These particles can scatter light in different ways, leading to duller or more muted colors. In areas with high levels of air pollution, sunrises and sunsets may appear less vibrant. *   **Not Always Blue:** The sky isn't always blue. The color can vary depending on the time of day, weather conditions, and the amount of pollution in the air. For example, during a storm, the sky may appear gray or even green due to the scattering of light by water droplets in the clouds. *   **Beyond Earth:** The color of the sky on other planets can be different depending on the composition and density of their atmospheres. For example, the sky on Mars can appear reddish due to the presence of iron oxide dust in the atmosphere. While Rayleigh scattering is the primary reason for the blue sky, it's not the complete story. Ozone absorption also plays a role, particularly at sunset. The blue color of the sky has puzzled humans for centuries, and while Rayleigh scattering is the commonly accepted explanation, ongoing research continues to refine our understanding of this phenomenon. ---
+
+
+---
+
+*📅 Analysis generated on November 13, 2025*  
+*🔬 Powered by INTELLISEARCH Research Platform*

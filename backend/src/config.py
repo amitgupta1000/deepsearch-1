@@ -97,13 +97,13 @@ DEFAULT_TEMPERATURE = LLM_TEMPERATURE
 
 # Search limits
 MAX_SEARCH_QUERIES = get_env_int("MAX_SEARCH_QUERIES", 10)  # Multiple queries for comprehensive coverage
-MAX_SEARCH_RESULTS = get_env_int("MAX_SEARCH_RESULTS", 10)  # Balanced between quality and performance
+MAX_SEARCH_RESULTS = get_env_int("MAX_SEARCH_RESULTS", 6)  # Balanced between quality and performance
 MAX_CONCURRENT_SCRAPES = get_env_int("MAX_CONCURRENT_SCRAPES", 6)  # Reasonable concurrency for stability
 MAX_SEARCH_RETRIES = get_env_int("MAX_SEARCH_RETRIES", 2)  # Limited retries to prevent hanging
 
 # AI iteration limits
-MAX_AI_ITERATIONS = get_env_int("MAX_AI_ITERATIONS", 3)
-MAX_USER_QUERY_LOOPS = get_env_int("MAX_USER_QUERY_LOOPS", 3)
+MAX_AI_ITERATIONS = get_env_int("MAX_AI_ITERATIONS", 1)
+MAX_USER_QUERY_LOOPS = get_env_int("MAX_USER_QUERY_LOOPS", 1)
 
 # Content processing
 CHUNK_SIZE = get_env_int("CHUNK_SIZE", 1000)  # Optimized for embedding model context
@@ -150,7 +150,6 @@ REPORT_FORMAT = os.getenv("REPORT_FORMAT", "md")
 DEFAULT_REPORT_TYPE = os.getenv("DEFAULT_REPORT_TYPE", "detailed")
 
 # Legacy support
-REPORT_FILENAME_PDF = os.getenv("REPORT_FILENAME_PDF", "Crystal_DeepSearch.pdf")
 REPORT_FILENAME_TEXT = os.getenv("REPORT_FILENAME_TEXT", "Crystal_DeepSearch.txt")
 
 # =============================================================================

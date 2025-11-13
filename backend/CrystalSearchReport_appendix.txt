@@ -1,0 +1,194 @@
+## 3. Appendix: Research Q&A and Sources
+
+### Research Questions and Detailed Answers
+
+#### Q1: Air pollution impact on sky color and visibility
+
+**Answer:** During
+sunsets and sunrises
+, when the Sun is closer to the horizon, sunlight has to
+travel through a longer distance
+and more of the dense environment to reach an observer’s eye. Sunrise and sunset times in your city
+Due to Rayleigh scattering, most of the light of shorter wavelengths – the blue, violet, and green – are scattered away multiple times,
+leaving only lights of longer wavelength
+– the... [1] pollutants tend to tone down the colors in the sky
+as well as impede light from reaching the observer on the ground. Because of this, the sky takes on dull hues of red and yellow when the air is full of dust and pollutants. This is why sunrises and sunsets in rural areas, over the ocean, and deserts are much more vibrant and colorful than over cities and urban areas. Tips: Take pictures of sunrise... [2] Public File Assistance
+Contact
+News Team
+Careers
+Contests
+twitter icon
+facebook icon
+ACCESSIBILITY
+Please ensure Javascript is enabled for purposes of
+website accessibility
+Why is the sky darker blue in fall, how the sun angle and air composition play a role
+by
+Meteorologist Violet Scibior
+Wed, October 1, 2025 at 5:18 PM
+5
+VIEW ALL PHOTOS
+Why is the sky darker blue in fall, how the sun angle and a... [3]
+
+---
+
+#### Q2: Citizen science projects measuring sky color and atmospheric conditions
+
+**Answer:** Redder when the Sun sets and rises
+Of course, the sky is not always blue. And Rayleigh scattering also explains why the sky tends to be reddish when the Sun is close to the horizon – at sunrise and sunset.When the Sun is near the horizon, its light passes through a lot more of the atmosphere to reach the Earth’s surface than when it is directly overhead. The blue and green light is scattered so we... [6]
+
+---
+
+#### Q3: Why is the sunset red or orange? [7] During
+sunsets and sunrises
+, when the Sun is closer to the horizon, sunlight has to
+travel through a longer distance
+and more of the dense environment to reach an observer’s eye. [8] Credit: NOAA/JPL-Caltech
+So what happens to all the “non-blue” wavelengths? They are still mixed together, unscattered by the atmosphere, so they still appear white. The scattered violet and blue light dominates the sky, making it appear blue. What happens to the violet? Some of the violet light is absorbed by the upper atmosphere. Also, our eyes are not as sensitive to violet as they are to blue.... [9]
+
+---
+
+#### Q4: History of the scientific explanation for why the sky is blue
+
+**Answer:** –
+Revised: 15 Sep 2023
+–
+Accepted: 20 Oct 2023
+–
+Published: 01 Dec 2023
+1
+Introduction
+The blue colour of the cloud-free sky is one of the most obvious and self-evident features of our natural environment and has puzzled humans for thousands of years. The blue colour of the sky is nowadays usually explained by Rayleigh scattering, an explanation that is, however, not entirely correct. In his 1953 ... [11] The Puzzle of the Blue Sky
+If the sky is blue, does that mean the air itself is blue? Clearly not. When you scoop up air in a jar, it looks transparent. So where does the color come from? The mystery deepens when you notice other natural phenomena:
+Sunsets glow red and orange. The Moon sometimes looks pale yellow. From space, the sky appears black, not blue. If air is “clear,” why does it change c... [12]
+
+---
+
+#### Q5: Why is the sky blue on Mars vs Earth? Clearly not. [15]
+
+---
+
+#### Q6: Advanced models of atmospheric light scattering
+
+**Answer:** pollutants tend to tone down the colors in the sky
+as well as impede light from reaching the observer on the ground. [17] 1. Understanding Light and the Electromagnetic Spectrum
+Light from the sun appears white, but in reality, it is made up of different colors. When passed through a prism, this white light separates into the visible spectrum: red, orange, yellow, green, blue, indigo, and violet. Each color corresponds to a different wavelength:
+The wavelength of red light is the longest, at about 700 nm. Violet and ... [20] When you look up at the sky during the day, this scattered blue and violet light reaches your eyes, however, the
+human eye is more receptive to blue frequencies
+than violet frequencies, so the
+sky looks blue
+. This phenomenon is known as
+Rayleigh scattering
+. It is named after British physicist John William Strutt, also known as Lord Rayleigh. Besides making the sky look blue, it is also the reaso... [24]
+
+---
+
+#### Q9: Is the sky always blue? Clearly not. [25] What Makes the Sky Blue Anyway
+To understand why the sky isn’t always blue, we first need to understand why it appears blue in the first place. Sunlight might look white to our eyes, but it actually contains
+all the colors of the rainbow
+. These colors travel in different wavelengths, with blue and violet at the shorter end and red and orange at the longer end. As sunlight enters Earth’s atmospher... [26] Redder when the Sun sets and rises
+Of course, the sky is not always blue. [27]
+
+---
+
+#### Q10: Expert opinions on common misconceptions about why the sky is blue
+
+**Answer:** 1. Violet and ... [28] Abstract
+The common answer to the question “Why is the sky blue?” is usually Rayleigh scattering. In 1953 Edward Hulburt demonstrated that Rayleigh scattering accounts for
+1
+/
+3
+and ozone absorption for
+2
+/
+3
+of the blue colour of the zenith sky at sunset. In this study, an approach to quantify the contribution of ozone to the blue colour of the sky for different viewing geometries is implemented ... [29] Why the Sky Is Blue and Sunsets Are Red: The Physics of Scattering | by Chemical Z | Sep, 2025 | Medium
+Sitemap
+Open in app
+Sign up
+Sign in
+Medium Logo
+Write
+Search
+Sign up
+Sign in
+Why the Sky Is Blue and Sunsets Are Red: The Physics of Scattering
+Chemical Z
+5 min read
+·
+Sep 30, 2025
+--
+1
+Listen
+Share
+Press enter or click to view image in full size
+Have you ever looked up on a sunny afternoon and ... [30]
+
+
+### Sources and Citations
+
+**[1]** https://www.timeanddate.com/astronomy/red-sunset.html
+
+**[2]** https://www.timeanddate.com/astronomy/red-sunset.html
+
+**[3]** https://cnycentral.com/weather/weather-wisdom/why-is-the-sky-darker-blue-in-fall-how-the-sun-angle-and-air-composition-play-a-role
+
+**[4]** https://www.detroitnews.com/story/life/just4kids/2025/03/12/just4kids-why-is-the-sky-blue/80758283007/
+
+**[5]** https://www.timeanddate.com/astronomy/red-sunset.html
+
+**[6]** https://cnycentral.com/weather/weather-wisdom/why-is-the-sky-darker-blue-in-fall-how-the-sun-angle-and-air-composition-play-a-role
+
+**[7]** https://www.timeanddate.com/astronomy/red-sunset.html
+
+**[8]** https://www.timeanddate.com/astronomy/red-sunset.html
+
+**[9]** https://www.nesdis.noaa.gov/about/k-12-education/atmosphere/why-the-sky-blue
+
+**[10]** https://acp.copernicus.org/articles/23/14829/2023/
+
+**[11]** https://cnycentral.com/weather/weather-wisdom/why-is-the-sky-darker-blue-in-fall-how-the-sun-angle-and-air-composition-play-a-role
+
+**[12]** https://medium.com/@zehraanjum210/why-the-sky-is-blue-and-sunsets-are-red-the-physics-of-scattering-1e719cac89ba
+
+**[13]** https://cnycentral.com/weather/weather-wisdom/why-is-the-sky-darker-blue-in-fall-how-the-sun-angle-and-air-composition-play-a-role
+
+**[14]** https://medium.com/@zehraanjum210/why-the-sky-is-blue-and-sunsets-are-red-the-physics-of-scattering-1e719cac89ba
+
+**[15]** https://www.timeanddate.com/astronomy/red-sunset.html
+
+**[16]** https://www.timeanddate.com/astronomy/red-sunset.html
+
+**[17]** https://cnycentral.com/weather/weather-wisdom/why-is-the-sky-darker-blue-in-fall-how-the-sun-angle-and-air-composition-play-a-role
+
+**[18]** https://uniboardhub.com/blog-detail.php?post=scattering-of-light-why-is-the-sky-blue-and-sunsets-red
+
+**[19]** https://acp.copernicus.org/articles/23/14829/2023/
+
+**[20]** https://cnycentral.com/weather/weather-wisdom/why-is-the-sky-darker-blue-in-fall-how-the-sun-angle-and-air-composition-play-a-role
+
+**[21]** https://www.timeanddate.com/astronomy/red-sunset.html
+
+**[22]** https://www.timeanddate.com/astronomy/red-sunset.html
+
+**[23]** https://cnycentral.com/weather/weather-wisdom/why-is-the-sky-darker-blue-in-fall-how-the-sun-angle-and-air-composition-play-a-role
+
+**[24]** https://acp.copernicus.org/articles/23/14829/2023/
+
+**[25]** https://medium.com/@zehraanjum210/why-the-sky-is-blue-and-sunsets-are-red-the-physics-of-scattering-1e719cac89ba
+
+**[26]** https://www.cmycubes.com/blogs/cmycubes/color-of-the-sky-explained-simple-science-behind-light-scattering?srsltid=AfmBOooxuoSoQ-ZIyEVhsEI3eYDI0oEyd76M7DMNCFfDMbeTTtW8YncW
+
+**[27]** https://www.detroitnews.com/story/life/just4kids/2025/03/12/just4kids-why-is-the-sky-blue/80758283007/
+
+**[28]** https://uniboardhub.com/blog-detail.php?post=scattering-of-light-why-is-the-sky-blue-and-sunsets-red
+
+**[29]** https://acp.copernicus.org/articles/23/14829/2023/
+
+**[30]** https://medium.com/@zehraanjum210/why-the-sky-is-blue-and-sunsets-are-red-the-physics-of-scattering-1e719cac89ba
+
+
+---
+
+*📅 Appendix generated on November 13, 2025*  
+*🔬 Powered by INTELLISEARCH Research Platform*

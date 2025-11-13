@@ -1,9 +1,7 @@
 import asyncio
 import logging
-import argparse
-from typing import Dict, Any, List
+from typing import Dict, Any
 
-# Basic logging configuration in case setup.py didn't configure it
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Startup validation
@@ -31,12 +29,10 @@ def validate_startup():
         logging.error(f"Startup validation error: {e}")
         return False
 
-# RunnableConfig is optional (depends on langchain_core availability)
 try:
     from langchain_core.runnables import RunnableConfig
     config = RunnableConfig(recursion_limit=100)
 except Exception:
-    logging.debug("langchain_core.runnables not available; continuing without RunnableConfig.")
     config = None
 
 
@@ -91,32 +87,30 @@ async def run_workflow(
         else:
             astream = app.astream(initial_state)
 
-        # Track execution progress
+        # Track execution progress and capture final state
         executed_nodes = []
+        last_state = None
         async for step in astream:
             for key, value in step.items():
                 logging.info("Node executed: %s", key)
                 executed_nodes.append(key)
+            last_state = step
 
         logging.info("Workflow finished successfully.")
-        final_report_filename = initial_state.get("report_filename", "No report file generated.")
-        logging.info("Check for report file: %s.txt", final_report_filename)
-
-        # Check for any errors in the final state
-        final_error_state = initial_state.get('error')
-        if final_error_state:
-            logging.warning("Workflow completed with errors: %s", final_error_state)
+        if last_state:
+            final_error_state = last_state.get('error')
+            if final_error_state:
+                logging.warning("Workflow completed with errors: %s", final_error_state)
+            else:
+                logging.info("Workflow completed successfully without errors.")
+            return last_state
         else:
-            logging.info("Workflow completed successfully without errors.")
-
-        return initial_state
+            logging.warning("No final state returned from workflow.")
+            return None
 
     except Exception as e:
         logging.exception(f"An error occurred during workflow execution: {e}")
         return None
-
-
-
 
 
 def simple_cli():
@@ -128,8 +122,8 @@ def simple_cli():
     user_research_query = input("Enter your Research Query: ")
 
     print("\nSelect research type:")
-    print("1: Legal")
-    print("2: General")
+    print("1: General")
+    print("2: Legal")
     print("3: Macro")
     print("4: DeepSearch")
     print("5: Person Search")
@@ -137,8 +131,8 @@ def simple_cli():
     prompt_type_choice = input("Enter the number for your desired research type: ")
 
     prompt_type_mapping = {
-        "1": "legal",
-        "2": "general",
+        "1": "general",
+        "2": "legal",
         "3": "macro",
         "4": "deepsearch",
         "5": "person_search",
@@ -148,14 +142,18 @@ def simple_cli():
     print(f"Selected research type: {selected_prompt_type}")
 
     print("\n🚀 Generating standard report and appendix...")
-    result = asyncio.run(run_workflow(
+    # Run workflow and capture the final state
+    final_state = asyncio.run(run_workflow(
         user_research_query,
         selected_prompt_type
     ))
-    # Output summary
-    if result and result.get("report"):
+    # Output summary from final state
+    if final_state and final_state.get("report"):
         print("\nReport generated successfully!")
-        print("Report filename:", result.get("report_filename", "IntelliSearchReport"))
+        print("Report filename:", final_state.get("report_filename", "IntelliSearchReport"))
+        print("\nReport preview:\n", final_state.get("report", "")[:500])
+        if final_state.get("error"):
+            print("\n[Warning] Errors during workflow:\n", final_state.get("error"))
     else:
         print("\nReport generation failed or incomplete.")
 
