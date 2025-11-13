@@ -22,8 +22,6 @@ from backend.src.graph import app as workflow_app
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 SERPER_API_KEY = os.getenv("SERPER_API_KEY", "")
 
-print(f"[main.py] GOOGLE_API_KEY: {GOOGLE_API_KEY}")
-print(f"[main.py] SERPER_API_KEY: {SERPER_API_KEY}")
 
 def get_current_date():
     return datetime.now().strftime("%Y-%m-%d")
@@ -81,15 +79,15 @@ async def run_workflow(
         else:
             astream = workflow_app.astream(initial_state)
         
+        last_state = None
         async for step in astream:
             for key, value in step.items():
                 logging.info("Node executed: %s", key)
                 session["current_step"] = f"Executing step: {key}"
                 session["progress"] = progress_map.get(key, session["progress"])
                 session["updated_at"] = datetime.now()
-
-        final_state = await astream.get_final_output()
-        return final_state
+            last_state = step
+        return last_state
 
     except Exception as e:
         logging.exception(f"An error occurred during workflow execution: {e}")

@@ -935,9 +935,11 @@ async def extract_content(state: AgentState) -> AgentState:
                     # Truncate content if it's excessively long
                     extracted_content = scraped_content.text[:10000] if scraped_content.text else "" # Limit to 10k characters
                     extracted_title = scraped_content.title if scraped_content.title else "Untitled"
+                    print(f"[EXTRACT SUCCESS] {target_url}")
                     logging.info("Successfully extracted content from %s", target_url)
                     return target_url, {"content": extracted_content, "title": extracted_title} # Return URL and content/title dict
                 else:
+                    print(f"[EXTRACT FAIL] {target_url} | Error: {scraped_content.error}")
                     # If scraping failed but didn't timeout, log the error and use snippet if available
                     error_msg = f"Scraping failed for {target_url}: {scraped_content.error}"
                     logging.error(error_msg)

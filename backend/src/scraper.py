@@ -101,7 +101,15 @@ class Scraper:
                     scrape_time=time.time() - start
                 )
         except Exception as e:
-            return ScrapedContent(url=url, success=False, error=str(e), scrape_time=time.time() - start)
+            return ScrapedContent(
+                url=url,
+                title=url,
+                text="",
+                html=None,
+                success=False,
+                error=str(e),
+                scrape_time=time.time() - start
+            )
         finally:
             if session is not None:
                 await session.close()
