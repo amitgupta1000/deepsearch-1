@@ -810,6 +810,8 @@ async def evaluate_search_results(state: AgentState) -> AgentState:
         "error": "\n".join(errors) if errors else None
     })
 
+    final_urls = [item.url for item in final_data if hasattr(item, 'url')]
+    print(f"Final URLs for extraction (first 5): {final_urls[:5]}")
     logging.info(f"evaluate_search_results: Final data size: {len(final_data)}")
     return state
 
