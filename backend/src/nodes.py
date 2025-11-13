@@ -231,8 +231,8 @@ except ImportError:
     MAX_SEARCH_QUERIES = 5
     MAX_CONCURRENT_SCRAPES = 4
     MAX_SEARCH_RETRIES = 2
-    MAX_AI_ITERATIONS = 3
-    MAX_USER_QUERY_LOOPS = 3
+    MAX_AI_ITERATIONS = 1
+    MAX_USER_QUERY_LOOPS = 1
     DEFAULT_USER_AGENT = "intellISearch-bot/1.0"
     DEFAULT_REFERER = "https://example.com"
     URL_TIMEOUT = 45
@@ -1267,7 +1267,7 @@ async def AI_evaluate(state: AgentState) -> AgentState:
     logging.info("AI Evaluation started: evaluating %d Q&A pairs for original query coverage.", len(qa_pairs))
 
     state["search_iteration_count"] = state.get("search_iteration_count", 0) + 1
-    max_iterations = 3  # Limit to 3 AI-driven iterations
+    max_iterations =  MAX_AI_ITERATIONS # Limit to MAX AI-driven iterations
     errors = []
     state["proceed"] = True
 

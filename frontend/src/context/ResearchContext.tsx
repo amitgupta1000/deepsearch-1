@@ -175,11 +175,12 @@ export const ResearchProvider: React.FC<{ children: ReactNode }> = ({ children }
               wordCount: result.report_content?.split(' ').length || 0,
               sources: result.sources?.length || 0
             });
-            
+
+            // Map backend fields to frontend expected structure
             return {
-              report: result.report_content || 'No report content available',
+              report: result.report_content || result.report || 'No report content available',
               sources: result.sources || [],
-              wordCount: result.report_content ? result.report_content.split(' ').length : 0,
+              wordCount: (result.report_content || result.report) ? (result.report_content || result.report).split(' ').length : 0,
               citations: result.citations || [],
               timestamp: result.completed_at || new Date().toISOString(),
               sessionId: sessionId // Add session ID for download functionality

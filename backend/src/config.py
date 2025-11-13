@@ -96,8 +96,8 @@ DEFAULT_TEMPERATURE = LLM_TEMPERATURE
 # =============================================================================
 
 # Search limits
-MAX_SEARCH_QUERIES = get_env_int("MAX_SEARCH_QUERIES", 10)  # Multiple queries for comprehensive coverage
-MAX_SEARCH_RESULTS = get_env_int("MAX_SEARCH_RESULTS", 6)  # Balanced between quality and performance
+MAX_SEARCH_QUERIES = get_env_int("MAX_SEARCH_QUERIES", 15)  # Multiple queries for comprehensive coverage
+MAX_SEARCH_RESULTS = get_env_int("MAX_SEARCH_RESULTS", 10)  # Balanced between quality and performance
 MAX_CONCURRENT_SCRAPES = get_env_int("MAX_CONCURRENT_SCRAPES", 6)  # Reasonable concurrency for stability
 MAX_SEARCH_RETRIES = get_env_int("MAX_SEARCH_RETRIES", 2)  # Limited retries to prevent hanging
 
