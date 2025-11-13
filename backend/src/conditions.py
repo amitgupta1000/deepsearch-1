@@ -43,8 +43,14 @@ def route_user_approval(state: dict) -> str:
 def route_ai_evaluate(state: dict) -> str:
     """
     Routes AI evaluation result to the appropriate next node.
+    Uses MAX_AI_ITERATIONS from config for iteration cap.
     """
-    max_loops = 5  # You can make this configurable
+    try:
+        from .config import MAX_AI_ITERATIONS
+    except ImportError:
+        MAX_AI_ITERATIONS = 1
+
+    max_loops = MAX_AI_ITERATIONS
 
     if state.get("search_iteration_count", 0) >= max_loops:
         return "write_report"
