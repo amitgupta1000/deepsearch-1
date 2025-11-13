@@ -1019,6 +1019,13 @@ async def extract_content(state: AgentState) -> AgentState:
 
     state["relevant_contexts"] = relevant_contexts
 
+    # Print sample text from the first 5 successful extractions
+    sample_items = list(relevant_contexts.items())[:5]
+    print("\n--- Extraction Samples (first 5) ---")
+    for i, (url, content_data) in enumerate(sample_items, 1):
+        sample_text = content_data.get("content", "")
+        print(f"[{i}] {url}:\n{sample_text[:300]}\n---")
+
     # Append new errors to existing ones in state
     # Errors from process_single_url_with_timeout are already logged, no need to add to state['error'] unless critical
     # Let's just add a summary error if relevant_contexts is empty despite having valid_data initially
@@ -1140,7 +1147,7 @@ async def embed_and_retrieve(state: AgentState) -> AgentState:
     new_error = (str(current_error_state or '') + "\n" + "\n".join(errors)).strip() if errors else (current_error_state.strip() if current_error_state is not None else None)
     state['error'] = None if new_error is None or new_error == "" else new_error
     state["relevant_chunks"] = []
-    return state
+
 
 
 async def create_qa_pairs(state: AgentState) -> AgentState:
@@ -1232,6 +1239,15 @@ async def create_qa_pairs(state: AgentState) -> AgentState:
         state["all_citations"] = all_citations
         logging.info(f"Created {len(qa_pairs)} Q&A pairs with {len(all_citations)} total citations.")
         
+        # Print sample text from the first 2 QA pairs if available
+        qa_pairs = state.get("qa_pairs", [])
+        print("\n--- QA Pair Samples (first 2) ---")
+        for i, qa in enumerate(qa_pairs[:2], 1):
+            question = qa.get("question", "")
+            answer = qa.get("answer", "")
+            print(f"[{i}] Q: {question}\nA: {answer[:300]}\n---")
+        return state
+
     except Exception as e:
         error_msg = f"Error creating Q&A pairs: {e}"
         logging.error(error_msg, exc_info=True)
