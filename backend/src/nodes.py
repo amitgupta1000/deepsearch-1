@@ -288,12 +288,6 @@ try:
         query_writer_instructions_investment,
         web_search_validation_instructions,
         reflection_instructions_modified,
-        report_writer_instructions_legal,
-        report_writer_instructions_general,
-        report_writer_instructions_macro,
-        report_writer_instructions_deepsearch,
-        report_writer_instructions_person_search,
-        report_writer_instructions_investment,
     ) 
 except ImportError:
     logging.error("Could not import prompt instructions from prompt.py. LLM nodes will not function.")
@@ -306,12 +300,6 @@ except ImportError:
     query_writer_instructions_investment = ""
     web_search_validation_instructions = ""
     reflection_instructions_modified = ""
-    report_writer_instructions_legal = ""
-    report_writer_instructions_general = ""
-    report_writer_instructions_macro = ""
-    report_writer_instructions_deepsearch = ""
-    report_writer_instructions_person_search = ""
-    report_writer_instructions_investment = ""
     
 
 # Import LangChain components used in nodes
@@ -1019,13 +1007,6 @@ async def extract_content(state: AgentState) -> AgentState:
 
     state["relevant_contexts"] = relevant_contexts
 
-    # Print sample text from the first 5 successful extractions
-    sample_items = list(relevant_contexts.items())[:5]
-    print("\n--- Extraction Samples (first 5) ---")
-    for i, (url, content_data) in enumerate(sample_items, 1):
-        sample_text = content_data.get("content", "")
-        print(f"[{i}] {url}:\n{sample_text[:300]}\n---")
-
     # Append new errors to existing ones in state
     # Errors from process_single_url_with_timeout are already logged, no need to add to state['error'] unless critical
     # Let's just add a summary error if relevant_contexts is empty despite having valid_data initially
@@ -1606,6 +1587,10 @@ async def write_report(state: AgentState):
     appendix_content += f"\n---\n\n*📅 Appendix generated on {get_current_date()}*  \n*🔬 Powered by INTELLISEARCH Research Platform*\n"
 
     logging.info("Three-part report generated successfully with separate display and download content.")
+    print("[DEBUG] Display Content Sample:\n", display_content[:500])
+    print("[DEBUG] Appendix Content Sample:\n", appendix_content[:500])
+    print(f"[DEBUG] Analysis Filename: {analysis_filename_text}")
+    print(f"[DEBUG] Appendix Filename: {appendix_text_filename}")
 
     # Save appendix to text file
     appendix_filename_text = REPORT_FILENAME_TEXT.replace(".txt", "_appendix.txt")
@@ -1644,6 +1629,9 @@ async def write_report(state: AgentState):
     state['iteration_count'] = 0  # Reset iteration counter
 
     logging.info("Report generation completed. State updated with final report and Q&A data preserved.")
+    print("[DEBUG] Final state['report'] sample:\n", state.get("report", "")[:500])
+    print("[DEBUG] Final state['report_filename']:", state.get("report_filename", ""))
+    print("[DEBUG] Final state['appendix_filename']:", state.get("appendix_filename", ""))
     
     return state
 
