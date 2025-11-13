@@ -124,9 +124,13 @@ except ImportError:
 
 try:
     from .utils import (
-        safe_format, get_current_date, clean_extracted_text,
-    rank_urls, save_report_to_text,
-    format_research_report, enhance_report_readability  # Import utility functions
+        safe_format, 
+        get_current_date, 
+        clean_extracted_text,
+        rank_urls, 
+        save_report_to_text,
+        format_research_report, 
+        enhance_report_readability  # Import utility functions
     )
 except ImportError:
     logging.error("Could not import utility functions from utils.py. Some nodes may be limited.")
