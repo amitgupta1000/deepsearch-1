@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MagnifyingGlassIcon, Cog6ToothIcon, KeyIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useResearch } from '../context/ResearchContext';
 import type { ResearchRequest } from '../types';
 
@@ -7,11 +7,6 @@ const ResearchForm: React.FC = () => {
   const { startResearch, state } = useResearch();
   const [query, setQuery] = useState('');
   const [promptType, setPromptType] = useState('general');
-  const [showApiKeys, setShowApiKeys] = useState(false);
-  const [apiKeys, setApiKeys] = useState({
-    gemini: '',
-    serper: '',
-  });
 
   const promptTypes = [
     { value: 'general', label: 'General Research', description: 'Broad research across multiple topics and sources' },
@@ -29,7 +24,6 @@ const ResearchForm: React.FC = () => {
     const request: ResearchRequest = {
       query: query.trim(),
       promptType,
-      apiKeys,
     };
 
     await startResearch(request);
@@ -123,62 +117,6 @@ const ResearchForm: React.FC = () => {
                 </label>
               ))}
             </div>
-          </div>
-
-          {/* API Keys Section */}
-          <div className="border-t pt-6">
-            <button
-              type="button"
-              onClick={() => setShowApiKeys(!showApiKeys)}
-              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
-              disabled={state.isLoading}
-            >
-              <Cog6ToothIcon className="w-4 h-4" />
-              <span>Advanced Settings</span>
-              <span className="text-xs bg-gray-100 px-2 py-1 rounded">Optional</span>
-            </button>
-            
-            {showApiKeys && (
-              <div className="mt-4 p-4 bg-gray-50 rounded-lg space-y-4">
-                <div className="flex items-center space-x-2 mb-3">
-                  <KeyIcon className="w-4 h-4 text-gray-500" />
-                  <span className="font-medium text-gray-700">Custom API Keys</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="gemini-key" className="block text-sm font-medium text-gray-700 mb-1">
-                      Google Gemini API Key
-                    </label>
-                    <input
-                      id="gemini-key"
-                      type="password"
-                      value={apiKeys.gemini}
-                      onChange={(e) => setApiKeys(prev => ({ ...prev, gemini: e.target.value }))}
-                      placeholder="Enter Gemini API key..."
-                      className="input-field"
-                      disabled={state.isLoading}
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="serper-key" className="block text-sm font-medium text-gray-700 mb-1">
-                      Serper API Key
-                    </label>
-                    <input
-                      id="serper-key"
-                      type="password"
-                      value={apiKeys.serper}
-                      onChange={(e) => setApiKeys(prev => ({ ...prev, serper: e.target.value }))}
-                      placeholder="Enter Serper API key..."
-                      className="input-field"
-                      disabled={state.isLoading}
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-gray-500">
-                  Leave empty to use default API keys configured on the server.
-                </p>
-              </div>
-            )}
           </div>
 
           {/* Submit Button */}

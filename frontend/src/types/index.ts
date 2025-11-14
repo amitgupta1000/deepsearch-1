@@ -1,19 +1,14 @@
 export interface ResearchRequest {
   query: string;
   promptType?: string;
-  apiKeys: {
-    gemini?: string;
-    serper?: string;
-  };
 }
 
 export interface ResearchResult {
-  report: string;
-  sources: string[];
-  wordCount: number;
-  citations: string[];
-  timestamp: string;
-  sessionId?: string; // Optional session ID for server-side downloads
+  analysis_content: string;
+  appendix_content: string;
+  session_id: string; 
+  created_at: string;
+  completed_at?: string;
 }
 
 export interface ActivityLog {
@@ -32,10 +27,3 @@ export interface ResearchState {
   progress: number;
   currentStep: string;
 }
-
-export interface Citation {
-  id: number;
-  url: string;
-  title: string;
-}
-
