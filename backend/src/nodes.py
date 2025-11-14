@@ -1437,7 +1437,7 @@ def deduplicate_content(text: str) -> str:
     
     return ' '.join(unique_sentences)
 
-
+#===================================================
 async def write_report(state: AgentState):
     """
     Generates the final report using the new three-part structure:
@@ -1445,126 +1445,100 @@ async def write_report(state: AgentState):
     2) IntelliSearch Response (LLM analysis) 
     3) Appendix with Q&A pairs and citations
     """
-    # Use color constants from setup if available
     try:
-        from setup import RED, ENDC, GREEN
+        from setup import GREEN, ENDC
     except ImportError:
-        RED = '\033[91m'
-        ENDC = '\033[0m'
-        GREEN = '\033[92m'
+        GREEN = '\\033[92m'
+        ENDC = '\\033[0m'
 
     errors: List[str] = []
-
-    # Config and state
-    prompt_type = state.get("prompt_type", "general")
-    
-    logging.info("Using prompt type '%s' with new three-part report structure.", prompt_type)
-
     research_topic = state.get('new_query', 'the topic')
-    search_queries = state.get('search_queries', [])
     qa_pairs = state.get('qa_pairs', [])
-    print(f"[DEBUG][write_report] state['qa_pairs'] length: {len(qa_pairs)}")
-    if qa_pairs:
-        print(f"[DEBUG][write_report] First QA: {qa_pairs[0]}")
+    display_content = []
+    logging.info(f"Generating report for topic: '{research_topic}'")
+	REPORT_FILENAME_TEXT = "CrystalSearchReport.txt"
 
     if not qa_pairs:
-        final_report_content = f"Could not generate a report. No Q&A pairs were created for the topic: '{research_topic}'."
-        errors.append(final_report_content)
-        logging.warning(final_report_content)
-        print("[DEBUG] No Q&A pairs found. Report will be blank. Check upstream nodes for chunk extraction and Q&A generation.")
-        # Save and update state as before
-        analysis_filename_text = REPORT_FILENAME_TEXT.replace(".txt", "_analysis.txt")
-        analysis_text_filename = save_report_to_text(final_report_content, analysis_filename_text)
+        logging.warning(f"No Q&A pairs found for topic: '{research_topic}'. Generating empty report.")
+        display_content = f"Could not generate a report. No Q&A pairs were created for the topic: '{research_topic}'."
+        errors.append(display_content)
+        
+        analysis_filename = REPORT_FILENAME_TEXT.replace(".txt", "_analysis.txt")
+        analysis_text_file = save_report_to_text(display_content, analysis_filename)
 
-        state["analysis_content"] = final_report_content
-        state["analysis_filename"] = analysis_text_filename
-        state["appendix_content"] = ""
-        state["appendix_filename"] = None
-        current_error = state.get('error', '') or ''
-        state['error'] = (current_error + "\n" + "\n".join(errors)).strip() if errors else current_error.strip()
-        state['error'] = None if state['error'] == "" else state['error']
-        return state
-
-    # PART 1: Original User Query
-    part1_query = f"# Research Report\n\n## 1. Original User Query\n\n**{research_topic}**\n\n---\n\n"
-
-    # PART 2: Generate IntelliSearch Response using LLM analysis
-    logging.info("Generating IntelliSearch Response (Part 2)...")
-    
-    # Prepare context from Q&A pairs for LLM analysis
-    qa_context = ""
-    if qa_pairs:
-        qa_context = "Based on the following Q&A analysis:\n\n"
-        for i, qa in enumerate(qa_pairs):
-            qa_context += f"Q{i+1}: {qa['question']}\n"
-            qa_context += f"A{i+1}: {qa['answer'][:3000]}...\n\n"
+        state.update({
+            "analysis_content": display_content,
+            "analysis_filename": analysis_text_file,
+            "appendix_content": "",
+            "appendix_filename": None,
+        })
     else:
-        qa_context = "No structured Q&A data available for analysis."
+        # PART 1: Original User Query
+        part1_query = f"# Research Report\\n\\n## 1. Original User Query\\n\\n**{research_topic}**\\n\\n---\\n\\n"
 
-    intellisearch_prompt = f"""
-    You are an expert research analyst. Provide a comprehensive, analytical response to the user's query by synthesizing information from the collected research data.
-
-    USER QUERY: "{research_topic}"
-
-    RESEARCH DATA:
-    {qa_context}
-
-    INSTRUCTIONS:
-    - Provide a direct, analytical answer to the user's original question
-    - Synthesize insights from all the research data
-    - Focus on creating a cohesive, analytical response
-    - Target 500-1000 words for this response
-    - Use clear, professional language with proper markdown formatting
-    - Include key insights and implications
-    - Do not repeat the individual Q&A pairs (they will be in the appendix)
-    - Focus on answering the user's question comprehensively
-    - Use bullet points, subheadings, or numbered lists where appropriate
-
-    Generate the IntelliSearch Response:
-    """
-
-    try:
-        messages = [
-            SystemMessage(content=intellisearch_prompt),
-            HumanMessage(content=f"Analyze and answer: {research_topic}")
-        ]
+        # PART 2: Generate IntelliSearch Response using LLM analysis
+        logging.info("Generating IntelliSearch Response (Part 2)...")
         
-        if llm_call_async:
-            intellisearch_response = await llm_call_async(messages)
-            if not intellisearch_response:
-                intellisearch_response = "Unable to generate analysis due to LLM unavailability."
-        else:
-            intellisearch_response = "Unable to generate analysis due to LLM unavailability."
+        qa_context = "Based on the following Q&A analysis:\\n\\n"
+        for i, qa in enumerate(qa_pairs):
+            qa_context += f"Q{i+1}: {qa['question']}\\nA{i+1}: {qa['answer'][:3000]}...\\n\\n"
+
+        intellisearch_prompt = f"""
+        You are an expert research analyst. Provide a comprehensive, analytical response to the user's query by synthesizing information from the collected research data.
+
+        USER QUERY: "{research_topic}"
+
+        RESEARCH DATA:
+        {qa_context}
+
+        INSTRUCTIONS:
+        - Provide a direct, analytical answer to the user's original question
+        - Synthesize insights from all the research data
+        - Focus on creating a cohesive, analytical response
+        - Target 500-1000 words for this response
+        - Use clear, professional language with proper markdown formatting
+        - Include key insights and implications
+        - Do not repeat the individual Q&A pairs (they will be in the appendix)
+        - Focus on answering the user's question comprehensively
+        - Use bullet points, subheadings, or numbered lists where appropriate
+
+        Generate the IntelliSearch Response:
+        """
+
+        try:
+            messages = [
+                SystemMessage(content=intellisearch_prompt),
+                HumanMessage(content=f"Analyze and answer: {research_topic}")
+            ]
             
-    except Exception as e:
-        logging.error(f"Error generating IntelliSearch response: {e}")
-        intellisearch_response = f"Error generating analysis: {str(e)}"
+            if llm_call_async:
+                intellisearch_response = await llm_call_async(messages) or "Unable to generate analysis due to LLM unavailability."
+            else:
+                intellisearch_response = "Unable to generate analysis due to LLM unavailability."
+                
+        except Exception as e:
+            logging.error(f"Error generating IntelliSearch response: {e}")
+            intellisearch_response = f"Error generating analysis: {str(e)}"
 
-    part2_response = f"## 2. IntelliSearch Response\n\n{intellisearch_response}\n\n---\n\n"
+        part2_response = f"## 2. IntelliSearch Response\\n\\n{intellisearch_response}\\n\\n---\\n\\n"
 
-    # PART 3: Appendix with Q&A pairs and citations
-    logging.info("Generating Appendix (Part 3)...")
-    
-    part3_appendix = "## 3. Appendix: Research Q&A and Sources\n\n"
-    
-    all_citations = []
-    citation_counter = 1
-    
-    if qa_pairs:
-        part3_appendix += "### Research Questions and Detailed Answers\n\n"
+        # PART 3: Appendix with Q&A pairs and citations
+        logging.info("Generating Appendix (Part 3)...")
+        
+        part3_appendix = "## 3. Appendix: Research Q&A and Sources\\n\\n"
+        all_citations = []
+        citation_counter = 1
+        
+        part3_appendix += "### Research Questions and Detailed Answers\\n\\n"
         
         for i, qa in enumerate(qa_pairs):
-            part3_appendix += f"#### Q{i+1}: {qa['question']}\n\n"
-            
-            # Process answer and update citation numbers
+            part3_appendix += f"#### Q{i+1}: {qa['question']}\\n\\n"
             answer = qa['answer']
             for citation in qa.get('citations', []):
-                # Replace local citation numbers with global ones
                 old_ref = f"[{citation['number']}]"
                 new_ref = f"[{citation_counter}]"
                 answer = answer.replace(old_ref, new_ref)
                 
-                # Add to global citations list
                 all_citations.append({
                     'number': citation_counter,
                     'source': citation['source'],
@@ -1573,79 +1547,60 @@ async def write_report(state: AgentState):
                 })
                 citation_counter += 1
             
-            part3_appendix += f"**Answer:** {answer}\n\n"
-            if i < len(qa_pairs) - 1:  # Add separator except for last item
-                part3_appendix += "---\n\n"
+            part3_appendix += f"**Answer:** {answer}\\n\\n"
+            if i < len(qa_pairs) - 1:
+                part3_appendix += "---\\n\\n"
 
-    # Add citations section with better formatting
-    if all_citations:
-        part3_appendix += "\n### Sources and Citations\n\n"
-        for citation in all_citations:
-            source_info = citation['source']
-            if citation.get('url') and citation['url'] != citation['source']:
-                part3_appendix += f"**[{citation['number']}]** [{citation['source']}]({citation['url']})\n\n"
-            else:
-                part3_appendix += f"**[{citation['number']}]** {source_info}\n\n"
 
-    # Create separate content for display vs download
-    # Deduplicate content in the report
-    deduped_part2 = deduplicate_content(part2_response)
-    deduped_appendix = deduplicate_content(part3_appendix)
+        # Deduplicate and format final content
+        deduped_part2 = deduplicate_content(part2_response)
+        deduped_appendix = deduplicate_content(part3_appendix)
 
-    # For display: Show User Query (Part 1) + IntelliSearch Analysis (Part 2)
-    display_content = part1_query + deduped_part2
-    display_content += f"\n---\n\n*📅 Analysis generated on {get_current_date()}*  \n*🔬 Powered by INTELLISEARCH Research Platform*\n"
+        display_content = part1_query + deduped_part2
+        display_content += f"\\n---\\n\\n Analysis generated on {get_current_date()}*  \\n Powered by INTELLISEARCH Research Platform*\\n"
 
-    # For download: Full report with all parts
-    full_report_content = part1_query + deduped_part2 + deduped_appendix
-    full_report_content += f"\n---\n\n*📅 Report generated on {get_current_date()}*  \n*🔬 Powered by INTELLISEARCH Research Platform*\n"
+        appendix_content = deduped_appendix
+        appendix_content += f"\\n---\\n\\n Appendix generated on {get_current_date()}*  \\n Powered by INTELLISEARCH Research Platform*\\n"
 
-    # For appendix download: Just the appendix section
-    appendix_content = deduped_appendix
-    appendix_content += f"\n---\n\n*📅 Appendix generated on {get_current_date()}*  \n*🔬 Powered by INTELLISEARCH Research Platform*\n"
+        logging.info("Three-part report generated successfully.")
+        print("[DEBUG] Display Content Sample:\\n", display_content[:500])
+        print("[DEBUG] Appendix Content Sample:\\n", appendix_content[:500])
 
-    logging.info("Three-part report generated successfully with separate display and download content.")
-    print("[DEBUG] Display Content Sample:\n", display_content[:500])
-    print("[DEBUG] Appendix Content Sample:\n", appendix_content[:500])
+        # Save files
+        appendix_filename = REPORT_FILENAME_TEXT.replace(".txt", "_appendix.txt")
+        appendix_text_file = save_report_to_text(appendix_content, appendix_filename)
+        if not appendix_text_file:
+            errors.append(f"Failed to save appendix to text file: {appendix_filename}.")
 
-    # Save appendix to text file
-    REPORT_FILENAME_TEXT = "CrystalSearchReport.txt"
+        analysis_filename = REPORT_FILENAME_TEXT.replace(".txt", "_analysis.txt")
+        analysis_text_file = save_report_to_text(display_content, analysis_filename)
+        if not analysis_text_file:
+            errors.append(f"Failed to save analysis to text file: {analysis_filename}.")
 
-    appendix_filename_text = REPORT_FILENAME_TEXT.replace(".txt", "_appendix.txt")
-    appendix_text_filename = save_report_to_text(appendix_content, appendix_filename_text)
-    if not appendix_text_filename:
-        errors.append(f"Failed to save appendix to text file: {appendix_filename_text}.")
-        logging.error(errors[-1])
+        # Update state
+        state.update({
+            "analysis_content": display_content,
+            "appendix_content": appendix_content,
+            "analysis_filename": analysis_text_file,
+            "appendix_filename": appendix_text_file
+        })
 
-    # Save analysis to text file
-    analysis_filename_text = REPORT_FILENAME_TEXT.replace(".txt", "_analysis.txt")
-    analysis_text_filename = save_report_to_text(display_content, analysis_filename_text)
-    if not analysis_text_filename:
-        errors.append(f"Failed to save analysis to text file: {analysis_filename_text}.")
-        logging.error(errors[-1])
-
-    # Update state with analysis and appendix content and filenames
-    state["analysis_content"] = display_content
-    state["appendix_content"] = appendix_content
-    state["analysis_filename"] = analysis_text_filename
-    state["appendix_filename"] = appendix_text_filename
-    
-    # Handle errors
+    # Common final steps for both cases
     current_error = state.get('error', '') or ''
-    state['error'] = (current_error + "\n" + "\n".join(errors)).strip() if errors else current_error.strip()
-    state['error'] = None if state['error'] == "" else state['error']
+    state['error'] = (current_error + "\\n" + "\\n".join(errors)).strip() if errors else (current_error.strip() if current_error else None)
+    if state['error'] == '': state['error'] = None
 
-    # Clean up intermediate data that's no longer needed
-    # Keep qa_pairs and all_citations for potential future use (e.g., follow-up queries)
-    state['data'] = []  # Clear search results
-    state['relevant_contexts'] = {}  # Clear extracted content
-    state['suggested_follow_up_queries'] = []  # Clear follow-up queries
-    state['knowledge_gap'] = ""  # Clear gap information
-    state['rationale'] = ""  # Clear rationale
-    state['iteration_count'] = 0  # Reset iteration counter
-
-    logging.info("Report generation completed. State updated with final report and Q&A data preserved.")
-    print("[DEBUG] Final state['analysis_content'] sample:\n", state.get("analysis_content", "")[:500])
+    # Clean up intermediate data
+    state.update({
+        'data': [],
+        'relevant_contexts': {},
+        'suggested_follow_up_queries': [],
+        'knowledge_gap': "",
+        'rationale': "",
+        'iteration_count': 0,
+    })
+    
+    logging.info("Report generation completed. State updated.")
     return state
 
 logging.info("nodes.py loaded with LangGraph node functions.")
