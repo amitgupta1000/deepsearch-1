@@ -52,8 +52,10 @@ async def run_workflow(
         "visited_urls": [],
         "failed_urls": [],
         "iteration_count": 0,
-        "report": None,
-        "report_filename": "IntelliSearchReport",
+        "analysis_content": None,
+        "appendix_content": None,
+        "analysis_filename": "CrystalSearchReport_analysis.txt",
+        "appendix_filename": "CrystalSearchReport_appendix.txt",
         "error": None,
         "evaluation_response": None,
         "suggested_follow_up_queries": [],
@@ -158,8 +160,10 @@ class ResearchSession(BaseModel):
     updated_at: datetime
     progress: int = 0
     current_step: str = ""
-    report_content: Optional[str] = None
-    report_filename: Optional[str] = None
+    analysis_content: Optional[str] = None
+    appendix_content: Optional[str] = None
+    analysis_filename: Optional[str] = None
+    appendix_filename: Optional[str] = None
     error_message: Optional[str] = None
 
 class ResearchStatus(BaseModel):
@@ -202,8 +206,10 @@ async def start_research(request: ResearchRequest, background_tasks: BackgroundT
         "updated_at": now,
         "progress": 0,
         "current_step": "Queued",
-        "report_content": None,
-        "report_filename": None,
+        "analysis_content": None,
+        "appendix_content": None,
+        "analysis_filename": None,
+        "appendix_filename": None,
         "error_message": None
     }
     research_sessions[session_id] = session
@@ -266,40 +272,48 @@ async def get_research_result(session_id: str):
     return {
         "session_id": session_id,
         "query": session["query"],
-        "report_content": session["report_content"],
+        "analysis_content": session["analysis_content"],
+        "appendix_content": session["appendix_content"],
         "created_at": session["created_at"],
         "completed_at": session["updated_at"]
     }
 
 @app.get("/api/research/{session_id}/download")
-async def download_report(session_id: str, content_type: str = "full"):
+async def download_report(session_id: str, content_type: str = "analysis"):
     if session_id not in research_sessions:
         raise HTTPException(status_code=404, detail="Research session not found")
     session = research_sessions[session_id]
-    if session["status"] != "completed" or not session["report_filename"]:
+    if session["status"] != "completed":
         raise HTTPException(status_code=400, detail="Report not available for download")
-    if content_type not in ["full", "appendix"]:
-        raise HTTPException(status_code=400, detail="Content type must be 'full' or 'appendix'")
+
+    if content_type not in ["analysis", "appendix"]:
+        raise HTTPException(status_code=400, detail="Content type must be 'analysis' or 'appendix'")
+
     if content_type == "appendix":
-        file_suffix = "_appendix"
+        file_to_serve = session.get("appendix_filename")
         filename_suffix = "appendix"
-    else:
-        file_suffix = ""
-        filename_suffix = "report"
-    text_path = os.path.join("..", "..", session["report_filename"])
-    if file_suffix:
-        file_path = text_path.replace(".txt", f"{file_suffix}.txt")
-    else:
-        file_path = text_path
+    else: # Default to analysis
+        file_to_serve = session.get("analysis_filename")
+        filename_suffix = "analysis"
+
+    if not file_to_serve:
+        raise HTTPException(status_code=404, detail=f"{filename_suffix.title()} file not found")
+    
+    # Construct the full path to the file.
+    file_path = os.path.join(file_to_serve)
+    
     media_type = "text/plain"
-    filename = f"intellisearch-{filename_suffix}-{session_id[:8]}.txt"
+    download_filename = f"CrystalSearch-{filename_suffix}-{session_id[:8]}.txt"
+
     if os.path.exists(file_path):
         return FileResponse(
             path=file_path,
-            filename=filename,
+            filename=download_filename,
             media_type=media_type
         )
     else:
+        # For debugging: log the path that was not found.
+        logger.error(f"File not found at path: {file_path}")
         raise HTTPException(status_code=404, detail=f"{filename_suffix.title()} text file not found")
 
 @app.get("/api/research/sessions")
@@ -317,15 +331,29 @@ async def list_research_sessions(limit: int = 10, offset: int = 0):
 async def delete_research_session(session_id: str):
     if session_id not in research_sessions:
         raise HTTPException(status_code=404, detail="Research session not found")
-    session = research_sessions[session_id]
-    if session.get("report_filename"):
-        try:
-            report_path = os.path.join("..", "..", session["report_filename"])
-            if os.path.exists(report_path):
-                os.remove(report_path)
-        except Exception as e:
-            logger.warning(f"Failed to delete report file: {e}")
-    del research_sessions[session_id]
+    
+    session = research_sessions.pop(session_id)
+    
+    # Attempt to delete associated report files
+    analysis_filename = session.get("analysis_filename")
+    appendix_filename = session.get("appendix_filename")
+
+    try:
+        if analysis_filename:
+            analysis_file = os.path.join(analysis_filename)
+            if os.path.exists(analysis_file):
+                os.remove(analysis_file)
+                logger.info(f"Deleted analysis file: {analysis_file}")
+
+        if appendix_filename:
+            appendix_file = os.path.join(appendix_filename)
+            if os.path.exists(appendix_file):
+                os.remove(appendix_file)
+                logger.info(f"Deleted appendix file: {appendix_file}")
+
+    except Exception as e:
+        logger.warning(f"Failed to delete report files for session {session_id}: {e}")
+            
     return APIResponse(success=True, message="Research session deleted successfully")
 
 @app.post("/api/research/test-workflow")
@@ -345,8 +373,10 @@ async def test_research_workflow(request: ResearchRequest):
         "visited_urls": [],
         "failed_urls": [],
         "iteration_count": 0,
-        "report": None,
-        "report_filename": "TestReport",
+        "analysis_content": None,
+        "appendix_content": None,
+        "analysis_filename": "TestReport_analysis.txt",
+        "appendix_filename": "TestReport_appendix.txt",
         "error": None,
         "evaluation_response": None,
         "suggested_follow_up_queries": [],
@@ -392,8 +422,10 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
 
         # After workflow completes
         if result:
-            session["report_content"] = result.get("report")
-            session["report_filename"] = result.get("report_filename")
+            session["analysis_content"] = result.get("analysis_content")
+            session["appendix_content"] = result.get("appendix_content")
+            session["analysis_filename"] = result.get("analysis_filename")
+            session["appendix_filename"] = result.get("appendix_filename")
             session["status"] = "completed"
             session["progress"] = 100
             session["current_step"] = "Research completed"

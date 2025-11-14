@@ -355,8 +355,6 @@ class AgentState(TypedDict):
     visited_urls: Optional[List[str]]
     failed_urls: Optional[List[str]]
     iteration_count: Optional[int]
-    report: Optional[str]
-    report_filename: Optional[str]
     error: Optional[str]
     evaluation_response: Optional[str]
     suggested_follow_up_queries: Optional[List[str]]
@@ -364,6 +362,11 @@ class AgentState(TypedDict):
     approval_iteration_count: Optional[int]
     search_iteration_count: Optional[int]
     snippet_state: Optional[Dict[str, str]]
+    analysis_content: Optional[str]
+    appendix_content: Optional[str]
+    analysis_filename: Optional[str]
+    appendix_filename: Optional[str]
+
 
 # Pydantic models for LLM output validation (moved from initial cells)
 class SearchQueryResponse(BaseModel):
@@ -1470,9 +1473,13 @@ async def write_report(state: AgentState):
         logging.warning(final_report_content)
         print("[DEBUG] No Q&A pairs found. Report will be blank. Check upstream nodes for chunk extraction and Q&A generation.")
         # Save and update state as before
-        text_filename = save_report_to_text(final_report_content, REPORT_FILENAME_TEXT)
-        state["report"] = final_report_content
-        state["report_filename"] = text_filename
+        analysis_filename_text = REPORT_FILENAME_TEXT.replace(".txt", "_analysis.txt")
+        analysis_text_filename = save_report_to_text(final_report_content, analysis_filename_text)
+
+        state["analysis_content"] = final_report_content
+        state["analysis_filename"] = analysis_text_filename
+        state["appendix_content"] = ""
+        state["appendix_filename"] = None
         current_error = state.get('error', '') or ''
         state['error'] = (current_error + "\n" + "\n".join(errors)).strip() if errors else current_error.strip()
         state['error'] = None if state['error'] == "" else state['error']
@@ -1494,7 +1501,7 @@ async def write_report(state: AgentState):
     else:
         qa_context = "No structured Q&A data available for analysis."
 
-    intellisearch_prompt = f"""
+    intellisearch_prompt = f\"\"\"
     You are an expert research analyst. Provide a comprehensive, analytical response to the user's query by synthesizing information from the collected research data.
 
     USER QUERY: "{research_topic}"
@@ -1514,7 +1521,7 @@ async def write_report(state: AgentState):
     - Use bullet points, subheadings, or numbered lists where appropriate
 
     Generate the IntelliSearch Response:
-    """
+    \"\"\"
 
     try:
         messages = [
@@ -1617,13 +1624,11 @@ async def write_report(state: AgentState):
         errors.append(f"Failed to save analysis to text file: {analysis_filename_text}.")
         logging.error(errors[-1])
 
-    # Update state - only keep analysis and appendix
-    state["report"] = display_content
-    state["report_filename"] = analysis_filename_text
-    state["appendix_content"] = appendix_content
+    # Update state with analysis and appendix content and filenames
     state["analysis_content"] = display_content
+    state["appendix_content"] = appendix_content
+    state["analysis_filename"] = analysis_text_filename
     state["appendix_filename"] = appendix_text_filename
-    state["analysis_filename"] = analysis_filename_text
     
     # Handle errors
     current_error = state.get('error', '') or ''
@@ -1640,8 +1645,7 @@ async def write_report(state: AgentState):
     state['iteration_count'] = 0  # Reset iteration counter
 
     logging.info("Report generation completed. State updated with final report and Q&A data preserved.")
-    print("[DEBUG] Final state['report'] sample:\n", state.get("report", "")[:500])
+    print("[DEBUG] Final state['analysis_content'] sample:\n", state.get("analysis_content", "")[:500])
     return state
-
 
 logging.info("nodes.py loaded with LangGraph node functions.")
