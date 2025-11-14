@@ -1501,7 +1501,7 @@ async def write_report(state: AgentState):
     else:
         qa_context = "No structured Q&A data available for analysis."
 
-    intellisearch_prompt = f\"\"\"
+    intellisearch_prompt = f"""
     You are an expert research analyst. Provide a comprehensive, analytical response to the user's query by synthesizing information from the collected research data.
 
     USER QUERY: "{research_topic}"
@@ -1521,7 +1521,7 @@ async def write_report(state: AgentState):
     - Use bullet points, subheadings, or numbered lists where appropriate
 
     Generate the IntelliSearch Response:
-    \"\"\"
+    """
 
     try:
         messages = [
