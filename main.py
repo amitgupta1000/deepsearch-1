@@ -29,107 +29,6 @@ def get_current_date():
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def run_workflow(
-    initial_query: str,
-    prompt_type: str,
-    session_id: str
-):
-    if workflow_app is None:
-        logging.error("LangGraph app is not compiled or imported. Cannot run workflow.")
-        print("Workflow cannot be run due to errors in graph compilation or imports.")
-        return None
-    
-    session = research_sessions[session_id]
-    logging.info(f"Starting workflow for query: '{initial_query}'")
-    initial_state = {
-        "new_query": initial_query,
-        "search_queries": [],
-        "rationale": None,
-        "data": [],
-        "relevant_contexts": {},
-        "relevant_chunks": [],
-        "proceed": True,
-        "visited_urls": [],
-        "failed_urls": [],
-        "iteration_count": 0,
-        "analysis_content": None,
-        "appendix_content": None,
-        "analysis_filename": "CrystalSearchReport_analysis.txt",
-        "appendix_filename": "CrystalSearchReport_appendix.txt",
-        "error": None,
-        "evaluation_response": None,
-        "suggested_follow_up_queries": [],
-        "prompt_type": prompt_type,
-        "approval_iteration_count": 0,
-        "search_iteration_count": 0,
-        "report_type": None
-    }
-    
-    progress_map = {
-        "create_queries": 10,
-        "evaluate_search_results": 30,
-        "extract_content": 50,
-        "embed_and_retrieve": 70,
-        "create_qa_pairs": 80,
-        "AI_evaluate": 90,
-        "write_report": 95
-    }
-
-    try:
-        if config is not None:
-            astream = workflow_app.astream(initial_state, config=config)
-        else:
-            astream = workflow_app.astream(initial_state)
-        
-        last_state = None
-        async for step in astream:
-            for key, value in step.items():
-                logging.info("Node executed: %s", key)
-                session["current_step"] = f"Executing step: {key}"
-                session["progress"] = progress_map.get(key, session["progress"])
-                session["updated_at"] = datetime.now()
-            last_state = step
-        return last_state
-
-    except Exception as e:
-        logging.exception(f"An error occurred during workflow execution: {e}")
-        session["status"] = "failed"
-        session["error_message"] = str(e)
-        session["current_step"] = f"Workflow error: {str(e)}"
-        session["updated_at"] = datetime.now()
-        return None
-
-import sys
-import os
-import logging
-import uuid
-import asyncio
-from datetime import datetime
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
-import json
-
-try:
-    from langchain_core.runnables import RunnableConfig
-    config = RunnableConfig(recursion_limit=100)
-except Exception:
-    config = None
-from backend.src.graph import app as workflow_app
-
-# Environment variables
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
-SERPER_API_KEY = os.getenv("SERPER_API_KEY", "")
-
-def get_current_date():
-    return datetime.now().strftime("%Y-%m-%d")
-
-# Logging configuration
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 # FastAPI app instance
 app = FastAPI(
     title="INTELLISEARCH API",
@@ -191,65 +90,25 @@ class APIResponse(BaseModel):
 
 # --- Workflow Execution ---
 async def run_workflow(initial_query: str, prompt_type: str, session_id: str):
-    if workflow_app is None:
-        logging.error("LangGraph app is not compiled. Cannot run workflow.")
-        return None
+    from backend.app_local import run_workflow as local_run_workflow
 
-    session = research_sessions[session_id]
-    logging.info(f"Starting workflow for query: '{initial_query}'")
-    initial_state = {
-        "new_query": initial_query,
-        "prompt_type": prompt_type,
-        "search_queries": [],
-        "rationale": None,
-        "data": [],
-        "relevant_contexts": {},
-        "relevant_chunks": [],
-        "proceed": True,
-        "visited_urls": [],
-        "failed_urls": [],
-        "iteration_count": 0,
-        "analysis_content": None,
-        "appendix_content": None,
-        "analysis_filename": "CrystalSearchReport_analysis.txt",
-        "appendix_filename": "CrystalSearchReport_appendix.txt",
-        "error": None,
-        "evaluation_response": None,
-        "suggested_follow_up_queries": [],
-        "approval_iteration_count": 0,
-        "search_iteration_count": 0,
-        "report_type": None,
-    }
-
-    progress_map = {
-        "create_queries": 10,
-        "evaluate_search_results": 30,
-        "extract_content": 50,
-        "embed_and_retrieve": 70,
-        "create_qa_pairs": 80,
-        "AI_evaluate": 90,
-        "write_report": 95,
-    }
-
-    try:
-        astream = workflow_app.astream(initial_state, config=config or {})
-        async for step in astream:
-            for key, value in step.items():
-                logging.info("Node executed: %s", key)
-                session["current_step"] = f"Executing step: {key}"
-                session["progress"] = progress_map.get(key, session["progress"])
-                session["updated_at"] = datetime.now()
-
-        final_state = await astream.get_final_output()
-        return final_state
-
-    except Exception as e:
-        logging.exception(f"An error occurred during workflow execution: {e}")
-        session["status"] = "failed"
-        session["error_message"] = str(e)
-        session["current_step"] = f"Workflow error: {str(e)}"
-        session["updated_at"] = datetime.now()
-        return None
+    async def run_workflow(initial_query: str, prompt_type: str, session_id: str):
+        """
+        Uses the shared run_workflow from app_local.py for consistent workflow execution.
+        """
+        try:
+            session = research_sessions[session_id]
+            logging.info(f"Starting workflow for query: '{initial_query}' (session: {session_id})")
+            result = await local_run_workflow(initial_query, prompt_type)
+            return result
+        except Exception as e:
+            logging.exception(f"An error occurred during workflow execution: {e}")
+            session = research_sessions.get(session_id, {})
+            session["status"] = "failed"
+            session["error_message"] = str(e)
+            session["current_step"] = f"Workflow error: {str(e)}"
+            session["updated_at"] = datetime.now()
+            return None
 
 async def run_research_pipeline(session_id: str, request: ResearchRequest):
     try:
@@ -366,7 +225,7 @@ async def download_report(session_id: str, content_type: str = "analysis"):
     if not file_to_serve:
         raise HTTPException(status_code=404, detail=f"{content_type.title()} file not found")
 
-    file_path = os.path.join(file_to_serve)
+    file_path = file_to_serve
     if os.path.exists(file_path):
         return FileResponse(
             path=file_path,

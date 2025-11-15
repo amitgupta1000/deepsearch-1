@@ -2,38 +2,8 @@ import asyncio
 import logging
 from typing import Dict, Any
 
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-# Startup validation
-def validate_startup():
-    """Quick startup validation to ensure critical imports work."""
-    try:
-        # Test critical imports
-        from src.config import validate_config
-        from src.graph import app
-
-        if not validate_config():
-            logging.warning("Configuration validation failed - check .env file")
-
-        if app is None:
-            logging.error("LangGraph app failed to compile - check LangChain imports")
-            return False
-
-        return True
-
-    except ImportError as e:
-        logging.error(f"Critical import failed: {e}")
-        logging.error("Run 'python startup_validation.py' for detailed diagnostics")
-        return False
-    except Exception as e:
-        logging.error(f"Startup validation error: {e}")
-        return False
-
-try:
-    from langchain_core.runnables import RunnableConfig
-    config = RunnableConfig(recursion_limit=100)
-except Exception:
-    config = None
 
 
 # Import the compiled LangGraph application
@@ -70,7 +40,7 @@ async def run_workflow(
         "failed_urls": [],
         "iteration_count": 0,
         "report": None,
-        "report_filename": "IntelliSearchReport",
+        "report_filename": None,
         "error": None,
         "evaluation_response": None,
         "suggested_follow_up_queries": [],
@@ -147,11 +117,14 @@ def simple_cli():
         user_research_query,
         selected_prompt_type
     ))
-    # Output summary from final state
-    if final_state and final_state.get("report"):
+    # Output summary from final state (updated for new workflow keys)
+    if final_state and final_state.get("analysis_content"):
         print("\nReport generated successfully!")
-        print("Report filename:", final_state.get("report_filename", "IntelliSearchReport"))
-        print("\nReport preview:\n", final_state.get("report", "")[:500])
+        print("Analysis filename:", final_state.get("analysis_filename", "analysis.txt"))
+        print("\nAnalysis preview:\n", final_state.get("analysis_content", "")[:500])
+        if final_state.get("appendix_content"):
+            print("\nAppendix filename:", final_state.get("appendix_filename", "appendix.txt"))
+            print("\nAppendix preview:\n", final_state.get("appendix_content", "")[:500])
         if final_state.get("error"):
             print("\n[Warning] Errors during workflow:\n", final_state.get("error"))
     else:
@@ -161,10 +134,4 @@ def simple_cli():
 
 # --- Main Execution Block ---
 if __name__ == "__main__":
-    # Perform startup validation
-    if not validate_startup():
-        print("\n💥 Startup validation failed!")
-        print("   Run 'python startup_validation.py' for detailed diagnostics")
-        print("   Or run 'run_setup_and_interactive.bat' to fix environment")
-        exit(1)
     simple_cli()
