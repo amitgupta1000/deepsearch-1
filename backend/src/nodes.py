@@ -1445,18 +1445,13 @@ async def write_report(state: AgentState):
     2) IntelliSearch Response (LLM analysis) 
     3) Appendix with Q&A pairs and citations
     """
-    try:
-        from setup import GREEN, ENDC
-    except ImportError:
-        GREEN = '\\033[92m'
-        ENDC = '\\033[0m'
-
+    GREEN = '\033[92m'
+    ENDC = '\033[0m'
     errors: List[str] = []
     research_topic = state.get('new_query', 'the topic')
     qa_pairs = state.get('qa_pairs', [])
     display_content = []
     logging.info(f"Generating report for topic: '{research_topic}'")
-	REPORT_FILENAME_TEXT = "CrystalSearchReport.txt"
 
     if not qa_pairs:
         logging.warning(f"No Q&A pairs found for topic: '{research_topic}'. Generating empty report.")

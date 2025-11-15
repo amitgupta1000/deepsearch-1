@@ -29,9 +29,6 @@ class SearchResult:
             "source": self.source
         }
 
-## PDF generation and FPDF logic removed
-
-
 # Utility function to safely format prompts with content that may contain curly braces
 def safe_format(template: str, **kwargs: Any) -> str:
     """
@@ -67,8 +64,6 @@ def clean_extracted_text(text: str) -> str:
        text = re.sub(r'\(Source:.*?\)', '', text) # Remove source citations if present from previous steps
 
        return text
-
-## PDF content fetching removed
 
 
 # Helper function to rank URLs
@@ -119,8 +114,6 @@ def save_report_to_text(report_content: str, filename: str = REPORT_FILENAME_TEX
     except IOError as e:
         logging.exception(f"Error saving report to text file {filename}: {e}")
         return ""
-
-## PDF generation and markdown-to-PDF logic removed
 
 
 def format_research_report(report_content: str) -> str:
