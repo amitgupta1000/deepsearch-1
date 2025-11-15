@@ -29,42 +29,13 @@ def get_current_date():
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def run_workflow(
-    initial_query: str,
-    prompt_type: str,
-    session_id: str
-):
+
+# Shared workflow utility
+async def run_langgraph_workflow(initial_state: dict, session: dict = None):
     if workflow_app is None:
-        logging.error("LangGraph app is not compiled or imported. Cannot run workflow.")
-        print("Workflow cannot be run due to errors in graph compilation or imports.")
+        logger.error("LangGraph app is not compiled or imported. Cannot run workflow.")
         return None
-    
-    session = research_sessions[session_id]
-    logging.info(f"Starting workflow for query: '{initial_query}'")
-    initial_state = {
-        "new_query": initial_query,
-        "search_queries": [],
-        "rationale": None,
-        "data": [],
-        "relevant_contexts": {},
-        "relevant_chunks": [],
-        "proceed": True,
-        "visited_urls": [],
-        "failed_urls": [],
-        "iteration_count": 0,
-        "analysis_content": None,
-        "appendix_content": None,
-        "analysis_filename": "CrystalSearchReport_analysis.txt",
-        "appendix_filename": "CrystalSearchReport_appendix.txt",
-        "error": None,
-        "evaluation_response": None,
-        "suggested_follow_up_queries": [],
-        "prompt_type": prompt_type,
-        "approval_iteration_count": 0,
-        "search_iteration_count": 0,
-        "report_type": None
-    }
-    
+
     progress_map = {
         "create_queries": 10,
         "evaluate_search_results": 30,
@@ -80,24 +51,53 @@ async def run_workflow(
             astream = workflow_app.astream(initial_state, config=config)
         else:
             astream = workflow_app.astream(initial_state)
-        
+
         last_state = None
         async for step in astream:
             for key, value in step.items():
-                logging.info("Node executed: %s", key)
-                session["current_step"] = f"Executing step: {key}"
-                session["progress"] = progress_map.get(key, session["progress"])
-                session["updated_at"] = datetime.now()
+                logger.info("Node executed: %s", key)
+                if session is not None:
+                    session["current_step"] = f"Executing step: {key}"
+                    session["progress"] = progress_map.get(key, session.get("progress", 0))
+                    session["updated_at"] = datetime.now()
             last_state = step
         return last_state
-
     except Exception as e:
-        logging.exception(f"An error occurred during workflow execution: {e}")
-        session["status"] = "failed"
-        session["error_message"] = str(e)
-        session["current_step"] = f"Workflow error: {str(e)}"
-        session["updated_at"] = datetime.now()
+        logger.exception(f"An error occurred during workflow execution: {e}")
+        if session is not None:
+            session["status"] = "failed"
+            session["error_message"] = str(e)
+            session["current_step"] = f"Workflow error: {str(e)}"
+            session["updated_at"] = datetime.now()
         return None
+
+# Replace run_workflow usage in pipeline
+async def run_workflow(initial_query: str, prompt_type: str, session_id: str):
+    session = research_sessions[session_id]
+    initial_state = {
+        "new_query": initial_query,
+        "search_queries": [],
+        "rationale": None,
+        "data": [],
+        "relevant_contexts": {},
+        "relevant_chunks": [],
+        "proceed": True,
+        "visited_urls": [],
+        "failed_urls": [],
+        "iteration_count": 0,
+        "analysis_content": None,
+        "appendix_content": None,
+        "analysis_filename": os.path.join("reports", f"CrystalSearchReport_analysis_{session_id[:8]}.txt"),
+        "appendix_filename": os.path.join("reports", f"CrystalSearchReport_appendix_{session_id[:8]}.txt"),
+        "error": None,
+        "evaluation_response": None,
+        "suggested_follow_up_queries": [],
+        "prompt_type": prompt_type,
+        "approval_iteration_count": 0,
+        "search_iteration_count": 0,
+        "report_type": None
+    }
+    return await run_langgraph_workflow(initial_state, session)
 
 import sys
 import os

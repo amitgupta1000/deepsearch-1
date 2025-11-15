@@ -106,13 +106,18 @@ def rank_urls(query: str, urls: List[str], relevant_contexts: Dict[str, Dict[str
 
 def save_report_to_text(report_content: str, filename: str = REPORT_FILENAME_TEXT) -> str:
     """Saves the report content to a text file."""
+    import os
+    reports_dir = os.path.join(os.getcwd(), "reports")
+    if not os.path.exists(reports_dir):
+        os.makedirs(reports_dir)
+    file_path = filename if os.path.isabs(filename) else os.path.join(reports_dir, filename)
     try:
-        with open(filename, "w", encoding='utf-8') as f: # Specify utf-8 encoding
+        with open(file_path, "w", encoding='utf-8') as f:
             f.write(report_content)
-        logging.info(f"Report saved to: {filename}")
-        return filename
+        logging.info(f"Report saved to: {file_path}")
+        return file_path
     except IOError as e:
-        logging.exception(f"Error saving report to text file {filename}: {e}")
+        logging.exception(f"Error saving report to text file {file_path}: {e}")
         return ""
 
 
