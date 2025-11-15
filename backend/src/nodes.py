@@ -1458,12 +1458,12 @@ async def write_report(state: AgentState):
         display_content = f"Could not generate a report. No Q&A pairs were created for the topic: '{research_topic}'."
         errors.append(display_content)
         
-        analysis_filename = REPORT_FILENAME_TEXT.replace(".txt", "_analysis.txt")
+        analysis_filename = f"{REPORT_FILENAME_TEXT.replace(".txt", "_analysis.txt")}"
         analysis_text_file = save_report_to_text(display_content, analysis_filename)
 
         state.update({
             "analysis_content": display_content,
-            "analysis_filename": analysis_text_file,
+            "analysis_filename": analysis_filename,
             "appendix_content": "",
             "appendix_filename": None,
         })
@@ -1562,12 +1562,12 @@ async def write_report(state: AgentState):
         print("[DEBUG] Appendix Content Sample:\\n", appendix_content[:500])
 
         # Save files
-        appendix_filename = REPORT_FILENAME_TEXT.replace(".txt", "_appendix.txt")
+        appendix_filename = f"{REPORT_FILENAME_TEXT.replace(".txt", "_appendix.txt")}"
         appendix_text_file = save_report_to_text(appendix_content, appendix_filename)
         if not appendix_text_file:
             errors.append(f"Failed to save appendix to text file: {appendix_filename}.")
 
-        analysis_filename = REPORT_FILENAME_TEXT.replace(".txt", "_analysis.txt")
+        analysis_filename = f"{REPORT_FILENAME_TEXT.replace(".txt", "_analysis.txt")}"
         analysis_text_file = save_report_to_text(display_content, analysis_filename)
         if not analysis_text_file:
             errors.append(f"Failed to save analysis to text file: {analysis_filename}.")
@@ -1576,8 +1576,8 @@ async def write_report(state: AgentState):
         state.update({
             "analysis_content": display_content,
             "appendix_content": appendix_content,
-            "analysis_filename": analysis_text_file,
-            "appendix_filename": appendix_text_file
+            "analysis_filename": analysis_filename,
+            "appendix_filename": appendix_filename
         })
 
     # Common final steps for both cases
