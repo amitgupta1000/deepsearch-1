@@ -9,7 +9,7 @@ import time # Added time for cache timestamp
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from config import REPORT_FILENAME_TEXT
+from .config import REPORT_FILENAME_TEXT
 
 @dataclass
 class SearchResult:
