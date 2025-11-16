@@ -4,6 +4,13 @@ from typing import Dict, Any
 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# RunnableConfig is optional (depends on langchain_core availability)
+try:
+    from langchain_core.runnables import RunnableConfig
+    config = RunnableConfig(recursion_limit=100)
+except Exception:
+    logging.debug("langchain_core.runnables not available; continuing without RunnableConfig.")
+    config = None
 
 
 # Import the compiled LangGraph application
