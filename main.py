@@ -147,6 +147,8 @@ async def run_workflow(
                 session["progress"] = progress_map.get(key, session["progress"])
                 session["updated_at"] = datetime.now()
             last_state = step
+        logging.info(f"[run_workflow] Final state returned: analysis_content={str(last_state.get('analysis_content', ''))[:200]}")
+        logging.info(f"[run_workflow] Final state returned: appendix_content={str(last_state.get('appendix_content', ''))[:200]}")
         return last_state
 
     except Exception as e:
@@ -169,6 +171,8 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
 
         # After workflow completes
         if result:
+            logging.info(f"[run_research_pipeline] Setting session['analysis_content']: {str(result.get('analysis_content', ''))[:200]}")
+            logging.info(f"[run_research_pipeline] Setting session['appendix_content']: {str(result.get('appendix_content', ''))[:200]}")
             session["analysis_content"] = result.get("analysis_content")
             session["appendix_content"] = result.get("appendix_content")
             session["analysis_filename"] = result.get("analysis_filename")

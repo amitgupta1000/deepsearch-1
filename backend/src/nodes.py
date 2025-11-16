@@ -1457,10 +1457,9 @@ async def write_report(state: AgentState):
         logging.warning(f"No Q&A pairs found for topic: '{research_topic}'. Generating empty report.")
         display_content = f"Could not generate a report. No Q&A pairs were created for the topic: '{research_topic}'."
         errors.append(display_content)
-        
-        analysis_filename = f"{REPORT_FILENAME_TEXT.replace(".txt", "_analysis.txt")}"
+        analysis_filename = f"{REPORT_FILENAME_TEXT.replace('.txt', '_analysis.txt')}"
         analysis_text_file = save_report_to_text(display_content, analysis_filename)
-
+        logging.info(f"[write_report] Setting analysis_content: {display_content[:200]}")
         state.update({
             "analysis_content": display_content,
             "analysis_filename": analysis_filename,
@@ -1573,6 +1572,8 @@ async def write_report(state: AgentState):
             errors.append(f"Failed to save analysis to text file: {analysis_filename}.")
 
         # Update state
+        logging.info(f"[write_report] Setting analysis_content: {display_content[:200]}")
+        logging.info(f"[write_report] Setting appendix_content: {appendix_content[:200]}")
         state.update({
             "analysis_content": display_content,
             "appendix_content": appendix_content,
