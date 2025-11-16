@@ -1,7 +1,12 @@
 import asyncio
 import logging
 from typing import Dict, Any
-
+try:
+    from langchain_core.runnables import RunnableConfig
+    config = RunnableConfig(recursion_limit=100)
+except Exception:
+    logging.debug("langchain_core.runnables not available; continuing without RunnableConfig.")
+    config = None
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -50,27 +55,34 @@ async def run_workflow(
     }
 
     # Run the compiled workflow
-    astream = app.astream(initial_state)
-    executed_nodes = []
-    last_state = None
-    async for step in astream:
-        for key, value in step.items():
-            logging.info("Node executed: %s", key)
-            executed_nodes.append(key)
-        last_state = step
-
-    logging.info("Workflow finished successfully.")
-    if last_state:
-        final_error_state = last_state.get('error')
-        if final_error_state:
-            logging.warning("Workflow completed with errors: %s", final_error_state)
+    try:
+        if config is not None:
+            astream = app.astream(initial_state, config=config)
         else:
-            logging.info("Workflow completed successfully without errors.")
-        return last_state
-    else:
-        logging.warning("No final state returned from workflow.")
-        return None
+            astream = app.astream(initial_state)
 
+        executed_nodes = []
+        last_state = None
+        async for step in astream:
+            for key, value in step.items():
+                logging.info("Node executed: %s", key)
+                executed_nodes.append(key)
+            last_state = step
+    
+        logging.info("Workflow finished successfully.")
+        if last_state:
+            final_error_state = last_state.get('error')
+            if final_error_state:
+                logging.warning("Workflow completed with errors: %s", final_error_state)
+            else:
+                logging.info("Workflow completed successfully without errors.")
+            return last_state
+        else:
+            logging.warning("No final state returned from workflow.")
+            return None
+    except Exception as e:
+        logging.exception(f"An error occurred during workflow execution: {e}")
+        return None
 
 
 def simple_cli():
