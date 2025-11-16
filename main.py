@@ -18,10 +18,8 @@ except Exception:
     config = None
 from backend.src.graph import app as workflow_app
 
-
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 SERPER_API_KEY = os.getenv("SERPER_API_KEY", "")
-
 
 def get_current_date():
     return datetime.now().strftime("%Y-%m-%d")
@@ -89,26 +87,75 @@ class APIResponse(BaseModel):
     data: Optional[Any] = None
 
 # --- Workflow Execution ---
-async def run_workflow(initial_query: str, prompt_type: str, session_id: str):
-    from backend.app_local import run_workflow as local_run_workflow
+async def run_workflow(
+    initial_query: str,
+    prompt_type: str,
+    session_id: str
+):
+    if workflow_app is None:
+        logging.error("LangGraph app is not compiled or imported. Cannot run workflow.")
+        print("Workflow cannot be run due to errors in graph compilation or imports.")
+        return None
+    
+    session = research_sessions[session_id]
+    logging.info(f"Starting workflow for query: '{initial_query}'")
+    initial_state = {
+        "new_query": initial_query,
+        "search_queries": [],
+        "rationale": None,
+        "data": [],
+        "relevant_contexts": {},
+        "relevant_chunks": [],
+        "proceed": True,
+        "visited_urls": [],
+        "failed_urls": [],
+        "iteration_count": 0,
+        "analysis_content": None,
+        "appendix_content": None,
+        "analysis_filename": None,
+        "appendix_filename": None,
+        "error": None,
+        "evaluation_response": None,
+        "suggested_follow_up_queries": [],
+        "prompt_type": prompt_type,
+        "approval_iteration_count": 0,
+        "search_iteration_count": 0,
+        "report_type": None
+    }
+    
+    progress_map = {
+        "create_queries": 10,
+        "evaluate_search_results": 30,
+        "extract_content": 50,
+        "embed_and_retrieve": 70,
+        "create_qa_pairs": 80,
+        "AI_evaluate": 90,
+        "write_report": 95
+    }
 
-    async def run_workflow(initial_query: str, prompt_type: str, session_id: str):
-        """
-        Uses the shared run_workflow from app_local.py for consistent workflow execution.
-        """
-        try:
-            session = research_sessions[session_id]
-            logging.info(f"Starting workflow for query: '{initial_query}' (session: {session_id})")
-            result = await local_run_workflow(initial_query, prompt_type)
-            return result
-        except Exception as e:
-            logging.exception(f"An error occurred during workflow execution: {e}")
-            session = research_sessions.get(session_id, {})
-            session["status"] = "failed"
-            session["error_message"] = str(e)
-            session["current_step"] = f"Workflow error: {str(e)}"
-            session["updated_at"] = datetime.now()
-            return None
+    try:
+        if config is not None:
+            astream = workflow_app.astream(initial_state, config=config)
+        else:
+            astream = workflow_app.astream(initial_state)
+        
+        last_state = None
+        async for step in astream:
+            for key, value in step.items():
+                logging.info("Node executed: %s", key)
+                session["current_step"] = f"Executing step: {key}"
+                session["progress"] = progress_map.get(key, session["progress"])
+                session["updated_at"] = datetime.now()
+            last_state = step
+        return last_state
+
+    except Exception as e:
+        logging.exception(f"An error occurred during workflow execution: {e}")
+        session["status"] = "failed"
+        session["error_message"] = str(e)
+        session["current_step"] = f"Workflow error: {str(e)}"
+        session["updated_at"] = datetime.now()
+        return None
 
 async def run_research_pipeline(session_id: str, request: ResearchRequest):
     try:
@@ -117,8 +164,10 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
         session["current_step"] = "Starting research pipeline..."
         session["progress"] = 5
 
+        # Use local run_workflow function
         result = await run_workflow(request.query, request.prompt_type, session_id)
 
+        # After workflow completes
         if result:
             session["analysis_content"] = result.get("analysis_content")
             session["appendix_content"] = result.get("appendix_content")
@@ -135,21 +184,21 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
             session["current_step"] = "Workflow returned no result."
             session["updated_at"] = datetime.now()
             logger.error(f"Workflow returned no result for session {session_id}")
-
     except Exception as e:
         logger.error(f"Research pipeline failed for session {session_id}: {e}")
-        if session_id in research_sessions:
-            session = research_sessions[session_id]
+        session = research_sessions.get(session_id)
+        if session:
             session["status"] = "failed"
             session["error_message"] = str(e)
             session["current_step"] = f"Error: {str(e)}"
             session["updated_at"] = datetime.now()
+            session["status"] = "failed"
 
 # --- API Endpoints ---
 @app.get("/")
 async def root():
     return {
-        "message": "INTELLISEARCH API is running",
+        "message": "CRYSTAL DEEPSEARCH API is running",
         "status": "active",
         "timestamp": datetime.now().isoformat(),
     }
@@ -299,15 +348,57 @@ async def get_config():
 
 @app.post("/api/research/test-workflow")
 async def test_research_workflow(request: ResearchRequest):
+    """
+    Runs the research workflow synchronously for testing purposes and returns the final state.
+    """
     initial_state = {
         "new_query": request.query,
         "prompt_type": request.prompt_type,
-        # ... (rest of initial state)
+        "search_queries": [],
+        "rationale": None,
+        "data": [],
+        "relevant_contexts": {},
+        "relevant_chunks": [],
+        "proceed": True,
+        "visited_urls": [],
+        "failed_urls": [],
+        "iteration_count": 0,
+        "analysis_content": None,
+        "appendix_content": None,
+        "analysis_filename": "TestReport_analysis.txt",
+        "appendix_filename": "TestReport_appendix.txt",
+        "error": None,
+        "evaluation_response": None,
+        "suggested_follow_up_queries": [],
+        "approval_iteration_count": 0,
+        "search_iteration_count": 0,
+        "report_type": None
     }
-    # This is a simplified test endpoint. In a real scenario, you would run the full workflow.
-    # The full workflow logic is handled by the background task in /api/research
-    return {"message": "Test endpoint. For full workflow, use /api/research and track session."}
+    
+    final_state = None
+    try:
+        if config is not None:
+            astream = workflow_app.astream(initial_state, config=config)
+        else:
+            astream = workflow_app.astream(initial_state)
 
+        # Aynchronously iterate through the stream to execute the graph
+        async for step in astream:
+            # log steps for visibility during run
+            for key, value in step.items():
+                logger.info(f"Executing node: {key}")
+        
+        # Get the final state
+        final_state = await astream.get_final_output()
+
+    except Exception as e:
+        logger.exception(f"An error occurred during workflow test execution: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    if final_state:
+        return final_state
+    else:
+        raise HTTPException(status_code=500, detail="Workflow did not produce a final state.")
 
 # --- Main Execution Block ---
 if __name__ == "__main__":
