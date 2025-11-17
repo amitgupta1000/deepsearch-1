@@ -11,7 +11,7 @@ except Exception:
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Import the compiled LangGraph application
-from src.graph import app
+from backend.src.graph import app as workflow_app
 
 
 async def run_workflow(
@@ -24,7 +24,7 @@ async def run_workflow(
         initial_query: The user's initial research query.
         prompt_type: Type of prompt to use.
     """
-    if app is None:
+    if workflow_app is None:
         logging.error("LangGraph app is not compiled or imported. Cannot run workflow.")
         print("Workflow cannot be run due to errors in graph compilation or imports.")
         return None
@@ -57,9 +57,9 @@ async def run_workflow(
     # Run the compiled workflow
     try:
         if config is not None:
-            astream = app.astream(initial_state, config=config)
+            astream =workflow_app.astream(initial_state, config=config)
         else:
-            astream = app.astream(initial_state)
+            astream = workflow_app.astream(initial_state)
 
         executed_nodes = []
         last_state = None
