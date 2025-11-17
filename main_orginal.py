@@ -1,3 +1,5 @@
+# main.py moved to project root # all imports updated to reflect new location
+
 import sys
 import os
 import logging
@@ -9,8 +11,6 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 
-import uvicorn
-from backend import app_local
 try:
     from langchain_core.runnables import RunnableConfig
     config = RunnableConfig(recursion_limit=100)
@@ -27,6 +27,7 @@ def get_current_date():
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# FastAPI app instance
 app = FastAPI(
     title="INTELLISEARCH API",
     description="AI-powered research pipeline with web interface",
@@ -35,6 +36,7 @@ app = FastAPI(
     redoc_url="/api/redoc"
 )
 
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -48,9 +50,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# In-memory session storage
 research_sessions: Dict[str, Dict] = {}
 MAX_SESSIONS = 10
 
+# --- Pydantic Models ---
 class ResearchRequest(BaseModel):
     query: str = Field(..., description="Research query or question")
     prompt_type: str = Field(default="general", description="Prompt type: general, legal, macro, etc.")
@@ -82,12 +86,78 @@ class APIResponse(BaseModel):
     message: str
     data: Optional[Any] = None
 
-# Use app_local.run_workflow directly
-import asyncio
-async def run_workflow(initial_query: str, prompt_type: str, session_id: str):
+# --- Workflow Execution ---
+async def run_workflow(
+    initial_query: str,
+    prompt_type: str,
+    session_id: str
+):
+    if workflow_app is None:
+        logging.error("LangGraph app is not compiled or imported. Cannot run workflow.")
+        print("Workflow cannot be run due to errors in graph compilation or imports.")
+        return None
+    
     session = research_sessions[session_id]
-    result = await app_local.run_workflow(initial_query, prompt_type)
-    return result
+    logging.info(f"Starting workflow for query: '{initial_query}'")
+    initial_state = {
+        "new_query": initial_query,
+        "search_queries": [],
+        "rationale": None,
+        "data": [],
+        "relevant_contexts": {},
+        "relevant_chunks": [],
+        "proceed": True,
+        "visited_urls": [],
+        "failed_urls": [],
+        "iteration_count": 0,
+        "analysis_content": None,
+        "appendix_content": None,
+        "analysis_filename": None,
+        "appendix_filename": None,
+        "error": None,
+        "evaluation_response": None,
+        "suggested_follow_up_queries": [],
+        "prompt_type": prompt_type,
+        "approval_iteration_count": 0,
+        "search_iteration_count": 0,
+        "report_type": None
+    }
+    
+    progress_map = {
+        "create_queries": 10,
+        "evaluate_search_results": 30,
+        "extract_content": 50,
+        "embed_and_retrieve": 70,
+        "create_qa_pairs": 80,
+        "AI_evaluate": 90,
+        "write_report": 95
+    }
+
+    try:
+        if config is not None:
+            astream = workflow_app.astream(initial_state, config=config)
+        else:
+            astream = workflow_app.astream(initial_state)
+        
+        last_state = None
+        async for step in astream:
+            for key, value in step.items():
+                logging.info("Node executed: %s", key)
+                session["current_step"] = f"Executing step: {key}"
+                session["progress"] = progress_map.get(key, session["progress"])
+                session["updated_at"] = datetime.now()
+            last_state = step
+        logging.info(f"[run_workflow] Final state returned: analysis_content={str(last_state.get('analysis_content', ''))[:200]}")
+        logging.info(f"[run_workflow] Final state returned: appendix_content={str(last_state.get('appendix_content', ''))[:200]}")
+        return last_state
+
+    except Exception as e:
+        logging.exception(f"An error occurred during workflow execution: {e}")
+        session["status"] = "failed"
+        session["error_message"] = str(e)
+        session["current_step"] = f"Workflow error: {str(e)}"
+        session["updated_at"] = datetime.now()
+        return None
 
 async def run_research_pipeline(session_id: str, request: ResearchRequest):
     try:
@@ -95,7 +165,11 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
         session["status"] = "running"
         session["current_step"] = "Starting research pipeline..."
         session["progress"] = 5
+
+        # Use local run_workflow function
         result = await run_workflow(request.query, request.prompt_type, session_id)
+
+        # After workflow completes
         if result:
             logging.info(f"[run_research_pipeline] Setting session['analysis_content']: {str(result.get('analysis_content', ''))[:200]}")
             logging.info(f"[run_research_pipeline] Setting session['appendix_content']: {str(result.get('appendix_content', ''))[:200]}")
@@ -124,7 +198,6 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
             session["updated_at"] = datetime.now()
             session["status"] = "failed"
 
-# --- API Endpoints ---
 # --- API Endpoints ---
 @app.get("/")
 async def root():
@@ -331,11 +404,10 @@ async def test_research_workflow(request: ResearchRequest):
     else:
         raise HTTPException(status_code=500, detail="Workflow did not produce a final state.")
 
-
+# --- Main Execution Block ---
 if __name__ == "__main__":
-   #app_local.simple_cli()
+    import uvicorn
 
     port = int(os.getenv("PORT", 8000))
     reload = os.getenv("ENVIRONMENT") != "production"
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=reload, loop="asyncio")
-
