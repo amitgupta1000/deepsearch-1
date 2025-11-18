@@ -326,63 +326,7 @@ async def get_config():
         },
     }
 
-@app.post("/api/research/test-workflow")
-async def test_research_workflow(request: ResearchRequest):
-    """
-    Runs the research workflow synchronously for testing purposes and returns the final state.
-    """
-    initial_state = {
-        "new_query": request.query,
-        "prompt_type": request.prompt_type,
-        "search_queries": [],
-        "rationale": None,
-        "data": [],
-        "relevant_contexts": {},
-        "relevant_chunks": [],
-        "proceed": True,
-        "visited_urls": [],
-        "failed_urls": [],
-        "iteration_count": 0,
-        "analysis_content": None,
-        "appendix_content": None,
-        "analysis_filename": "TestReport_analysis.txt",
-        "appendix_filename": "TestReport_appendix.txt",
-        "error": None,
-        "evaluation_response": None,
-        "suggested_follow_up_queries": [],
-        "approval_iteration_count": 0,
-        "search_iteration_count": 0,
-        "report_type": None
-    }
-    
-    final_state = None
-    try:
-        if config is not None:
-            astream = workflow_app.astream(initial_state, config=config)
-        else:
-            astream = workflow_app.astream(initial_state)
-
-        # Aynchronously iterate through the stream to execute the graph
-        async for step in astream:
-            # log steps for visibility during run
-            for key, value in step.items():
-                logger.info(f"Executing node: {key}")
-        
-        # Get the final state
-        final_state = await astream.get_final_output()
-
-    except Exception as e:
-        logger.exception(f"An error occurred during workflow test execution: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-    if final_state:
-        return final_state
-    else:
-        raise HTTPException(status_code=500, detail="Workflow did not produce a final state.")
-
-
 if __name__ == "__main__":
-   #app_local.simple_cli()
 
     port = int(os.getenv("PORT", 8000))
     reload = os.getenv("ENVIRONMENT") != "production"

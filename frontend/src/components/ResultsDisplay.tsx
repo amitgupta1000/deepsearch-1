@@ -119,8 +119,15 @@ const ResultsDisplay: React.FC = () => {
             <span>Analysis Report</span>
           </h3>
           <div className="prose prose-lg max-w-none">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {result.analysis_content}
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                p: ({ children }) => <p>{String(children).replace(/\n\n/g, '<br /><br />')}</p>,
+                ul: ({ children }) => <ul className="list-disc pl-6">{children}</ul>,
+                li: ({ children }) => <li className="mb-2">{children}</li>
+              }}
+            >
+              {result.analysis_content.replace(/\n\n/g, '\n')}
             </ReactMarkdown>
           </div>
         </div>
@@ -134,8 +141,15 @@ const ResultsDisplay: React.FC = () => {
             <span>Appendix</span>
           </h3>
           <div className="prose max-w-none">
-             <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {result.appendix_content}
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                p: ({ children }) => <p>{String(children).replace(/\n\n/g, '<br /><br />')}</p>,
+                ul: ({ children }) => <ul className="list-disc pl-6">{children}</ul>,
+                li: ({ children }) => <li className="mb-2">{children}</li>
+              }}
+            >
+              {result.appendix_content.replace(/\n\n/g, '\n')}
             </ReactMarkdown>
           </div>
         </div>
