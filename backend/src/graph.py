@@ -104,8 +104,6 @@ workflow.add_conditional_edges(
     }
 )
 
-
-
 # Edge to END from write_report
 if "write_report" in workflow.nodes:
     workflow.add_edge("write_report", END)

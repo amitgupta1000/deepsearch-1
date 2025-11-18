@@ -53,9 +53,6 @@ def get_env_list(key: str, default: List[str] = None, separator: str = ',') -> L
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 SERPER_API_KEY = os.getenv("SERPER_API_KEY", "")
 
-print(f"[config.py] GOOGLE_API_KEY: {GOOGLE_API_KEY}")
-print(f"[config.py] SERPER_API_KEY: {SERPER_API_KEY}")
-
 # =============================================================================
 # LLM CONFIGURATION
 # =============================================================================
@@ -96,8 +93,8 @@ DEFAULT_TEMPERATURE = LLM_TEMPERATURE
 # =============================================================================
 
 # Search limits
-MAX_SEARCH_QUERIES = get_env_int("MAX_SEARCH_QUERIES", 15)  # Multiple queries for comprehensive coverage
-MAX_SEARCH_RESULTS = get_env_int("MAX_SEARCH_RESULTS", 10)  # Balanced between quality and performance
+MAX_SEARCH_QUERIES = get_env_int("MAX_SEARCH_QUERIES", 3)  # Multiple queries for comprehensive coverage
+MAX_SEARCH_RESULTS = get_env_int("MAX_SEARCH_RESULTS", 3)  # Balanced between quality and performance
 MAX_CONCURRENT_SCRAPES = get_env_int("MAX_CONCURRENT_SCRAPES", 6)  # Reasonable concurrency for stability
 MAX_SEARCH_RETRIES = get_env_int("MAX_SEARCH_RETRIES", 2)  # Limited retries to prevent hanging
 

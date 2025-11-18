@@ -42,7 +42,6 @@ app.add_middleware(
         "http://localhost:5173",
         "http://localhost:8000",
         "https://deepsearch-56755551-95627.web.app",
-        "*",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -83,58 +82,28 @@ class APIResponse(BaseModel):
     message: str
     data: Optional[Any] = None
 
-
-#==============
-from backend.src.graph import app as workflow_app
-
+# Use app_local.run_workflow directly
+import asyncio
 async def run_workflow(initial_query: str, prompt_type: str, session_id: str):
-    if workflow_app is None:
-        raise RuntimeError("Workflow not compiled. LangGraph not available.")
+    session = research_sessions[session_id]
+    result = await app_local.run_workflow(initial_query, prompt_type)
+    return result
 
-    # Initial state for the workflow
-    initial_state = {
-        "new_query": initial_query,
-        "prompt_type": prompt_type,
-        "search_queries": [],
-        "rationale": None,
-        "data": [],
-        "relevant_contexts": {},
-        "relevant_chunks": [],
-        "proceed": True,
-        "visited_urls": [],
-        "failed_urls": [],
-        "iteration_count": 0,
-        "analysis_content": None,
-        "appendix_content": None,
-        "error": None,
-        "evaluation_response": None,
-        "suggested_follow_up_queries": [],
-        "approval_iteration_count": 0,
-        "search_iteration_count": 0,
-        "report_type": None,
-    }
-
-    try:
-        # Direct one-shot execution
-        final_state = await workflow_app.ainvoke(initial_state)
-        return final_state
-    except Exception as e:
-        logging.exception(f"Workflow execution failed: {e}")
-        raise
-#==============
 async def run_research_pipeline(session_id: str, request: ResearchRequest):
     try:
         session = research_sessions[session_id]
         session["status"] = "running"
         session["current_step"] = "Starting research pipeline..."
         session["progress"] = 5
-
         result = await run_workflow(request.query, request.prompt_type, session_id)
         logging.info(f"[run_research_pipeline] Workflow result: {result}")
-
         if result:
+            logging.info(f"[run_research_pipeline] Setting session['analysis_content']: {str(result.get('analysis_content', ''))[:200]}")
+            logging.info(f"[run_research_pipeline] Setting session['appendix_content']: {str(result.get('appendix_content', ''))[:200]}")
             session["analysis_content"] = result.get("analysis_content")
             session["appendix_content"] = result.get("appendix_content")
+            session["analysis_filename"] = result.get("analysis_filename")
+            session["appendix_filename"] = result.get("appendix_filename")
             session["status"] = "completed"
             session["progress"] = 100
             session["current_step"] = "Research completed"
@@ -154,8 +123,9 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
             session["error_message"] = str(e)
             session["current_step"] = f"Error: {str(e)}"
             session["updated_at"] = datetime.now()
+            session["status"] = "failed"
 
-#====================
+# --- API Endpoints ---
 # --- API Endpoints ---
 @app.get("/")
 async def root():
@@ -219,24 +189,6 @@ async def get_research_result(session_id: str):
         "created_at": session["created_at"],
         "completed_at": session["updated_at"],
     }
-
-
-@app.get("/api/research/{session_id}/result")
-async def get_research_result(session_id: str):
-    if session_id not in research_sessions:
-        raise HTTPException(status_code=404, detail="Research session not found")
-    session = research_sessions[session_id]
-    if session["status"] != "completed":
-        raise HTTPException(status_code=400, detail=f"Research not completed. Status: {session['status']}")
-    return {
-        "session_id": session_id,
-        "query": session["query"],
-        "analysis_content": session["analysis_content"],
-        "appendix_content": session["appendix_content"],
-        "created_at": session["created_at"],
-        "completed_at": session["updated_at"],
-    }
-
 
 @app.get("/api/research/{session_id}/download")
 async def download_report(session_id: str, content_type: str = "analysis"):

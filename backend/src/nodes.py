@@ -1456,14 +1456,16 @@ async def write_report(state: AgentState):
     if not qa_pairs:
         logging.warning(f"No Q&A pairs found for topic: '{research_topic}'. Generating empty report.")
         display_content = f"Could not generate a report. No Q&A pairs were created for the topic: '{research_topic}'."
+        appendix_content = "No appendix available."
         errors.append(display_content)
         analysis_filename = f"{REPORT_FILENAME_TEXT.replace('.txt', '_analysis.txt')}"
         analysis_text_file = save_report_to_text(display_content, analysis_filename)
         logging.info(f"[write_report] Setting analysis_content: {display_content[:200]}")
+        logging.info(f"[write_report] Setting appendix_content: {appendix_content[:200]}")
         state.update({
             "analysis_content": display_content,
             "analysis_filename": analysis_filename,
-            "appendix_content": "",
+            "appendix_content": appendix_content,
             "appendix_filename": None,
         })
     else:
@@ -1557,8 +1559,6 @@ async def write_report(state: AgentState):
         appendix_content += f"\\n---\\n\\n Appendix generated on {get_current_date()}*  \\n Powered by INTELLISEARCH Research Platform*\\n"
 
         logging.info("Three-part report generated successfully.")
-        print("[DEBUG] Display Content Sample:\\n", display_content[:500])
-        print("[DEBUG] Appendix Content Sample:\\n", appendix_content[:500])
 
         # Save files
         appendix_filename = f"{REPORT_FILENAME_TEXT.replace(".txt", "_appendix.txt")}"
@@ -1571,12 +1571,15 @@ async def write_report(state: AgentState):
         if not analysis_text_file:
             errors.append(f"Failed to save analysis to text file: {analysis_filename}.")
 
+        # Log actual content lengths and previews before updating state
+        logging.info(f"[write_report] display_content length: {len(display_content)}")
+        logging.info(f"[write_report] appendix_content length: {len(appendix_content)}")
+        logging.info(f"[write_report] display_content preview: {str(display_content)[:500]}")
+        logging.info(f"[write_report] appendix_content preview: {str(appendix_content)[:500]}")
         # Update state
-        logging.info(f"[write_report] Setting analysis_content: {display_content[:200]}")
-        logging.info(f"[write_report] Setting appendix_content: {appendix_content[:200]}")
         state.update({
-            "analysis_content": display_content,
-            "appendix_content": appendix_content,
+            "analysis_content": str(display_content),
+            "appendix_content": str(appendix_content),
             "analysis_filename": analysis_filename,
             "appendix_filename": appendix_filename
         })
