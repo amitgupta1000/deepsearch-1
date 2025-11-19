@@ -1571,8 +1571,8 @@ async def write_report(state: AgentState):
         state.update({
             "analysis_content": str(display_content),
             "appendix_content": str(appendix_content),
-            "analysis_filename": analysis_text_file,
-            "appendix_filename": appendix_text_file
+            "analysis_filename": analysis_filename,
+            "appendix_filename": appendix_filename,
         })
 
     # Common final steps for both cases
