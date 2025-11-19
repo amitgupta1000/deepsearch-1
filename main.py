@@ -1,14 +1,28 @@
-import sys
-import os
-import logging
-import uuid
-from datetime import datetime
-
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
+
+import sys
+import os
+import logging
+import uuid
+from datetime import datetime
+from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
+from typing import Optional, List, Dict, Any
+
+# Firestore setup
+try:
+    from google.cloud import firestore
+    db = firestore.Client()
+except ImportError:
+    db = None
+    logging.warning("google-cloud-firestore not installed. Firestore features will be disabled.")
+from backend.src.config import CONFIG_SOURCES
 from backend.src.config import CONFIG_SOURCES
 
 import uvicorn
@@ -142,6 +156,22 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
             session["current_step"] = "Research completed"
             session["updated_at"] = datetime.now()
             logger.info(f"Research session {session_id} completed successfully")
+
+            # Save to Firestore
+            if db:
+                try:
+                    doc_ref = db.collection("research_reports").document(session_id)
+                    doc_ref.set({
+                        "session_id": session_id,
+                        "query": session["query"],
+                        "analysis_content": session["analysis_content"],
+                        "appendix_content": session["appendix_content"],
+                        "created_at": session["created_at"],
+                        "updated_at": session["updated_at"],
+                    })
+                    logger.info(f"Saved report to Firestore for session {session_id}")
+                except Exception as e:
+                    logger.error(f"Failed to save report to Firestore: {e}")
         else:
             session["status"] = "failed"
             session["error_message"] = "No result returned from workflow."
@@ -293,6 +323,22 @@ async def delete_research_session(session_id: str):
                 logger.warning(f"Failed to delete file {filename}: {e}")
 
     return APIResponse(success=True, message="Research session deleted successfully")
+
+# --- Firestore Retrieval Endpoint ---
+@app.get("/api/research/{session_id}/firestore_result")
+async def get_firestore_result(session_id: str):
+    if not db:
+        raise HTTPException(status_code=503, detail="Firestore client not available")
+    try:
+        doc_ref = db.collection("research_reports").document(session_id)
+        doc = doc_ref.get()
+        if doc.exists:
+            return doc.to_dict()
+        else:
+            raise HTTPException(status_code=404, detail="Report not found in Firestore")
+    except Exception as e:
+        logger.error(f"Error retrieving report from Firestore: {e}")
+        raise HTTPException(status_code=500, detail="Error retrieving report from Firestore")
 
 
 # --- Health & Debug Endpoints ---
