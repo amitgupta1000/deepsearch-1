@@ -3,7 +3,23 @@
 
 import os
 import logging
-from typing import List
+from typing import List, Any, Callable
+
+# Dictionary to track config values and their sources
+CONFIG_SOURCES = {}
+
+def get_config_value(key: str, default: Any, cast_func: Callable = str) -> Any:
+    value = os.getenv(key)
+    if value is not None:
+        try:
+            casted_value = cast_func(value)
+        except Exception:
+            casted_value = default
+        CONFIG_SOURCES[key] = {"value": casted_value, "source": "env"}
+        return casted_value
+    else:
+        CONFIG_SOURCES[key] = {"value": default, "source": "default"}
+        return default
 
 # Load environment variables (for local dev only)
 try:
@@ -12,53 +28,50 @@ try:
 except ImportError:
     pass
 
+
 def get_env_bool(key: str, default: bool = False) -> bool:
-    value = os.getenv(key)
-    if value is None:
-        return default
-    return value.lower() in ('true', '1', 'yes', 'on')
+    def cast_bool(val):
+        return val.lower() in ('true', '1', 'yes', 'on')
+    return get_config_value(key, default, cast_bool)
 
 def get_env_int(key: str, default: int) -> int:
-    value = os.getenv(key)
-    if value is None:
-        return default
-    try:
-        return int(value)
-    except ValueError:
-        logging.warning(f"Invalid integer value for {key}, using default: {default}")
-        return default
+    def cast_int(val):
+        try:
+            return int(val)
+        except ValueError:
+            logging.warning(f"Invalid integer value for {key}, using default: {default}")
+            return default
+    return get_config_value(key, default, cast_int)
 
 def get_env_float(key: str, default: float) -> float:
-    value = os.getenv(key)
-    if value is None:
-        return default
-    try:
-        return float(value)
-    except ValueError:
-        logging.warning(f"Invalid float value for {key}, using default: {default}")
-        return default
+    def cast_float(val):
+        try:
+            return float(val)
+        except ValueError:
+            logging.warning(f"Invalid float value for {key}, using default: {default}")
+            return default
+    return get_config_value(key, default, cast_float)
 
 def get_env_list(key: str, default: List[str] = None, separator: str = ',') -> List[str]:
     if default is None:
         default = []
-    value = os.getenv(key)
-    if not value:
-        return default
-    return [item.strip() for item in value.split(separator) if item.strip()]
+    def cast_list(val):
+        return [item.strip() for item in val.split(separator) if item.strip()]
+    return get_config_value(key, default, cast_list)
 
 # =============================================================================
 # API KEYS  
 # =============================================================================
 
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
-SERPER_API_KEY = os.getenv("SERPER_API_KEY", "")
+GOOGLE_API_KEY = get_config_value("GOOGLE_API_KEY", "")
+SERPER_API_KEY = get_config_value("SERPER_API_KEY", "")
 
 # =============================================================================
 # LLM CONFIGURATION
 # =============================================================================
 
-PRIMARY_LLM_PROVIDER = os.getenv("PRIMARY_LLM_PROVIDER", "google")
-GOOGLE_MODEL = os.getenv("GOOGLE_MODEL", "gemini-2.0-flash")
+PRIMARY_LLM_PROVIDER = get_config_value("PRIMARY_LLM_PROVIDER", "google")
+GOOGLE_MODEL = get_config_value("GOOGLE_MODEL", "gemini-2.0-flash")
 
 # Embedding Configuration
 EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "google")

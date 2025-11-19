@@ -3,11 +3,13 @@ import os
 import logging
 import uuid
 from datetime import datetime
+
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
+from backend.src.config import CONFIG_SOURCES
 
 import uvicorn
 from backend import app_local
@@ -315,6 +317,8 @@ async def debug_info():
         "python_path": sys.path[-3:],
     }
 
+
+# Existing config info endpoint
 @app.get("/api/config")
 async def get_config():
     return {
@@ -325,6 +329,14 @@ async def get_config():
             "max_query_length": 500,
         },
     }
+
+# New endpoint: config values and sources
+@app.get("/api/config/values")
+async def get_config_values():
+    """
+    Returns all config keys, their values, and source (env or default).
+    """
+    return CONFIG_SOURCES
 
 if __name__ == "__main__":
 
