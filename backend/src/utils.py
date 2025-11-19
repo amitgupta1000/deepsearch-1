@@ -115,6 +115,22 @@ def save_report_to_text(report_content: str, filename: str = REPORT_FILENAME_TEX
         with open(file_path, "w", encoding='utf-8') as f:
             f.write(report_content)
         logging.info(f"Report saved to: {file_path}")
+
+        # Firestore save
+        try:
+            from google.cloud import firestore
+            db = firestore.Client()
+            # Use filename as document id for simplicity
+            doc_ref = db.collection("report_files").document(os.path.basename(file_path))
+            doc_ref.set({
+                "filename": os.path.basename(file_path),
+                "content": report_content,
+                "saved_at": __import__('datetime').datetime.now().isoformat()
+            })
+            logging.info(f"Report also saved to Firestore: {os.path.basename(file_path)}")
+        except Exception as e:
+            logging.warning(f"Could not save report to Firestore: {e}")
+
         return file_path
     except IOError as e:
         logging.exception(f"Error saving report to text file {file_path}: {e}")

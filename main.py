@@ -1,3 +1,41 @@
+# --- Firestore File Download Endpoint ---
+@app.get("/api/research/download_firestore/{filename}")
+async def download_firestore_file(filename: str):
+    if not db:
+        raise HTTPException(status_code=503, detail="Firestore client not available")
+    try:
+        doc_ref = db.collection("report_files").document(filename)
+        doc = doc_ref.get()
+        if doc.exists:
+            data = doc.to_dict()
+            from fastapi.responses import Response
+            return Response(content=data["content"], media_type="text/plain", headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            })
+        else:
+            raise HTTPException(status_code=404, detail="File not found in Firestore")
+    except Exception as e:
+        logger.error(f"Error downloading file from Firestore: {e}")
+        raise HTTPException(status_code=500, detail="Error downloading file from Firestore")
+# --- Firestore File Download Endpoint ---
+@app.get("/api/research/download_firestore/{filename}")
+async def download_firestore_file(filename: str):
+    if not db:
+        raise HTTPException(status_code=503, detail="Firestore client not available")
+    try:
+        doc_ref = db.collection("report_files").document(filename)
+        doc = doc_ref.get()
+        if doc.exists:
+            data = doc.to_dict()
+            from fastapi.responses import Response
+            return Response(content=data["content"], media_type="text/plain", headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            })
+        else:
+            raise HTTPException(status_code=404, detail="File not found in Firestore")
+    except Exception as e:
+        logger.error(f"Error downloading file from Firestore: {e}")
+        raise HTTPException(status_code=500, detail="Error downloading file from Firestore")
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse

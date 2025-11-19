@@ -21,17 +21,25 @@ const ResultsDisplay: React.FC = () => {
       return;
     }
 
+    // Compose filename to match backend Firestore logic
+    const filename = `CrystalSearch-${contentType}-${result.session_id.substring(0, 8)}.txt`;
+
     try {
-      const response = await fetch(`/api/research/${result.session_id}/download?content_type=${contentType}`);
+      // Try standard download first
+      let response = await fetch(`/api/research/${result.session_id}/download?content_type=${contentType}`);
       if (!response.ok) {
-        throw new Error(`Failed to download file: ${response.statusText}`);
+        // If not found, try Firestore
+        response = await fetch(`/api/research/download_firestore/${filename}`);
+        if (!response.ok) {
+          throw new Error(`Failed to download file: ${response.statusText}`);
+        }
       }
 
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `IntelliSearch-${contentType}-${result.session_id.substring(0, 8)}.txt`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
