@@ -44,6 +44,7 @@ const ResultsDisplay: React.FC = () => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      console.log(`Successfully downloaded ${contentType} file: ${filename}`);
     } catch (err) {
       console.error(`Error downloading ${contentType} file:`, err);
       alert(`Failed to download file. Please try again.`);
