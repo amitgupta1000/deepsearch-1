@@ -298,6 +298,27 @@ async def download_report(session_id: str, content_type: str = "analysis"):
     else:
         logger.error(f"File not found at path: {file_path}")
         raise HTTPException(status_code=404, detail=f"{content_type.title()} text file not found")
+        # If file not found, try to serve from Firestore (research_reports)
+        if db:
+            try:
+                doc_ref = db.collection("research_reports").document(session_id)
+                doc = doc_ref.get()
+                if doc.exists:
+                    data = doc.to_dict()
+                    content = data.get(f"{content_type}_content")
+                    if content:
+                        from fastapi.responses import Response
+                        return Response(content=content, media_type="text/plain", headers={
+                            "Content-Disposition": f"attachment; filename=CrystalSearch-{content_type}-{session_id[:8]}.txt"
+                        })
+                    else:
+                        raise HTTPException(status_code=404, detail=f"{content_type.title()} content not found in Firestore")
+                else:
+                    raise HTTPException(status_code=404, detail="Report not found in Firestore")
+            except Exception as e:
+                logger.error(f"Error downloading {content_type} from Firestore: {e}")
+                raise HTTPException(status_code=500, detail="Error downloading from Firestore")
+        raise HTTPException(status_code=404, detail=f"{content_type.title()} file not found")
 
 @app.get("/api/research/sessions")
 async def list_research_sessions(limit: int = 10, offset: int = 0):
