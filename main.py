@@ -1,5 +1,5 @@
 import os
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"C:\gen-lang-client-0665888431-038f11096cad.json"
+#os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"C:\gen-lang-client-0665888431-038f11096cad.json"
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
