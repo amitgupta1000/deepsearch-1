@@ -101,9 +101,4 @@ sympy==1.14.0
 pluggy==1.6.0
 SQLAlchemy==2.0.41
 rank_bm25==0.2.2
-<<<<<<< HEAD
 python-multipart==0.0.20
-# --- Playwright note ---
-# After installing these requirements, run 'playwright install --with-deps' in your Dockerfile or deployment script to ensure browser binaries and system dependencies are available for headless scraping
-=======
->>>>>>> 112781c (Refactor backend download endpoint to use Firestore only for report retrieval)
