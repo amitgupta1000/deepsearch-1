@@ -104,36 +104,22 @@ def rank_urls(query: str, urls: List[str], relevant_contexts: Dict[str, Dict[str
 
 # Function to save report to text
 
-def save_report_to_text(report_content: str, filename: str = REPORT_FILENAME_TEXT) -> str:
-    """Saves the report content to a text file."""
-    import os
-    reports_dir = os.path.join(os.getcwd(), "reports")
-    if not os.path.exists(reports_dir):
-        os.makedirs(reports_dir)
-    file_path = filename if os.path.isabs(filename) else os.path.join(reports_dir, filename)
+def save_report_to_text(report_content: str, filename: str) -> str:
+    """Saves the report content to Firestore only."""
     try:
-        with open(file_path, "w", encoding='utf-8') as f:
-            f.write(report_content)
-        logging.info(f"Report saved to: {file_path}")
-
-        # Firestore save
-        try:
-            from google.cloud import firestore
-            db = firestore.Client()
-            # Use filename as document id for simplicity
-            doc_ref = db.collection("report_files").document(os.path.basename(file_path))
-            doc_ref.set({
-                "filename": os.path.basename(file_path),
-                "content": report_content,
-                "saved_at": __import__('datetime').datetime.now().isoformat()
-            })
-            logging.info(f"Report also saved to Firestore: {os.path.basename(file_path)}")
-        except Exception as e:
-            logging.warning(f"Could not save report to Firestore: {e}")
-
-        return file_path
-    except IOError as e:
-        logging.exception(f"Error saving report to text file {file_path}: {e}")
+        from google.cloud import firestore
+        db = firestore.Client()
+        # Use filename as document id for simplicity
+        doc_ref = db.collection("report_files").document(filename)
+        doc_ref.set({
+            "filename": filename,
+            "content": report_content,
+            "saved_at": __import__('datetime').datetime.now().isoformat()
+        })
+        logging.info(f"Report saved to Firestore: {filename}")
+        return filename  # Return filename for reference
+    except Exception as e:
+        logging.warning(f"Could not save report to Firestore: {e}")
         return ""
 
 

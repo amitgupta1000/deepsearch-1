@@ -1,41 +1,3 @@
-# --- Firestore File Download Endpoint ---
-@app.get("/api/research/download_firestore/{filename}")
-async def download_firestore_file(filename: str):
-    if not db:
-        raise HTTPException(status_code=503, detail="Firestore client not available")
-    try:
-        doc_ref = db.collection("report_files").document(filename)
-        doc = doc_ref.get()
-        if doc.exists:
-            data = doc.to_dict()
-            from fastapi.responses import Response
-            return Response(content=data["content"], media_type="text/plain", headers={
-                "Content-Disposition": f"attachment; filename={filename}"
-            })
-        else:
-            raise HTTPException(status_code=404, detail="File not found in Firestore")
-    except Exception as e:
-        logger.error(f"Error downloading file from Firestore: {e}")
-        raise HTTPException(status_code=500, detail="Error downloading file from Firestore")
-# --- Firestore File Download Endpoint ---
-@app.get("/api/research/download_firestore/{filename}")
-async def download_firestore_file(filename: str):
-    if not db:
-        raise HTTPException(status_code=503, detail="Firestore client not available")
-    try:
-        doc_ref = db.collection("report_files").document(filename)
-        doc = doc_ref.get()
-        if doc.exists:
-            data = doc.to_dict()
-            from fastapi.responses import Response
-            return Response(content=data["content"], media_type="text/plain", headers={
-                "Content-Disposition": f"attachment; filename={filename}"
-            })
-        else:
-            raise HTTPException(status_code=404, detail="File not found in Firestore")
-    except Exception as e:
-        logger.error(f"Error downloading file from Firestore: {e}")
-        raise HTTPException(status_code=500, detail="Error downloading file from Firestore")
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -64,7 +26,7 @@ from backend.src.config import CONFIG_SOURCES
 from backend.src.config import CONFIG_SOURCES
 
 import uvicorn
-from backend import app_local
+
 try:
     from langchain_core.runnables import RunnableConfig
     config = RunnableConfig(recursion_limit=100)
@@ -195,21 +157,12 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
             session["updated_at"] = datetime.now()
             logger.info(f"Research session {session_id} completed successfully")
 
-            # Save to Firestore
-            if db:
-                try:
-                    doc_ref = db.collection("research_reports").document(session_id)
-                    doc_ref.set({
-                        "session_id": session_id,
-                        "query": session["query"],
-                        "analysis_content": session["analysis_content"],
-                        "appendix_content": session["appendix_content"],
-                        "created_at": session["created_at"],
-                        "updated_at": session["updated_at"],
-                    })
-                    logger.info(f"Saved report to Firestore for session {session_id}")
-                except Exception as e:
-                    logger.error(f"Failed to save report to Firestore: {e}")
+            # Save analysis and appendix to Firestore via utils.save_report_to_text
+            from backend.src.utils import save_report_to_text
+            analysis_filename = f"CrystalSearch-analysis-{session_id[:8]}.txt"
+            appendix_filename = f"CrystalSearch-appendix-{session_id[:8]}.txt"
+            session["analysis_filename"] = save_report_to_text(session["analysis_content"] or "No analysis content available", analysis_filename)
+            session["appendix_filename"] = save_report_to_text(session["appendix_content"] or "No appendix content available", appendix_filename)
         else:
             session["status"] = "failed"
             session["error_message"] = "No result returned from workflow."
@@ -320,20 +273,27 @@ async def download_report(session_id: str, content_type: str = "analysis"):
     if content_type not in filename_map:
         raise HTTPException(status_code=400, detail="Content type must be 'analysis' or 'appendix'")
 
-    file_to_serve = session.get(filename_map[content_type])
-    if not file_to_serve:
+    filename = session.get(filename_map[content_type])
+    if not filename:
         raise HTTPException(status_code=404, detail=f"{content_type.title()} file not found")
 
-    file_path = file_to_serve
-    if os.path.exists(file_path):
-        return FileResponse(
-            path=file_path,
-            filename=f"CrystalSearch-{content_type}-{session_id[:8]}.txt",
-            media_type="text/plain",
-        )
-    else:
-        logger.error(f"File not found at path: {file_path}")
-        raise HTTPException(status_code=404, detail=f"{content_type.title()} text file not found")
+    # Firestore retrieval only
+    if not db:
+        raise HTTPException(status_code=503, detail="Firestore client not available")
+    try:
+        doc_ref = db.collection("report_files").document(filename)
+        doc = doc_ref.get()
+        if doc.exists:
+            data = doc.to_dict()
+            from fastapi.responses import Response
+            return Response(content=data["content"], media_type="text/plain", headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            })
+        else:
+            raise HTTPException(status_code=404, detail="File not found in Firestore")
+    except Exception as e:
+        logger.error(f"Error downloading file from Firestore: {e}")
+        raise HTTPException(status_code=500, detail="Error downloading file from Firestore")
 
 @app.get("/api/research/sessions")
 async def list_research_sessions(limit: int = 10, offset: int = 0):
@@ -362,7 +322,27 @@ async def delete_research_session(session_id: str):
 
     return APIResponse(success=True, message="Research session deleted successfully")
 
-# --- Firestore Retrieval Endpoint ---
+# --- Firestore File Download Endpoint ---
+@app.get("/api/research/download_firestore/{filename}")
+async def download_firestore_file(filename: str):
+    if not db:
+        raise HTTPException(status_code=503, detail="Firestore client not available")
+    try:
+        doc_ref = db.collection("report_files").document(filename)
+        doc = doc_ref.get()
+        if doc.exists:
+            data = doc.to_dict()
+            from fastapi.responses import Response
+            return Response(content=data["content"], media_type="text/plain", headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            })
+        else:
+            raise HTTPException(status_code=404, detail="File not found in Firestore")
+    except Exception as e:
+        logger.error(f"Error downloading file from Firestore: {e}")
+        raise HTTPException(status_code=500, detail="Error downloading file from Firestore")
+
+
 @app.get("/api/research/{session_id}/firestore_result")
 async def get_firestore_result(session_id: str):
     if not db:
@@ -377,7 +357,6 @@ async def get_firestore_result(session_id: str):
     except Exception as e:
         logger.error(f"Error retrieving report from Firestore: {e}")
         raise HTTPException(status_code=500, detail="Error retrieving report from Firestore")
-
 
 # --- Health & Debug Endpoints ---
 @app.get("/api/health")
