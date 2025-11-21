@@ -1,9 +1,6 @@
-<<<<<<< HEAD
 import os
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"C:\gen-lang-client-0665888431-038f11096cad.json"
 
-=======
->>>>>>> 112781c (Refactor backend download endpoint to use Firestore only for report retrieval)
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -282,39 +279,6 @@ async def download_report(session_id: str, content_type: str = "analysis"):
     if not filename:
         raise HTTPException(status_code=404, detail=f"{content_type.title()} file not found")
 
-<<<<<<< HEAD
-    file_path = file_to_serve
-    if os.path.exists(file_path):
-        return FileResponse(
-            path=file_path,
-            filename=f"CrystalSearch-{content_type}-{session_id[:8]}.txt",
-            media_type="text/plain",
-        )
-    else:
-        logger.error(f"File not found at path: {file_path}")
-        raise HTTPException(status_code=404, detail=f"{content_type.title()} text file not found")
-        # If file not found, try to serve from Firestore (research_reports)
-        if db:
-            try:
-                doc_ref = db.collection("research_reports").document(session_id)
-                doc = doc_ref.get()
-                if doc.exists:
-                    data = doc.to_dict()
-                    content = data.get(f"{content_type}_content")
-                    if content:
-                        from fastapi.responses import Response
-                        return Response(content=content, media_type="text/plain", headers={
-                            "Content-Disposition": f"attachment; filename=CrystalSearch-{content_type}-{session_id[:8]}.txt"
-                        })
-                    else:
-                        raise HTTPException(status_code=404, detail=f"{content_type.title()} content not found in Firestore")
-                else:
-                    raise HTTPException(status_code=404, detail="Report not found in Firestore")
-            except Exception as e:
-                logger.error(f"Error downloading {content_type} from Firestore: {e}")
-                raise HTTPException(status_code=500, detail="Error downloading from Firestore")
-        raise HTTPException(status_code=404, detail=f"{content_type.title()} file not found")
-=======
     # Firestore retrieval only
     if not db:
         raise HTTPException(status_code=503, detail="Firestore client not available")
@@ -332,7 +296,6 @@ async def download_report(session_id: str, content_type: str = "analysis"):
     except Exception as e:
         logger.error(f"Error downloading file from Firestore: {e}")
         raise HTTPException(status_code=500, detail="Error downloading file from Firestore")
->>>>>>> 112781c (Refactor backend download endpoint to use Firestore only for report retrieval)
 
 @app.get("/api/research/sessions")
 async def list_research_sessions(limit: int = 10, offset: int = 0):
@@ -361,45 +324,6 @@ async def delete_research_session(session_id: str):
 
     return APIResponse(success=True, message="Research session deleted successfully")
 
-<<<<<<< HEAD
-=======
-# --- Firestore File Download Endpoint ---
-@app.get("/api/research/download_firestore/{filename}")
-async def download_firestore_file(filename: str):
-    if not db:
-        raise HTTPException(status_code=503, detail="Firestore client not available")
-    try:
-        doc_ref = db.collection("report_files").document(filename)
-        doc = doc_ref.get()
-        if doc.exists:
-            data = doc.to_dict()
-            from fastapi.responses import Response
-            return Response(content=data["content"], media_type="text/plain", headers={
-                "Content-Disposition": f"attachment; filename={filename}"
-            })
-        else:
-            raise HTTPException(status_code=404, detail="File not found in Firestore")
-    except Exception as e:
-        logger.error(f"Error downloading file from Firestore: {e}")
-        raise HTTPException(status_code=500, detail="Error downloading file from Firestore")
-
-
-@app.get("/api/research/{session_id}/firestore_result")
-async def get_firestore_result(session_id: str):
-    if not db:
-        raise HTTPException(status_code=503, detail="Firestore client not available")
-    try:
-        doc_ref = db.collection("research_reports").document(session_id)
-        doc = doc_ref.get()
-        if doc.exists:
-            return doc.to_dict()
-        else:
-            raise HTTPException(status_code=404, detail="Report not found in Firestore")
-    except Exception as e:
-        logger.error(f"Error retrieving report from Firestore: {e}")
-        raise HTTPException(status_code=500, detail="Error retrieving report from Firestore")
-
->>>>>>> 112781c (Refactor backend download endpoint to use Firestore only for report retrieval)
 # --- Health & Debug Endpoints ---
 @app.get("/api/health")
 async def health_check():

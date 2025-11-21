@@ -25,16 +25,11 @@ const ResultsDisplay: React.FC = () => {
     const filename = `CrystalSearch-${contentType}-${result.session_id.substring(0, 8)}.txt`;
 
     try {
-      // Try standard download first
-      let response = await fetch(`/api/research/${result.session_id}/download?content_type=${contentType}`);
+      // Download directly from Firestore endpoint
+      const response = await fetch(`/api/research/download_firestore/${filename}`);
       if (!response.ok) {
-        // If not found, try Firestore
-        response = await fetch(`/api/research/download_firestore/${filename}`);
-        if (!response.ok) {
-          throw new Error(`Failed to download file: ${response.statusText}`);
-        }
+        throw new Error(`Failed to download file: ${response.statusText}`);
       }
-
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
