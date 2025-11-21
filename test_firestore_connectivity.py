@@ -1,5 +1,5 @@
 import os
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"C:\gen-lang-client-0665888431-038f11096cad.json"
+## Removed hardcoded GOOGLE_APPLICATION_CREDENTIALS; GCP uses service account authentication
 
 import os
 import logging
