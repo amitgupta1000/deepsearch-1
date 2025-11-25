@@ -180,6 +180,8 @@ export const ResearchProvider: React.FC<{ children: ReactNode }> = ({ children }
             return {
               analysis_content: result.analysis_content || 'No analysis content available',
               appendix_content: result.appendix_content || 'No appendix content available',
+              analysis_filename: result.analysis_filename || '',
+              appendix_filename: result.appendix_filename || '',
               session_id: sessionId,
               created_at: createdAt,
               completed_at: result.completed_at || new Date().toISOString()
