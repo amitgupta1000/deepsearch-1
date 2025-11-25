@@ -149,13 +149,10 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
             session["current_step"] = "Research completed"
             session["updated_at"] = datetime.now()
             logger.info(f"Research session {session_id} completed successfully")
-
-            # Save analysis and appendix to Firestore via utils.save_report_to_text
-            from backend.src.utils import save_report_to_text
-            analysis_filename = f"CrystalSearch-analysis-{session_id[:8]}.txt"
-            appendix_filename = f"CrystalSearch-appendix-{session_id[:8]}.txt"
-            session["analysis_filename"] = save_report_to_text(session["analysis_content"] or "No analysis content available", analysis_filename)
-            session["appendix_filename"] = save_report_to_text(session["appendix_content"] or "No appendix content available", appendix_filename)
+            
+            # The workflow already saved the reports and returned the filenames.
+            session["analysis_filename"] = result.get("analysis_filename")
+            session["appendix_filename"] = result.get("appendix_filename")
         else:
             session["status"] = "failed"
             session["error_message"] = "No result returned from workflow."

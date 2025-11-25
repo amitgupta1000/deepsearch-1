@@ -355,7 +355,7 @@ class AgentState(TypedDict):
     failed_urls: Optional[List[str]]
     iteration_count: Optional[int]
     error: Optional[str]
-    evaluation_response: Optional[str]
+    evaluation_response: Option
     suggested_follow_up_queries: Optional[List[str]]
     prompt_type: Optional[str]
     approval_iteration_count: Optional[int]
