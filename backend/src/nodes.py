@@ -82,12 +82,11 @@ except ImportError:
 
 # Import necessary classes and functions from other modules
 try:
-    from .llm_utils import llm_call_async, embeddings # Import only what we need - no llm variable
+    from .llm_utils import llm_call_async, embeddings
 except ImportError:
     logging.error("Could not import LLM/Embeddings from llm_utils. Some nodes may not function.")
     print("Could not import LLM/Embeddings from llm_utils. Some nodes may not function.")   
     llm_call_async, embeddings = None, None
-
 try:
     from .search import UnifiedSearcher, SearchResult # Assuming SearchResult and UnifiedSearcher are in search.py
 except ImportError:
@@ -1437,12 +1436,11 @@ def deduplicate_content(text: str) -> str:
     
     return ' '.join(unique_sentences)
 
-#===================================================
-async def write_report(state: AgentState):
+async def write_report(state: AgentState) -> AgentState:
     """
     Generates the final report using the new three-part structure:
     1) Original User Query
-    2) IntelliSearch Response (LLM analysis) 
+    2) IntelliSearch Response (LLM analysis)
     3) Appendix with Q&A pairs and citations
     """
     GREEN = '\033[92m'
@@ -1450,135 +1448,127 @@ async def write_report(state: AgentState):
     errors: List[str] = []
     research_topic = state.get('new_query', 'the topic')
     qa_pairs = state.get('qa_pairs', [])
-    display_content = []
+    analysis_content = ""
+    appendix_content = ""
+    analysis_filename = None
+    appendix_filename = None
+
     logging.info(f"Generating report for topic: '{research_topic}'")
 
     if not qa_pairs:
         logging.warning(f"No Q&A pairs found for topic: '{research_topic}'. Generating empty report.")
-        display_content = f"Could not generate a report. No Q&A pairs were created for the topic: '{research_topic}'."
+        analysis_content = f"Could not generate a report. No Q&A pairs were created for the topic: '{research_topic}'."
         appendix_content = "No appendix available."
-        errors.append(display_content)
-        analysis_filename = f"{REPORT_FILENAME_TEXT.replace('.txt', '_analysis.txt')}"
-        analysis_text_file = save_report_to_text(display_content, analysis_filename)
-        logging.info(f"[write_report] Setting analysis_content: {display_content[:200]}")
-        logging.info(f"[write_report] Setting appendix_content: {appendix_content[:200]}")
-        state.update({
-            "analysis_content": display_content,
-            "analysis_filename": analysis_filename,
-            "appendix_content": appendix_content,
-            "appendix_filename": None,
-        })
+        errors.append(analysis_content)
     else:
-        # PART 1: Original User Query
-        part1_query = f"# Research Report\n\n## 1. Original User Query\n\n**{research_topic}**\n\n---\n"
-
-        # PART 2: Generate IntelliSearch Response using LLM analysis
-        logging.info("Generating IntelliSearch Response (Part 2)...")
-        
-        qa_context = "Based on the following Q&A analysis:\n\n"
-        for i, qa in enumerate(qa_pairs):
-            qa_context += f"Q{i+1}: {qa['question']}\nA{i+1}: {qa['answer'][:3000]}...\n\n"
-
-        intellisearch_prompt = f"""
-        You are an expert research analyst. Provide a comprehensive, analytical response to the user's query by synthesizing information from the collected research data.
-
-        USER QUERY: "{research_topic}"
-
-        RESEARCH DATA:
-        {qa_context}
-
-        INSTRUCTIONS:
-        - Provide a direct, analytical answer to the user's original question
-        - Synthesize insights from all the research data
-        - Focus on creating a cohesive, analytical response
-        - Target 500-1000 words for this response
-        - Use clear, professional language with proper markdown formatting
-        - Include key insights and implications
-        - Do not repeat the individual Q&A pairs (they will be in the appendix)
-        - Focus on answering the user's question comprehensively
-        - Use bullet points, subheadings, or numbered lists where appropriate
-
-        Generate the IntelliSearch Response:
-        """
-
         try:
+            # PART 1: Original User Query
+            part1_query = f"# Research Report\n\n## 1. Original User Query\n\n**{research_topic}**\n\n---\n"
+
+            # PART 2: Generate IntelliSearch Response using LLM analysis
+            logging.info("Generating IntelliSearch Response (Part 2)...")
+            qa_context = "Based on the following Q&A analysis:\n\n"
+            for i, qa in enumerate(qa_pairs):
+                qa_context += f"Q{i+1}: {qa['question']}\nA{i+1}: {qa['answer'][:3000]}...\n\n"
+
+            intellisearch_prompt = f"""
+            You are an expert research analyst. Provide a comprehensive, analytical response to the user's query by synthesizing information from the collected research data.
+
+            USER QUERY: "{research_topic}"
+
+            RESEARCH DATA:
+            {qa_context}
+
+            INSTRUCTIONS:
+            - Provide a direct, analytical answer to the user's original question
+            - Synthesize insights from all the research data
+            - Focus on creating a cohesive, analytical response
+            - Target 500-1000 words for this response
+            - Use clear, professional language with proper markdown formatting
+            - Include key insights and implications
+            - Do not repeat the individual Q&A pairs (they will be in the appendix)
+            - Focus on answering the user's question comprehensively
+            - Use bullet points, subheadings, or numbered lists where appropriate
+
+            Generate the IntelliSearch Response:
+            """
+
             messages = [
                 SystemMessage(content=intellisearch_prompt),
                 HumanMessage(content=f"Analyze and answer: {research_topic}")
             ]
-            if llm_call_async:
-                intellisearch_response = await llm_call_async(messages) or "Unable to generate analysis due to LLM unavailability."
-            else:
-                intellisearch_response = "Unable to generate analysis due to LLM unavailability."
+            intellisearch_response = await llm_call_async(messages) if llm_call_async else "LLM analysis is unavailable."
+            intellisearch_response = intellisearch_response or "LLM analysis returned no content."
+
+            part2_response = f"## 2. IntelliSearch Response\n\n{intellisearch_response}\n\n---\n"
+
+            # PART 3: Appendix with Q&A pairs and citations
+            logging.info("Generating Appendix (Part 3)...")
+            part3_appendix = "## 3. Appendix: Research Q&A and Sources\n\n### Research Questions and Detailed Answers\n"
+            all_citations = []
+            citation_counter = 1
+            for i, qa in enumerate(qa_pairs):
+                part3_appendix += f"### Q{i+1}: {qa['question']}\n"
+                answer = qa['answer'].strip()
+                answer = re.sub(r'\n{2,}', '\n\n', answer)
+                part3_appendix += f"**Answer:**\n{answer}\n"
+                if qa.get('citations'):
+                    part3_appendix += "Sources:\n"
+                    for citation in qa['citations']:
+                        old_ref = f"[{citation['number']}]"
+                        new_ref = f"[{citation_counter}]"
+                        answer = answer.replace(old_ref, new_ref)
+                        part3_appendix += (
+                            f"- [{citation_counter}] {citation.get('title', 'Untitled')} ({citation['source']}) - [Link]({citation['url']})\n"
+                        )
+                        all_citations.append({
+                            'number': citation_counter,
+                            'source': citation['source'],
+                            'url': citation.get('url', ''),
+                            'content': citation.get('content', '')
+                        })
+                        citation_counter += 1
+
+            # Deduplicate and format final content
+            deduped_part2 = await enhanced_deduplicate_content(part2_response) if USE_LLM_DEDUPLICATION else deduplicate_content(part2_response)
+            analysis_content = part1_query + deduped_part2
+            analysis_content += f"\n---\n*Analysis generated on {get_current_date()}. Powered by INTELLISEARCH Research Platform.*\n"
+
+            appendix_content = part3_appendix
+            appendix_content += f"\n---\n*Appendix generated on {get_current_date()}. Powered by INTELLISEARCH Research Platform.*\n"
+
+            logging.info("Three-part report generated successfully.")
+
         except Exception as e:
-            logging.error(f"Error generating IntelliSearch response: {e}")
-            intellisearch_response = f"Error generating analysis: {str(e)}"
+            error_msg = f"Error during report generation: {e}"
+            logging.error(error_msg, exc_info=True)
+            errors.append(error_msg)
+            analysis_content = f"Failed to generate report: {error_msg}"
+            appendix_content = "Not available due to an error."
 
-        part2_response = f"## 2. IntelliSearch Response\n\n{intellisearch_response}\n\n---\n"
-
-        # PART 3: Appendix with Q&A pairs and citations
-        logging.info("Generating Appendix (Part 3)...")
-        
-        part3_appendix = "## 3. Appendix: Research Q&A and Sources\n"
-        all_citations = []
-        citation_counter = 1
-        part3_appendix += "### Research Questions and Detailed Answers\n"
-        for i, qa in enumerate(qa_pairs):
-            part3_appendix += f"### Q{i+1}: {qa['question']}\n"
-            answer = qa['answer'].strip()
-            answer = re.sub(r'\n{2,}', '\n\n', answer)
-            part3_appendix += f"**Answer:**\n{answer}\n"
-            if qa.get('citations'):
-                part3_appendix += "Sources:\n"
-                for citation in qa['citations']:
-                    old_ref = f"[{citation['number']}]"
-                    new_ref = f"[{citation_counter}]"
-                    answer = answer.replace(old_ref, new_ref)
-                    part3_appendix += (
-                        f"- [{citation_counter}] {citation.get('title', 'Untitled')} ({citation['source']}) - [Link]({citation['url']})\n"
-                    )
-                    all_citations.append({
-                        'number': citation_counter,
-                        'source': citation['source'],
-                        'url': citation.get('url', ''),
-                        'content': citation.get('content', '')
-                    })
-                    citation_counter += 1
-        # Deduplicate and format final content
-        deduped_part2 = deduplicate_content(part2_response)
-        deduped_appendix = deduplicate_content(part3_appendix)
-
-        display_content = part1_query + deduped_part2
-        display_content += f"\n---\n Analysis generated on {get_current_date()}*  \n Powered by INTELLISEARCH Research Platform*\n"
-
-        appendix_content = deduped_appendix
-        appendix_content += f"\n---\n Appendix generated on {get_current_date()}*  \n Powered by INTELLISEARCH Research Platform*\n"
-
-        logging.info("Three-part report generated successfully.")
-
-        # Save files
-        appendix_filename = f"{REPORT_FILENAME_TEXT.replace('.txt', '_appendix.txt')}"
-        appendix_text_file = save_report_to_text(appendix_content, appendix_filename)
-        if not appendix_text_file:
-            errors.append(f"Failed to save appendix to text file: {appendix_filename}.")
-
+    # Save files to Firestore
+    if analysis_content:
         analysis_filename = f"{REPORT_FILENAME_TEXT.replace('.txt', '_analysis.txt')}"
-        analysis_text_file = save_report_to_text(display_content, analysis_filename)
-        if not analysis_text_file:
+        if not save_report_to_text(analysis_content, analysis_filename):
             errors.append(f"Failed to save analysis to text file: {analysis_filename}.")
 
-        # Update state
-        state.update({
-            "analysis_content": str(display_content),
-            "appendix_content": str(appendix_content),
-            "analysis_filename": analysis_filename,
-            "appendix_filename": appendix_filename,
-        })
+    if appendix_content:
+        appendix_filename = f"{REPORT_FILENAME_TEXT.replace('.txt', '_appendix.txt')}"
+        if not save_report_to_text(appendix_content, appendix_filename):
+            errors.append(f"Failed to save appendix to text file: {appendix_filename}.")
 
     # Common final steps for both cases
     current_error = state.get('error', '') or ''
     state['error'] = (current_error + "\n" + "\n".join(errors)).strip() if errors else (current_error.strip() if current_error else None)
     if state['error'] == '': state['error'] = None
+
+    # Update state with final content and clear intermediate data
+    state.update({
+        "analysis_content": analysis_content,
+        "appendix_content": appendix_content,
+        "analysis_filename": analysis_filename,
+        "appendix_filename": appendix_filename,
+    })
 
     # Clean up intermediate data
     state.update({
