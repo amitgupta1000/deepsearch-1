@@ -26,6 +26,7 @@ const ResultsDisplay: React.FC = () => {
     }
 
     const content = contentType === 'analysis' ? result.analysis_content : result.appendix_content;
+    // Use correct property names for filenames, e.g. analysis_file_name and appendix_file_name
     const filename = contentType === 'analysis' ? result.analysis_filename : result.appendix_filename;
 
     if (!content || !filename) {

@@ -6,6 +6,8 @@ export interface ResearchRequest {
 export interface ResearchResult {
   analysis_content: string;
   appendix_content: string;
+  analysis_filename: string;
+  appendix_filename: string;
   session_id: string; 
   created_at: string;
   completed_at?: string;

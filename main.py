@@ -134,31 +134,33 @@ async def run_workflow(initial_query: str, prompt_type: str, session_id: str):
 #==============
 async def run_research_pipeline(session_id: str, request: ResearchRequest):
     try:
-        session = research_sessions[session_id]
-        session["status"] = "running"
-        session["current_step"] = "Starting research pipeline..."
-        session["progress"] = 5
+        research_sessions[session_id]["status"] = "running"
+        research_sessions[session_id]["current_step"] = "Starting research pipeline..."
+        research_sessions[session_id]["progress"] = 5
 
         result = await run_workflow(request.query, request.prompt_type, session_id)
         logging.info(f"[run_research_pipeline] Workflow result: {result}")
 
         if result:
-            session["analysis_content"] = result.get("analysis_content")
-            session["appendix_content"] = result.get("appendix_content")
-            session["status"] = "completed"
-            session["progress"] = 100
-            session["current_step"] = "Research completed"
-            session["updated_at"] = datetime.now()
+            research_sessions[session_id].update({
+                "analysis_content": result.get("analysis_content"),
+                "appendix_content": result.get("appendix_content"),
+                "status": "completed",
+                "progress": 100,
+                "current_step": "Research completed",
+                "updated_at": datetime.now(),
+                # The workflow already saved the reports and returned the filenames.
+                "analysis_filename": result.get("analysis_filename"),
+                "appendix_filename": result.get("appendix_filename"),
+            })
             logger.info(f"Research session {session_id} completed successfully")
-            
-            # The workflow already saved the reports and returned the filenames.
-            session["analysis_filename"] = result.get("analysis_filename")
-            session["appendix_filename"] = result.get("appendix_filename")
         else:
-            session["status"] = "failed"
-            session["error_message"] = "No result returned from workflow."
-            session["current_step"] = "Workflow returned no result."
-            session["updated_at"] = datetime.now()
+            research_sessions[session_id].update({
+                "status": "failed",
+                "error_message": "No result returned from workflow.",
+                "current_step": "Workflow returned no result.",
+                "updated_at": datetime.now(),
+            })
             logger.error(f"Workflow returned no result for session {session_id}")
     except Exception as e:
         logger.error(f"Research pipeline failed for session {session_id}: {e}")
@@ -232,41 +234,9 @@ async def get_research_result(session_id: str):
         "appendix_content": session["appendix_content"],
         "created_at": session["created_at"],
         "completed_at": session["updated_at"],
+        "analysis_filename": session.get("analysis_filename"),
+        "appendix_filename": session.get("appendix_filename"),
     }
-
-@app.get("/api/research/{session_id}/download")
-async def download_report(session_id: str, content_type: str = "analysis"):
-    if session_id not in research_sessions:
-        raise HTTPException(status_code=404, detail="Research session not found")
-    session = research_sessions[session_id]
-    if session["status"] != "completed":
-        raise HTTPException(status_code=400, detail="Report not available for download")
-
-    filename_map = {"analysis": "analysis_filename", "appendix": "appendix_filename"}
-    if content_type not in filename_map:
-        raise HTTPException(status_code=400, detail="Content type must be 'analysis' or 'appendix'")
-
-    filename = session.get(filename_map[content_type])
-    if not filename:
-        raise HTTPException(status_code=404, detail=f"{content_type.title()} file not found")
-
-    # Firestore retrieval only
-    if not db:
-        raise HTTPException(status_code=503, detail="Firestore client not available")
-    try:
-        doc_ref = db.collection("report_files").document(filename)
-        doc = doc_ref.get()
-        if doc.exists:
-            data = doc.to_dict()
-            from fastapi.responses import Response
-            return Response(content=data["content"], media_type="text/plain", headers={
-                "Content-Disposition": f"attachment; filename={filename}"
-            })
-        else:
-            raise HTTPException(status_code=404, detail="File not found in Firestore")
-    except Exception as e:
-        logger.error(f"Error downloading file from Firestore: {e}")
-        raise HTTPException(status_code=500, detail="Error downloading file from Firestore")
 
 @app.get("/api/research/sessions")
 async def list_research_sessions(limit: int = 10, offset: int = 0):

@@ -366,6 +366,7 @@ class AgentState(TypedDict):
     appendix_filename: Optional[str]
 
 
+
 # Pydantic models for LLM output validation (moved from initial cells)
 class SearchQueryResponse(BaseModel):
     """Represents the expected JSON structure from the create_queries LLM call."""
@@ -1447,13 +1448,14 @@ async def write_report(state: AgentState) -> AgentState:
     errors: List[str] = []
     research_topic = state.get('new_query', 'the topic')
     qa_pairs = state.get('qa_pairs', [])
-    session_id = state.get('session_id', 'unknown_session')  # Get session_id from state
+    full_session_id = state.get('session_id', 'unknown_session')  # Get session_id from state
+    short_session_id = full_session_id.split('-')[0] # Use the first 8 characters of the UUID
     analysis_content = ""
     appendix_content = ""
     analysis_filename = None
     appendix_filename = None
 
-    logging.info(f"Generating report for session '{session_id}' on topic: '{research_topic}'")
+    logging.info(f"Generating report for session '{full_session_id}' on topic: '{research_topic}'")
 
     if not qa_pairs:
         logging.warning(f"No Q&A pairs found for topic: '{research_topic}'. Generating empty report.")
@@ -1547,15 +1549,29 @@ async def write_report(state: AgentState) -> AgentState:
             appendix_content = "Not available due to an error."
 
     # Save files to Firestore
-    if analysis_content:
-        analysis_filename = f"{session_id}_analysis.txt"
-        if not save_report_to_text(analysis_content, analysis_filename):
-            errors.append(f"Failed to save analysis to text file: {analysis_filename}.")
+    db = None
+    try:
+        from google.cloud import firestore
+        db = firestore.Client()
+    except (ImportError, Exception) as e:
+        errors.append(f"Firestore client not available: {e}")
 
-    if appendix_content:
-        appendix_filename = f"{session_id}_appendix.txt"
-        if not save_report_to_text(appendix_content, appendix_filename):
-            errors.append(f"Failed to save appendix to text file: {appendix_filename}.")
+    if db:
+        if analysis_content:
+            analysis_filename = f"{short_session_id}_analysis.txt"
+            try:
+                db.collection("report_files").document(analysis_filename).set({"content": analysis_content})
+                logging.info(f"Successfully saved analysis report to Firestore: {analysis_filename}")
+            except Exception as e:
+                errors.append(f"Failed to save analysis to Firestore: {e}")
+
+        if appendix_content:
+            appendix_filename = f"{short_session_id}_appendix.txt"
+            try:
+                db.collection("report_files").document(appendix_filename).set({"content": appendix_content})
+                logging.info(f"Successfully saved appendix report to Firestore: {appendix_filename}")
+            except Exception as e:
+                errors.append(f"Failed to save appendix to Firestore: {e}")
 
     # Common final steps for both cases
     current_error = state.get('error', '') or ''
