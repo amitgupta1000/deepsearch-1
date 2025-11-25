@@ -6,13 +6,11 @@ print("nodes.py loaded: starting import checks...")
 
 try:
     from backend.src.config import *
-    print("Successfully imported from config.py")
 except Exception as e:
     print(f"Failed to import from config.py: {e}")
 
 try:
     from backend.src.utils import *
-    print("Successfully imported from utils.py")
 except Exception as e:
     print(f"Failed to import from utils.py: {e}")
 
@@ -341,6 +339,7 @@ except ImportError:
 
 from typing import TypedDict, Union
 class AgentState(TypedDict):
+    session_id: Optional[str]
     new_query: Optional[str]
     search_queries: Optional[List[str]]
     rationale: Optional[str]
@@ -355,7 +354,7 @@ class AgentState(TypedDict):
     failed_urls: Optional[List[str]]
     iteration_count: Optional[int]
     error: Optional[str]
-    evaluation_response: Option
+    evaluation_response: Optional[str]
     suggested_follow_up_queries: Optional[List[str]]
     prompt_type: Optional[str]
     approval_iteration_count: Optional[int]
@@ -1448,12 +1447,13 @@ async def write_report(state: AgentState) -> AgentState:
     errors: List[str] = []
     research_topic = state.get('new_query', 'the topic')
     qa_pairs = state.get('qa_pairs', [])
+    session_id = state.get('session_id', 'unknown_session')  # Get session_id from state
     analysis_content = ""
     appendix_content = ""
     analysis_filename = None
     appendix_filename = None
 
-    logging.info(f"Generating report for topic: '{research_topic}'")
+    logging.info(f"Generating report for session '{session_id}' on topic: '{research_topic}'")
 
     if not qa_pairs:
         logging.warning(f"No Q&A pairs found for topic: '{research_topic}'. Generating empty report.")
@@ -1548,12 +1548,12 @@ async def write_report(state: AgentState) -> AgentState:
 
     # Save files to Firestore
     if analysis_content:
-        analysis_filename = f"{REPORT_FILENAME_TEXT.replace('.txt', '_analysis.txt')}"
+        analysis_filename = f"{session_id}_analysis.txt"
         if not save_report_to_text(analysis_content, analysis_filename):
             errors.append(f"Failed to save analysis to text file: {analysis_filename}.")
 
     if appendix_content:
-        appendix_filename = f"{REPORT_FILENAME_TEXT.replace('.txt', '_appendix.txt')}"
+        appendix_filename = f"{session_id}_appendix.txt"
         if not save_report_to_text(appendix_content, appendix_filename):
             errors.append(f"Failed to save appendix to text file: {appendix_filename}.")
 

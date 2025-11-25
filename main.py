@@ -102,6 +102,7 @@ async def run_workflow(initial_query: str, prompt_type: str, session_id: str):
 
     # Initial state for the workflow
     initial_state = {
+        "session_id": session_id,
         "new_query": initial_query,
         "prompt_type": prompt_type,
         "search_queries": [],
@@ -339,27 +340,6 @@ async def get_config_values():
     Returns all config keys, their values, and source (env or default).
     """
     return CONFIG_SOURCES
-
-
-# --- Firestore File Download Endpoint ---
-@app.get("/api/research/download_firestore/{filename}")
-async def download_firestore_file(filename: str):
-    if not db:
-        raise HTTPException(status_code=503, detail="Firestore client not available")
-    try:
-        doc_ref = db.collection("report_files").document(filename)
-        doc = doc_ref.get()
-        if doc.exists:
-            data = doc.to_dict()
-            from fastapi.responses import Response
-            return Response(content=data["content"], media_type="text/plain", headers={
-                "Content-Disposition": f"attachment; filename={filename}"
-            })
-        else:
-            raise HTTPException(status_code=404, detail="File not found in Firestore")
-    except Exception as e:
-        logger.error(f"Error downloading file from Firestore: {e}")
-        raise HTTPException(status_code=500, detail="Error downloading file from Firestore")
 
 
 # --- Firestore Retrieval Endpoint ---

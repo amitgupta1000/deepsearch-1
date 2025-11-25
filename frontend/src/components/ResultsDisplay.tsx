@@ -16,28 +16,33 @@ const ResultsDisplay: React.FC = () => {
   const { isLoading, result, error } = state;
 
   const downloadReport = async (contentType: 'analysis' | 'appendix') => {
-    if (!result?.session_id) {
-      alert('Session ID not found, cannot download file.');
+    if (!result) {
+      alert('Result not available, cannot download file.');
       return;
     }
 
-    // Compose filename to match backend Firestore logic
-    const filename = `CrystalSearch-${contentType}-${result.session_id.substring(0, 8)}.txt`;
+    // Use the exact filename provided by the backend
+    const filename = contentType === 'analysis' ? result.analysis_filename : result.appendix_filename;
+
+    if (!filename) {
+      alert(`The ${contentType} report is not available for download.`);
+      return;
+    }
 
     try {
-      // Download directly from Firestore endpoint
-      const response = await fetch(`/api/research/download_firestore/${filename}`);
+      // Use the generic download endpoint with the correct filename
+      const response = await fetch(`/api/research/${result.session_id}/download?content_type=${contentType}`);
       if (!response.ok) {
         throw new Error(`Failed to download file: ${response.statusText}`);
       }
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename; // The browser will use this name for the downloaded file
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
       URL.revokeObjectURL(url);
       console.log(`Successfully downloaded ${contentType} file: ${filename}`);
     } catch (err) {
