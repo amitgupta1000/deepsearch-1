@@ -12,42 +12,45 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 const ResultsDisplay: React.FC = () => {
+  const [isDownloading, setIsDownloading] = React.useState<'analysis' | 'appendix' | null>(null);
   const { state, clearResults } = useResearch();
   const { isLoading, result, error } = state;
 
   const downloadReport = async (contentType: 'analysis' | 'appendix') => {
+    setIsDownloading(contentType);
+
     if (!result) {
       alert('Result not available, cannot download file.');
+      setIsDownloading(null);
       return;
     }
 
-    // Use the exact filename provided by the backend
+    const content = contentType === 'analysis' ? result.analysis_content : result.appendix_content;
     const filename = contentType === 'analysis' ? result.analysis_filename : result.appendix_filename;
 
-    if (!filename) {
-      alert(`The ${contentType} report is not available for download.`);
+    if (!content || !filename) {
+      alert(`The ${contentType} report content or filename is not available for download.`);
+      setIsDownloading(null);
       return;
     }
 
     try {
-      // Use the generic download endpoint with the correct filename
-      const response = await fetch(`/api/research/${result.session_id}/download?content_type=${contentType}`);
-      if (!response.ok) {
-        throw new Error(`Failed to download file: ${response.statusText}`);
-      }
-      const blob = await response.blob();
+      // Create a Blob from the content that's already in the state
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = filename; // The browser will use this name for the downloaded file
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       console.log(`Successfully downloaded ${contentType} file: ${filename}`);
     } catch (err) {
-      console.error(`Error downloading ${contentType} file:`, err);
-      alert(`Failed to download file. Please try again.`);
+      console.error(`Error creating download for ${contentType} file:`, err);
+      alert(`Failed to create download. Please try again.`);
+    } finally {
+      setIsDownloading(null);
     }
   };
 
@@ -105,13 +108,25 @@ const ResultsDisplay: React.FC = () => {
                 <span>{new Date(result.created_at).toLocaleString()}</span>
             </div>
             <div className="flex flex-wrap gap-2">
-                <button onClick={() => downloadReport('analysis')} className="btn-secondary flex items-center space-x-2">
+                <button
+                  onClick={() => downloadReport('analysis')}
+                  className="btn-secondary flex items-center space-x-2"
+                  disabled={!!isDownloading}
+                >
+                  {isDownloading === 'analysis' ? (
+                    <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                  ) : (
                     <ArrowDownTrayIcon className="w-4 h-4" />
-                    <span>Download Analysis</span>
+                  )}
+                  <span>{isDownloading === 'analysis' ? 'Downloading...' : 'Download Analysis'}</span>
                 </button>
-                <button onClick={() => downloadReport('appendix')} className="btn-secondary flex items-center space-x-2">
-                    <ArrowDownTrayIcon className="w-4 h-4" />
-                    <span>Download Appendix</span>
+                <button
+                  onClick={() => downloadReport('appendix')}
+                  className="btn-secondary flex items-center space-x-2"
+                  disabled={!!isDownloading}
+                >
+                  {isDownloading === 'appendix' ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <ArrowDownTrayIcon className="w-4 h-4" />}
+                  <span>{isDownloading === 'appendix' ? 'Downloading...' : 'Download Appendix'}</span>
                 </button>
                 <button onClick={clearResults} className="btn-primary">
                   New Research

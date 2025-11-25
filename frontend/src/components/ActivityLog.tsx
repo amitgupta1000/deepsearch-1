@@ -71,9 +71,9 @@ const ActivityLog: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-2 p-4">
-            {state.logs.map((log) => (
+            {state.logs.map((log, index) => (
               <div
-                key={log.id}
+                key={`${log.id}-${index}`}
                 className={`p-3 rounded-lg border text-sm ${getColorForLevel(log.level)}`}
               >
                 <div className="flex items-start space-x-2">
