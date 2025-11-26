@@ -209,24 +209,32 @@ class HybridRetriever:
         if not self.final_retriever:
             return [], {}
 
-        all_docs = []
         query_responses = {}
         seen_docs = set()
 
-        primary_query = queries[0] if queries else ""
-        if not primary_query:
+        if not queries:
             return [], {}
 
-        # The main retrieval is done with the primary query
-        all_docs = self.retrieve(primary_query)
+        # 1. Retrieve documents for each query to get a comprehensive set
+        all_retrieved_docs = []
+        for query in queries:
+            if query.strip():
+                docs = self.retrieve(query)
+                for doc in docs:
+                    doc_key = self._get_doc_key(doc)
+                    if doc_key not in seen_docs:
+                        all_retrieved_docs.append(doc)
+                        seen_docs.add(doc_key)
+
+        self.logger.info(f"Retrieved {len(all_retrieved_docs)} unique documents from {len(queries)} queries.")
 
         # Generate simple responses for all queries based on the retrieved docs
         for query in queries:
             if not query.strip():
                 continue
 
-            if all_docs:
-                top_docs_preview = all_docs[:3]
+            if all_retrieved_docs:
+                top_docs_preview = all_retrieved_docs[:3]
                 response_parts = []
 
                 for doc in top_docs_preview:
@@ -237,8 +245,7 @@ class HybridRetriever:
                 query_responses[query] = "\n\n".join(response_parts)
             else:
                 query_responses[query] = "No relevant information found for this query."
-        self.logger.info(f"Multi-query retrieval returned {len(all_docs)} documents.")
-        return all_docs, query_responses
+        return all_retrieved_docs, query_responses
 
     def _get_doc_key(self, doc: Document) -> str:
         """Generate unique key for document deduplication."""

@@ -27,17 +27,13 @@ except Exception:
 
 from typing import TypedDict, Optional, List, Dict, Any # Import necessary types
 from .conditions import (
-    should_continue_search,
-    should_terminate_search,
-    should_continue_approval,
-    should_terminate_approval
+    route_ai_evaluate
 )
 # Import nodes and AgentState from nodes.py
 try:
     from .nodes import (
         AgentState,
         create_queries,
-        user_approval_for_queries,
         evaluate_search_results,
         extract_content,
         embed_and_retrieve,
@@ -75,10 +71,6 @@ if all(node_name in workflow.nodes for node_name in ["create_queries", "evaluate
     workflow.add_edge("create_queries", "evaluate_search_results")
 
 
-from .conditions import route_user_approval
-
-    # Removed user_approval node and conditional edges
-
 # Add sequential edges
 if "evaluate_search_results" in workflow.nodes and "extract_content" in workflow.nodes:
     workflow.add_edge("evaluate_search_results", "extract_content")
@@ -91,9 +83,6 @@ if "embed_and_retrieve" in workflow.nodes and "create_qa_pairs" in workflow.node
 
 if "create_qa_pairs" in workflow.nodes and "AI_evaluate" in workflow.nodes:
     workflow.add_edge("create_qa_pairs", "AI_evaluate")
-
-
-from .conditions import route_ai_evaluate
 
 workflow.add_conditional_edges(
     "AI_evaluate",
