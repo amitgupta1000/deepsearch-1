@@ -111,15 +111,14 @@ MAX_SEARCH_QUERIES = get_env_int("MAX_SEARCH_QUERIES", 5)  # Default for "fast" 
 MAX_SEARCH_RESULTS = get_env_int("MAX_SEARCH_RESULTS", 3)  # Balanced between quality and performance
 MAX_CONCURRENT_SCRAPES = get_env_int("MAX_CONCURRENT_SCRAPES", 6)  # Reasonable concurrency for stability
 MAX_SEARCH_RETRIES = get_env_int("MAX_SEARCH_RETRIES", 2)  # Limited retries to prevent hanging
+MAX_AI_ITERATIONS = get_env_int("MAX_AI_ITERATIONS", 1)
+MAX_USER_QUERY_LOOPS = get_env_int("MAX_USER_QUERY_LOOPS", 1)
+
 
 # -- Ultra Search Mode Settings --
 ULTRA_MAX_SEARCH_QUERIES = get_env_int("ULTRA_MAX_SEARCH_QUERIES", 15)
 ULTRA_MAX_SEARCH_RESULTS = get_env_int("ULTRA_MAX_SEARCH_RESULTS", 10)
 ULTRA_MAX_AI_ITERATIONS = get_env_int("ULTRA_MAX_AI_ITERATIONS", 3)
-
-# AI iteration limits
-MAX_AI_ITERATIONS = get_env_int("MAX_AI_ITERATIONS", 1)
-MAX_USER_QUERY_LOOPS = get_env_int("MAX_USER_QUERY_LOOPS", 1)
 
 # Content processing
 CHUNK_SIZE = get_env_int("CHUNK_SIZE", 1000)  # Optimized for embedding model context

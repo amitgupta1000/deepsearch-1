@@ -7,6 +7,7 @@ const ResearchForm: React.FC = () => {
   const { startResearch, state } = useResearch();
   const [query, setQuery] = useState('');
   const [promptType, setPromptType] = useState('general');
+  const [searchMode, setSearchMode] = useState('fast'); // Add searchMode state
 
   const promptTypes = [
     { value: 'general', label: 'General Research', description: 'Broad research across multiple topics and sources' },
@@ -24,6 +25,7 @@ const ResearchForm: React.FC = () => {
     const request: ResearchRequest = {
       query: query.trim(),
       promptType,
+      search_mode: searchMode as 'fast' | 'ultra', // Include search_mode
     };
 
     await startResearch(request);
@@ -119,15 +121,47 @@ const ResearchForm: React.FC = () => {
             </div>
           </div>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={!query.trim() || state.isLoading}
-            className="btn-primary w-full py-4 text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 shadow-lg hover:shadow-xl transition-all duration-200"
-          >
-            <MagnifyingGlassIcon className="w-5 h-5" />
-            <span>{state.isLoading ? 'Researching...' : 'Start Research'}</span>
-          </button>
+          {/* Search Options & Submit Button */}
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-gray-200">
+            <div className="flex items-center gap-4">
+              <span className="font-medium text-gray-700">Search Depth:</span>
+              <div className="flex items-center rounded-full bg-gray-200 p-1">
+                <button
+                  type="button"
+                  onClick={() => setSearchMode('fast')}
+                  disabled={state.isLoading}
+                  className={`px-4 py-1 text-sm font-semibold rounded-full transition-colors ${
+                    searchMode === 'fast'
+                      ? 'bg-primary-600 text-white shadow'
+                      : 'text-gray-600 hover:bg-gray-300'
+                  }`}
+                >
+                  Fast
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSearchMode('ultra')}
+                  disabled={state.isLoading}
+                  className={`px-4 py-1 text-sm font-semibold rounded-full transition-colors ${
+                    searchMode === 'ultra'
+                      ? 'bg-primary-600 text-white shadow'
+                      : 'text-gray-600 hover:bg-gray-300'
+                  }`}
+                >
+                  Ultra
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={!query.trim() || state.isLoading}
+              className="btn-primary w-full sm:w-auto py-3 px-6 text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 shadow-lg hover:shadow-xl transition-all duration-200"
+            >
+              <MagnifyingGlassIcon className="w-5 h-5" />
+              <span>{state.isLoading ? 'Researching...' : 'Start Research'}</span>
+            </button>
+          </div>
         </form>
       </div>
     </div>
