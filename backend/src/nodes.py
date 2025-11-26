@@ -1472,7 +1472,7 @@ async def write_report(state: AgentState) -> AgentState:
 
             # PART 3: Appendix with Q&A pairs and citations
             logging.info("Generating Appendix (Part 3)...")
-            part3_appendix = "## 3. Appendix: Research Q&A and Sources\n\n### Research Questions and Detailed Answers\n"
+            part3_appendix = "#3. Appendix: Research Q&A and Sources\n\n# Research Questions and Detailed Answers\n"
             all_citations = []
             citation_counter = 1
             for i, qa in enumerate(qa_pairs):
@@ -1499,11 +1499,15 @@ async def write_report(state: AgentState) -> AgentState:
 
             # Deduplicate and format final content
             deduped_part2 = await enhanced_deduplicate_content(part2_response) if USE_LLM_DEDUPLICATION else deduplicate_content(part2_response)
-            analysis_content = part1_query + deduped_part2
-            analysis_content += f"\n---\n*Analysis generated on {get_current_date()}. Powered by INTELLISEARCH Research Platform.*\n"
 
-            appendix_content = part3_appendix
-            appendix_content += f"\n---\n*Appendix generated on {get_current_date()}. Powered by INTELLISEARCH Research Platform.*\n"
+            # Format both analysis and appendix content for consistent markdown and enhanced conclusion
+            raw_analysis = part1_query + deduped_part2
+            raw_analysis += f"\n---\n*Analysis generated on {get_current_date()}. Powered by INTELLISEARCH Research Platform.*\n"
+            analysis_content = format_research_report(raw_analysis)
+
+            raw_appendix = part3_appendix
+            raw_appendix += f"\n---\n*Appendix generated on {get_current_date()}. Powered by INTELLISEARCH Research Platform.*\n"
+            appendix_content = format_research_report(raw_appendix)
 
             logging.info("Three-part report generated successfully.")
 

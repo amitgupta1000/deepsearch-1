@@ -135,81 +135,57 @@ def format_research_report(report_content: str) -> str:
     """
     if not report_content or not report_content.strip():
         return report_content
-    
+
+    # Enhance the conclusion section before further formatting
+    report_content = enhance_conclusion_section(report_content)
+
     # Split into lines for processing
     lines = report_content.split('\n')
     formatted_lines = []
     
-    # Track current context
-    in_citation_section = False
     last_was_empty = False
-    
     for i, line in enumerate(lines):
         line = line.strip()
-        
         # Skip multiple consecutive empty lines
         if not line:
             if not last_was_empty:
                 formatted_lines.append('')
                 last_was_empty = True
             continue
-        
         last_was_empty = False
-        
-        # Detect citations section
-        if re.match(r'^#+ *(citations?|sources?|references?)', line, re.IGNORECASE):
-            in_citation_section = True
-            formatted_lines.append('')  # Add space before citations
-            formatted_lines.append(line)
-            formatted_lines.append('')  # Add space after heading
-            continue
-        
         # Format main headings (# Title)
-        if line.startswith('# ') and not in_citation_section:
-            # Add extra spacing around main headings
+        if line.startswith('# '):
             if formatted_lines and formatted_lines[-1] != '':
                 formatted_lines.append('')
             formatted_lines.append(line)
-            formatted_lines.append('')  # Add space after heading
+            formatted_lines.append('')
             continue
-        
         # Format sub-headings (## Title)
         if line.startswith('## '):
             if formatted_lines and formatted_lines[-1] != '':
                 formatted_lines.append('')
             formatted_lines.append(line)
-            formatted_lines.append('')  # Add space after sub-heading
+            formatted_lines.append('')
             continue
-        
         # Format sub-sub-headings (### Title)
         if line.startswith('### '):
             if formatted_lines and formatted_lines[-1] != '':
                 formatted_lines.append('')
             formatted_lines.append(line)
-            formatted_lines.append('')  # Add space after sub-sub-heading
+            formatted_lines.append('')
             continue
-        
         # Format bullet points
         if line.startswith('- ') or line.startswith('* '):
-            # Ensure proper spacing before bullet lists
             if formatted_lines and not formatted_lines[-1].startswith(('- ', '* ')) and formatted_lines[-1] != '':
                 formatted_lines.append('')
             formatted_lines.append(line)
             continue
-        
         # Format numbered lists
         if re.match(r'^\d+\. ', line):
-            # Ensure proper spacing before numbered lists
             if formatted_lines and not re.match(r'^\d+\. ', formatted_lines[-1] or '') and formatted_lines[-1] != '':
                 formatted_lines.append('')
             formatted_lines.append(line)
             continue
-        
-        # Format citations in the citations section
-        if in_citation_section and re.match(r'^\[\d+\]', line):
-            formatted_lines.append(line)
-            continue
-        
         # Regular paragraph text
         formatted_lines.append(line)
     
@@ -260,6 +236,17 @@ def enhance_report_readability(report_content: str) -> str:
     content = format_research_report(content)
     
     return content
+
+
+# Replace all '## Conclusion' with a bold section header for conclusion
+import re
+
+def enhance_conclusion_section(text: str) -> str:
+    # Replace markdown '## Conclusion' with bolded 'Conclusion' section
+    return re.sub(r'## Conclusion\s*', '\n**Conclusion**\n', text)
+
+# Example usage in formatting pipeline:
+# formatted_text = enhance_conclusion_section(generated_text)
 
 
 logging.info("utils.py loaded with utility functions.")
