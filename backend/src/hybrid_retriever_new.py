@@ -7,7 +7,7 @@ making it more maintainable and easier to understand.
 
 import logging
 from typing import List, Dict, Optional, Tuple, Any
-from dataclasses import dataclass
+
 
 # Core components from langchain-core
 from langchain_core.documents import Document
@@ -47,27 +47,13 @@ except ImportError:
     CROSS_ENCODER_AVAILABLE = False
 
 
-# Configuration 
-@dataclass
-class HybridRetrieverConfig:
-    """Configuration for the new hybrid retriever."""
-    # Retrieval parameters
-    top_k: int = 20
-    vector_weight: float = 0.6
-    bm25_weight: float = 0.4
-    
-    # Chunking parameters
-    chunk_size: int = 1000
-    chunk_overlap: int = 200
-    
-    # Quality filters
-    min_chunk_length: int = 50
-    min_word_count: int = 10
-    
-    # Cross-encoder reranking parameters
-    use_cross_encoder: bool = True
-    cross_encoder_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2" #"BAAI/bge-reranker-v2-m3" #
-    rerank_top_k: int = 20
+
+# Use config.py for all settings
+try:
+    from .config import *
+    import config as config
+except ImportError:
+    import config as config
 
 
 class HybridRetriever:
@@ -75,9 +61,30 @@ class HybridRetriever:
     A simplified hybrid retriever using standard LangChain components.
     """
     
-    def __init__(self, embeddings=None, config: Optional[HybridRetrieverConfig] = None):
+    def __init__(self, embeddings=None):
         self.embeddings = embeddings
-        self.config = config or HybridRetrieverConfig()
+        # Use all config settings from config.py for full alignment
+        self.top_k = config.RETRIEVAL_TOP_K
+        self.vector_weight = config.HYBRID_VECTOR_WEIGHT
+        self.bm25_weight = config.HYBRID_BM25_WEIGHT
+        self.chunk_size = config.CHUNK_SIZE
+        self.chunk_overlap = config.CHUNK_OVERLAP
+        self.min_chunk_length = config.MIN_CHUNK_LENGTH
+        self.min_word_count = config.MIN_WORD_COUNT
+        self.score_threshold = getattr(config, 'VECTOR_SCORE_THRESHOLD', 0.1)
+        self.fetch_k_multiplier = getattr(config, 'VECTOR_FETCH_K_MULTIPLIER', 2)
+        self.fusion_method = getattr(config, 'HYBRID_FUSION_METHOD', 'rrf')
+        self.rrf_k = getattr(config, 'HYBRID_RRF_K', 60)
+        self.use_cross_encoder = getattr(config, 'USE_CROSS_ENCODER_RERANKING', False)
+        self.cross_encoder_model = getattr(config, 'CROSS_ENCODER_MODEL', 'cross-encoder/ms-marco-MiniLM-L-6-v2')
+        self.cross_encoder_top_k = getattr(config, 'CROSS_ENCODER_TOP_K', 50)
+        self.rerank_top_k = getattr(config, 'RERANK_TOP_K', 20)
+        self.cross_encoder_batch_size = getattr(config, 'CROSS_ENCODER_BATCH_SIZE', 32)
+        self.vector_store = None
+        self.bm25_retriever = None
+        self.final_retriever = None
+        self.documents = []
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.vector_store = None
         self.bm25_retriever = None
         self.final_retriever = None
@@ -101,24 +108,24 @@ class HybridRetriever:
                 return False
 
             # 2. Create Ensemble Retriever
-            vector_retriever = self.vector_store.as_retriever(search_kwargs={"k": self.config.top_k})
+            vector_retriever = self.vector_store.as_retriever(search_kwargs={"k": self.top_k})
             ensemble_retriever = EnsembleRetriever(
                 retrievers=[self.bm25_retriever, vector_retriever],
-                weights=[self.config.bm25_weight, self.config.vector_weight],
+                weights=[self.bm25_weight, self.vector_weight],
             )
             self.logger.info("LangChain EnsembleRetriever created successfully.")
 
             # 3. Optionally wrap with Reranker
-            if self.config.use_cross_encoder and CROSS_ENCODER_AVAILABLE:
-                self.logger.info(f"Initializing reranker with model: {self.config.cross_encoder_model}")
-                model = HuggingFaceCrossEncoder(model_name=self.config.cross_encoder_model)
+            if self.use_cross_encoder and CROSS_ENCODER_AVAILABLE:
+                self.logger.info(f"Initializing reranker with model: {self.cross_encoder_model}")
+                model = HuggingFaceCrossEncoder(model_name=self.cross_encoder_model)
                 compressor =  CrossEncoderReranker(model=model, top_n=5)
                 self.final_retriever = ContextualCompressionRetriever(
                     base_compressor=compressor,
                     base_retriever=ensemble_retriever,
                 )
-                self.final_retriever.base_compressor.top_n = self.config.rerank_top_k
-                self.logger.info(f"Wrapped ensemble retriever with ContextualCompressionRetriever. Will return top {self.config.rerank_top_k} docs.")
+                self.final_retriever.base_compressor.top_n = self.rerank_top_k
+                self.logger.info(f"Wrapped ensemble retriever with ContextualCompressionRetriever. Will return top {self.rerank_top_k} docs.")
             else:
                 self.final_retriever = ensemble_retriever
 
@@ -132,8 +139,8 @@ class HybridRetriever:
         """Process and chunk documents from relevant contexts."""
         documents = []
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=self.config.chunk_size,
-            chunk_overlap=self.config.chunk_overlap,
+            chunk_size=self.chunk_size,
+            chunk_overlap=self.chunk_overlap,
             separators=["\n\n", "\n", ". ", " "],
         )
         
@@ -144,7 +151,7 @@ class HybridRetriever:
             
             chunks = text_splitter.split_text(content)
             for i, chunk in enumerate(chunks):
-                if (len(chunk) < self.config.min_chunk_length or len(chunk.split()) < self.config.min_word_count):
+                if (len(chunk) < self.min_chunk_length or len(chunk.split()) < self.min_word_count):
                     continue
                 
                 documents.append(Document(
@@ -179,7 +186,7 @@ class HybridRetriever:
                 self.logger.warning("BM25Retriever not available.")
                 return False
             self.bm25_retriever = BM25Retriever.from_documents(documents)
-            self.bm25_retriever.k = self.config.top_k
+            self.bm25_retriever.k = self.top_k
             self.logger.info("BM25 index built successfully.")
             return True
         except Exception as e:
@@ -247,16 +254,27 @@ class HybridRetriever:
         return {
             "total_documents": len(self.documents),
             "retriever_type": self.final_retriever.__class__.__name__ if self.final_retriever else "None",
-            "config": self.config.__dict__
+            "config": {
+                "top_k": self.top_k,
+                "vector_weight": self.vector_weight,
+                "bm25_weight": self.bm25_weight,
+                "chunk_size": self.chunk_size,
+                "chunk_overlap": self.chunk_overlap,
+                "min_chunk_length": self.min_chunk_length,
+                "min_word_count": self.min_word_count,
+                "use_cross_encoder": self.use_cross_encoder,
+                "cross_encoder_model": self.cross_encoder_model,
+                "rerank_top_k": self.rerank_top_k,
+            }
         }
 
 
-def create_hybrid_retriever(embeddings=None, **config_kwargs) -> HybridRetriever:
+
+def create_hybrid_retriever(embeddings=None) -> HybridRetriever:
     """
-    Factory function to create a new hybrid retriever.
+    Factory function to create a new hybrid retriever using config.py settings.
     """
-    config = HybridRetrieverConfig(**config_kwargs)
-    return HybridRetriever(embeddings=embeddings, config=config)
+    return HybridRetriever(embeddings=embeddings)
 
 
 

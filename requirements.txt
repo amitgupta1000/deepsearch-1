@@ -24,7 +24,7 @@ langsmith==0.3.45
 #transformers==4.53.1
 #scikit-learn==1.7.0
 faiss-cpu==1.12.0
-#torch==2.7.1
+torch==2.7.1
 
 # --- Async, HTTP, and utility ---
 aiohttp==3.12.13
