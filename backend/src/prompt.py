@@ -125,6 +125,7 @@ Generate {number_queries} commodity research queries using:
     - Use authoritative filters or context signals (e.g., site:eia.gov, site:bloomberg.com).
     - Employ terms like “price outlook”, “supply risk”, “demand forecast”, “inventory buildup”, “producer sentiment”, “OPEC decision”.
     - Aim for queries that reveal near-term and medium-term implications.
+    - Include at least one query that asks the opposite or questions a common assumption about the topic.
 
 Format:
 - Format your response as a JSON object with this key:
@@ -162,12 +163,15 @@ Generate {number_queries} search queries covering key aspects:
 - Expert perspectives and analysis
 - Controversies and debates
 - Policy and regulatory aspects
+- Include at least one query that asks the opposite or questions a common assumption about the topic.
 
 Use site-specific constraints where helpful (e.g., site:nature.com, site:nytimes.com).
     - One aspect per query (no multitopic prompts).
     - Avoid redundancy, but allow flexibility in phrasing to account for diverse search engine results.
     - You may include site-specific constraints where helpful (e.g., site:nature.com, site:nytimes.com).
     - Prefer phrasing that mirrors how users naturally ask questions.
+    - Include at least one query that asks the opposite or questions a common assumption about the topic.
+
 
 Format:
 - Format your response as a JSON object with this key:
@@ -217,6 +221,7 @@ You are a deep search assistant tasked with uncovering the most recent, relevant
 4. Include date signals (e.g., “August 2025”, “last 6 months”) where helpful.
 5. Avoid multitopic prompts — each query should target one aspect.
 6. Ensure queries are phrased naturally for search engines.
+7. Include at least one query that asks the opposite or questions a common assumption about the topic.
 
 ---
 
@@ -317,6 +322,7 @@ Generate {number_queries} investment research queries covering:
 - Valuation metrics and peer comparisons
 - Risk factors and regulatory compliance
 - Management quality and strategic direction
+- Include at least one query that asks the opposite or questions a common assumption about the topic.
 
 Target financial databases, exchanges, analyst reports, and credible business sources.
 

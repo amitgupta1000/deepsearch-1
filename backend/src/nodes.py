@@ -1293,11 +1293,13 @@ async def AI_evaluate(state: AgentState) -> AgentState:
     **Available Q&A Pairs:**
     {qa_text}
 
-    **Evaluation Criteria:**
-    1. Do the Q&A pairs collectively address all key aspects of the original query?
-    2. Is there sufficient depth of information to provide a comprehensive answer?
-    3. Are there any critical information gaps that would prevent a complete response?
+    **Adversarial Evaluation Task:**
+    1. **Play Devil's Advocate**: Act as a skeptical user. Do the answers truly and comprehensively address the original query, or are they superficial?
+    2. **Identify Weaknesses**: Pinpoint the weakest part of the collected information. What crucial aspect is missing or poorly explained?
+    3. **Check for Contradictions**: Do any of the answers appear to contradict each other? (Note this in the knowledge_gap).
+    4. **Assess Sufficiency**: Based on this adversarial review, is the information sufficient to create a high-quality, trustworthy report?
 
+    
     Respond with a JSON object containing:
     {{
         "is_sufficient": boolean,
