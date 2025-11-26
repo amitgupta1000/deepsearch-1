@@ -389,11 +389,7 @@ async def create_queries(state: AgentState) -> AgentState:
     Also checks for and uses suggested_follow_up_queries if available.
     """
     # Use RED color constant from setup if available
-    try:
-        from setup import RED, ENDC
-    except ImportError:
-        RED = '\033[91m'
-        ENDC = '\033[0m'
+    # Color constants not needed; removed for simplicity
 
     # Get prompt type from state
     prompt_type = state.get("prompt_type", "general") # Default to general
@@ -538,11 +534,6 @@ async def user_approval_for_queries(state: AgentState) -> AgentState:
       - state['approval_choice'] = 'yes'|'no' : simulated user response
     """
 
-    try:
-        from setup import RED, ENDC
-    except ImportError:
-        RED = '\033[91m'
-        ENDC = '\033[0m'
 
     rationale = state.get('rationale', 'No rationale provided.')
     search_queries = state.get('search_queries', [])
@@ -689,7 +680,7 @@ async def evaluate_search_results(state: AgentState) -> AgentState:
         return hashlib.sha256(f"{url}|{snippet}".encode()).hexdigest()
 
     try:
-        from setup import RED, ENDC, YELLOW
+            from .config import RED, ENDC, YELLOW
     except ImportError:
         RED, ENDC, YELLOW = '\033[91m', '\033[0m', '\033[93m'
 
@@ -816,7 +807,7 @@ async def extract_content(state: AgentState) -> AgentState:
     """
     # Use color constants from setup if available
     try:
-        from .config import RED, ENDC, YELLOW
+           from .config import RED, ENDC
     except ImportError:
         RED = '\033[91m'
         ENDC = '\033[0m'
@@ -1036,7 +1027,7 @@ async def embed_and_retrieve(state: AgentState) -> AgentState:
     """
     # Use color constants from setup if available
     try:
-        from setup import RED, ENDC
+           from .config import RED, ENDC
     except ImportError:
         RED = '\033[91m'
         ENDC = '\033[0m'
@@ -1255,12 +1246,6 @@ async def AI_evaluate(state: AgentState) -> AgentState:
     print(f"[DEBUG][AI_evaluate] state['qa_pairs'] length: {len(state.get('qa_pairs', []))}")
     if state.get('qa_pairs'):
         print(f"[DEBUG][AI_evaluate] First QA: {state['qa_pairs'][0]}")
-    try:
-        from setup import RED, ENDC, YELLOW
-    except ImportError:
-        RED = '\033[91m'
-        ENDC = '\033[0m'
-        YELLOW = '\033[93m'
 
     qa_pairs = state.get("qa_pairs", [])
     original_query = state.get("new_query", "")

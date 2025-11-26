@@ -9,13 +9,23 @@ import logging
 from typing import List, Dict, Optional, Tuple, Any
 from dataclasses import dataclass
 
+# Core components from langchain-core
+from langchain_core.documents import Document
+
+# Dedicated package for text splitters
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
 # Type definitions and fallbacks
 try:
     from langchain_core.documents import Document
     from langchain_text_splitters import RecursiveCharacterTextSplitter
     from langchain_community.vectorstores import FAISS
-    from langchain_community.retrievers import BM25Retriever, EnsembleRetriever
-    from langchain.retrievers import ContextualCompressionRetriever
+    from langchain_community.retrievers import BM25Retriever
+    from langchain_classic.retrievers import EnsembleRetriever
+    from langchain_classic.retrievers import ContextualCompressionRetriever
+    from langchain_classic.retrievers.document_compressors import CrossEncoderReranker
+
+    
 except ImportError as e:
     logging.warning(f"LangChain imports failed: {e}. Using fallback types.")
     class Document:
@@ -25,18 +35,19 @@ except ImportError as e:
     class RecursiveCharacterTextSplitter:
         def __init__(self, **kwargs): pass
         def split_text(self, text): return [text]
-    FAISS, BM25Retriever, EnsembleRetriever, ContextualCompressionRetriever = None, None, None, None
+    FAISS, BM25Retriever, EnsembleRetriever, ContextualCompressionRetriever, CrossEncoderReranker = None, None, None, None, None
 
 # Cross-encoder imports for semantic reranking
 try:
-    from langchain_community.cross_encoders import SentenceTransformerCrossEncoder
+    from langchain_community.cross_encoders import HuggingFaceCrossEncoder
     CROSS_ENCODER_AVAILABLE = True
 except ImportError:
-    logging.warning("SentenceTransformerCrossEncoder not available. Reranking will be disabled.")
-    SentenceTransformerCrossEncoder = None
+    logging.warning("HFCrossEncoder not available. Reranking will be disabled.")
+    HuggingFaceCrossEncodern = None
     CROSS_ENCODER_AVAILABLE = False
 
-# Configuration
+
+# Configuration 
 @dataclass
 class HybridRetrieverConfig:
     """Configuration for the new hybrid retriever."""
@@ -55,7 +66,7 @@ class HybridRetrieverConfig:
     
     # Cross-encoder reranking parameters
     use_cross_encoder: bool = True
-    cross_encoder_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    cross_encoder_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2" #"BAAI/bge-reranker-v2-m3" #
     rerank_top_k: int = 20
 
 
@@ -100,10 +111,10 @@ class HybridRetriever:
             # 3. Optionally wrap with Reranker
             if self.config.use_cross_encoder and CROSS_ENCODER_AVAILABLE:
                 self.logger.info(f"Initializing reranker with model: {self.config.cross_encoder_model}")
-                reranker = SentenceTransformerCrossEncoder(model_name=self.config.cross_encoder_model)
-                
+                model = HuggingFaceCrossEncoder(model_name=self.config.cross_encoder_model)
+                compressor =  CrossEncoderReranker(model=model, top_n=5)
                 self.final_retriever = ContextualCompressionRetriever(
-                    base_compressor=reranker,
+                    base_compressor=compressor,
                     base_retriever=ensemble_retriever,
                 )
                 self.final_retriever.base_compressor.top_n = self.config.rerank_top_k
@@ -246,6 +257,8 @@ def create_hybrid_retriever(embeddings=None, **config_kwargs) -> HybridRetriever
     """
     config = HybridRetrieverConfig(**config_kwargs)
     return HybridRetriever(embeddings=embeddings, config=config)
+
+
 
 
 logging.info("hybrid_retriever_new.py loaded successfully.")
