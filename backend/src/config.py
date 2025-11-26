@@ -4,6 +4,7 @@
 import os
 import logging
 from typing import List, Any, Callable
+import sys
 
 # Dictionary to track config values and their sources
 CONFIG_SOURCES = {}
@@ -136,12 +137,14 @@ RETRIEVAL_TOP_K = get_env_int("RETRIEVAL_TOP_K", 20)
 MIN_CHUNK_LENGTH = get_env_int("MIN_CHUNK_LENGTH", 50)
 MIN_WORD_COUNT = get_env_int("MIN_WORD_COUNT", 10)
 USE_MULTI_QUERY_RETRIEVAL = get_env_bool("USE_MULTI_QUERY_RETRIEVAL", True)
+
+import logging
 MAX_RETRIEVAL_QUERIES = get_env_int("MAX_RETRIEVAL_QUERIES", 5)
 QUERY_CHUNK_DISTRIBUTION = get_env_bool("QUERY_CHUNK_DISTRIBUTION", True)
 USE_HYBRID_RETRIEVAL = get_env_bool("USE_HYBRID_RETRIEVAL", True)
 USE_RERANKING = get_env_bool("USE_RERANKING", True)
 RERANKER_CANDIDATES_MULTIPLIER = get_env_int("RERANKER_CANDIDATES_MULTIPLIER", 3)
-USE_CROSS_ENCODER_RERANKING = get_env_bool("USE_CROSS_ENCODER_RERANKING", False)
+USE_CROSS_ENCODER_RERANKING = get_env_bool("USE_CROSS_ENCODER_RERANKING", True)
 
 # Only the fast cross-encoder model is supported
 CROSS_ENCODER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
@@ -150,6 +153,9 @@ RERANK_TOP_K = get_env_int("RERANK_TOP_K", 20)
 CROSS_ENCODER_BATCH_SIZE = get_env_int("CROSS_ENCODER_BATCH_SIZE", 32)
 MAX_RESULTS = MAX_SEARCH_RESULTS
 MAX_RETRIES = MAX_SEARCH_RETRIES
+
+# Log cross-encoder reranking config at startup
+logging.info(f"USE_CROSS_ENCODER_RERANKING={USE_CROSS_ENCODER_RERANKING}, CROSS_ENCODER_MODEL={CROSS_ENCODER_MODEL}, CROSS_ENCODER_TOP_K={CROSS_ENCODER_TOP_K}, RERANK_TOP_K={RERANK_TOP_K}, CROSS_ENCODER_BATCH_SIZE={CROSS_ENCODER_BATCH_SIZE}")
 
 
 # =============================================================================

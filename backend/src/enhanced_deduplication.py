@@ -23,8 +23,7 @@ try:
         LLM_DEDUP_MIN_WORDS,
         LLM_DEDUP_DETAILED_ONLY
     )
-    from .llm_calling import llm_call_async
-    from .prompt import get_current_date
+
 except ImportError:
     # Fallback imports for direct execution
     import sys
@@ -40,7 +39,7 @@ except ImportError:
         LLM_DEDUP_MIN_WORDS,
         LLM_DEDUP_DETAILED_ONLY
     )
-    from llm_calling import llm_call_async
+    from llm_utils import llm_call_async
     from prompt import get_current_date
 
 # Simple in-memory cache for deduplication results

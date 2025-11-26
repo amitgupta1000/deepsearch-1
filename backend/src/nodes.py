@@ -1,8 +1,6 @@
-# nodes.py
-# This file contains the individual nodes (functions) for the LangGraph workflow.
-# Using llm call from Langchain-ChatGoogleGenerativeAI for generating search strings, evaluations etc., and Google GenAI for report writing for verbosity
-
-print("nodes.py loaded: starting import checks...")
+# nodes.py # This file contains the individual nodes (functions) for the LangGraph workflow.
+import logging, json, re, asyncio
+from typing import Dict, Any, List, Optional
 
 try:
     from backend.src.config import *
@@ -14,11 +12,6 @@ try:
 except Exception as e:
     print(f"Failed to import from utils.py: {e}")
 
-import logging
-import json
-import re
-import asyncio
-from typing import Dict, Any, List, Optional
 
 # Try to import optional dependencies with fallbacks
 try:
@@ -114,10 +107,10 @@ except ImportError:
     Scraper, ScrapedContent = None, None
 
 try:
-    from .hybrid_retriever import HybridRetriever, HybridRetrieverConfig, create_hybrid_retriever
+    from backend.src.hybrid_retriever import HybridRetriever, create_hybrid_retriever
 except ImportError:
     logging.warning("Could not import hybrid retriever. Using fallback retrieval.")
-    HybridRetriever, HybridRetrieverConfig, create_hybrid_retriever = None, None, None
+    create_hybrid_retriever = None
 
 try:
     from .utils import (
@@ -151,9 +144,6 @@ except ImportError:
     def save_report_to_text(content: str, filename: str) -> str:
         """Fallback save function"""
         return filename
-
-# Note: question_analyzer module is not needed as LLM-based query generation 
-# in create_queries() provides superior question analysis and query generation
 
 try:
     from .config import(
@@ -1051,27 +1041,8 @@ async def embed_and_retrieve(state: AgentState) -> AgentState:
     if create_hybrid_retriever and embeddings and USE_HYBRID_RETRIEVAL:
         try:
             logging.info("Using hybrid retriever (BM25 + Vector Search)")
-            
             # Create hybrid retriever with configuration from config.py
-            hybrid_retriever = create_hybrid_retriever(
-                embeddings=embeddings,
-                top_k=RETRIEVAL_TOP_K,
-                vector_weight=HYBRID_VECTOR_WEIGHT,
-                bm25_weight=HYBRID_BM25_WEIGHT,
-                fusion_method=HYBRID_FUSION_METHOD,
-                rrf_k=HYBRID_RRF_K,
-                chunk_size=CHUNK_SIZE,
-                chunk_overlap=CHUNK_OVERLAP,
-                score_threshold=VECTOR_SCORE_THRESHOLD,
-                min_chunk_length=MIN_CHUNK_LENGTH,
-                min_word_count=MIN_WORD_COUNT,
-                # Cross-encoder reranking configuration
-                use_cross_encoder=USE_CROSS_ENCODER_RERANKING,
-                cross_encoder_model=CROSS_ENCODER_MODEL,
-                cross_encoder_top_k=CROSS_ENCODER_TOP_K,
-                rerank_top_k=RERANK_TOP_K,
-                cross_encoder_batch_size=CROSS_ENCODER_BATCH_SIZE
-            )
+            hybrid_retriever = create_hybrid_retriever(embeddings=embeddings)
             
             # Build indices
             if hybrid_retriever.build_index(relevant_contexts):

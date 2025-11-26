@@ -20,9 +20,9 @@ langgraph-checkpoint==2.1.0
 langgraph-prebuilt==1.0.2
 langgraph-sdk==0.2.9
 langsmith==0.3.45
-#sentence-transformers==5.0.0
-#transformers==4.53.1
-#scikit-learn==1.7.0
+sentence-transformers==5.0.0
+transformers==4.53.1
+scikit-learn==1.7.0
 faiss-cpu==1.12.0
 torch==2.7.1
 
@@ -93,3 +93,4 @@ idna==3.10
 joblib==1.5.1
 SQLAlchemy==2.0.41
 rank_bm25==0.2.2
+python-dotenv
