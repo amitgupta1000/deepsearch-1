@@ -45,12 +45,12 @@ def route_ai_evaluate(state: dict) -> str:
     Routes AI evaluation result to the appropriate next node.
     Uses MAX_AI_ITERATIONS from config for iteration cap.
     """
-    try:
+    # Use dynamic config from state, fallback to global config
+    # This makes the routing respect the search_mode
+    max_loops = state.get("max_ai_iterations")
+    if max_loops is None:
         from .config import MAX_AI_ITERATIONS
-    except ImportError:
-        MAX_AI_ITERATIONS = 1
-
-    max_loops = MAX_AI_ITERATIONS
+        max_loops = MAX_AI_ITERATIONS
 
     if state.get("search_iteration_count", 0) >= max_loops:
         return "write_report"

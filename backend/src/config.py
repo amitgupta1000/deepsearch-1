@@ -107,10 +107,15 @@ DEFAULT_TEMPERATURE = LLM_TEMPERATURE
 # =============================================================================
 
 # Search limits
-MAX_SEARCH_QUERIES = get_env_int("MAX_SEARCH_QUERIES", 3)  # Multiple queries for comprehensive coverage
+MAX_SEARCH_QUERIES = get_env_int("MAX_SEARCH_QUERIES", 5)  # Default for "fast" search
 MAX_SEARCH_RESULTS = get_env_int("MAX_SEARCH_RESULTS", 3)  # Balanced between quality and performance
 MAX_CONCURRENT_SCRAPES = get_env_int("MAX_CONCURRENT_SCRAPES", 6)  # Reasonable concurrency for stability
 MAX_SEARCH_RETRIES = get_env_int("MAX_SEARCH_RETRIES", 2)  # Limited retries to prevent hanging
+
+# -- Ultra Search Mode Settings --
+ULTRA_MAX_SEARCH_QUERIES = get_env_int("ULTRA_MAX_SEARCH_QUERIES", 15)
+ULTRA_MAX_SEARCH_RESULTS = get_env_int("ULTRA_MAX_SEARCH_RESULTS", 10)
+ULTRA_MAX_AI_ITERATIONS = get_env_int("ULTRA_MAX_AI_ITERATIONS", 3)
 
 # AI iteration limits
 MAX_AI_ITERATIONS = get_env_int("MAX_AI_ITERATIONS", 1)
@@ -303,8 +308,9 @@ __all__ = [
     'EMBEDDING_NORMALIZE', 'EMBEDDING_BATCH_SIZE', 'USE_ENHANCED_EMBEDDINGS',
     
     # Search and Processing
-    'MAX_SEARCH_QUERIES', 'MAX_SEARCH_RESULTS', 'MAX_CONCURRENT_SCRAPES',
-    'MAX_AI_ITERATIONS', 'CHUNK_SIZE', 'CHUNK_OVERLAP',
+    'MAX_SEARCH_QUERIES', 'MAX_SEARCH_RESULTS', 'MAX_AI_ITERATIONS',
+    'ULTRA_MAX_SEARCH_QUERIES', 'ULTRA_MAX_SEARCH_RESULTS', 'ULTRA_MAX_AI_ITERATIONS',
+    'MAX_CONCURRENT_SCRAPES', 'CHUNK_SIZE', 'CHUNK_OVERLAP',
     
     # Hybrid Retrieval
     'RETRIEVAL_METHOD', 'HYBRID_VECTOR_WEIGHT', 'HYBRID_BM25_WEIGHT',

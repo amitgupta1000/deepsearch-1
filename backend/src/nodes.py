@@ -354,6 +354,9 @@ class AgentState(TypedDict):
     appendix_content: Optional[str]
     analysis_filename: Optional[str]
     appendix_filename: Optional[str]
+    max_search_queries: Optional[int]
+    max_search_results: Optional[int]
+    max_ai_iterations: Optional[int]
 
 
 
@@ -424,7 +427,8 @@ async def create_queries(state: AgentState) -> AgentState:
     # Proceed with initial query generation if no suggested queries or max iterations reached
     logging.info("Generating initial search queries based on user query: %s", new_query)
 
-    number_queries = MAX_SEARCH_QUERIES # Use config constant if available
+    # Use dynamic config from state, fallback to global config
+    number_queries = state.get("max_search_queries", MAX_SEARCH_QUERIES)
 
     if new_query and llm_call_async: # Ensure llm_call_async is available
         # Use the message classes (either LangChain or our fallback implementation)
@@ -702,7 +706,10 @@ async def evaluate_search_results(state: AgentState) -> AgentState:
         })
         return state
 
-    search_engine = UnifiedSearcher()
+    # Use dynamic config from state for max_results, fallback to global config
+    max_results_per_query = state.get("max_search_results", MAX_SEARCH_RESULTS)
+    search_engine = UnifiedSearcher(max_results=max_results_per_query)
+
     search_tasks = [search_engine.search(q) for q in search_queries]
     search_results_list = await asyncio.gather(*search_tasks, return_exceptions=True)
 
@@ -1225,7 +1232,8 @@ async def AI_evaluate(state: AgentState) -> AgentState:
     logging.info("AI Evaluation started: evaluating %d Q&A pairs for original query coverage.", len(qa_pairs))
 
     state["search_iteration_count"] = state.get("search_iteration_count", 0) + 1
-    max_iterations =  MAX_AI_ITERATIONS # Limit to MAX AI-driven iterations
+    # Use dynamic config from state, fallback to global config
+    max_iterations = state.get("max_ai_iterations", MAX_AI_ITERATIONS)
     errors = []
     state["proceed"] = True
 

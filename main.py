@@ -63,7 +63,8 @@ MAX_SESSIONS = 10
 
 class ResearchRequest(BaseModel):
     query: str = Field(..., description="Research query or question")
-    prompt_type: str = Field(default="general", description="Prompt type: general, legal, macro, etc.")
+    prompt_type: str = Field(default="general", description="Type of prompt to use for query generation.")
+    search_mode: str = Field(default="fast", description="Search mode: 'fast' for quick results or 'ultra' for deep research.")
 
 class ResearchSession(BaseModel):
     session_id: str
@@ -96,9 +97,27 @@ class APIResponse(BaseModel):
 #==============
 from backend.src.graph import app as workflow_app
 
-async def run_workflow(initial_query: str, prompt_type: str, session_id: str):
+async def run_workflow(initial_query: str, prompt_type: str, search_mode: str, session_id: str):
     if workflow_app is None:
         raise RuntimeError("Workflow not compiled. LangGraph not available.")
+
+    # Import config values for search modes
+    from backend.src.config import (
+        MAX_SEARCH_QUERIES, MAX_SEARCH_RESULTS, MAX_AI_ITERATIONS,
+        ULTRA_MAX_SEARCH_QUERIES, ULTRA_MAX_SEARCH_RESULTS, ULTRA_MAX_AI_ITERATIONS
+    )
+
+    # Determine settings based on search_mode
+    if search_mode == "ultra":
+        max_queries = ULTRA_MAX_SEARCH_QUERIES
+        max_results = ULTRA_MAX_SEARCH_RESULTS
+        max_iterations = ULTRA_MAX_AI_ITERATIONS
+        logger.info(f"Running in 'ultra' mode: {max_queries} queries, {max_results} results, {max_iterations} iterations.")
+    else: # Default to "fast"
+        max_queries = MAX_SEARCH_QUERIES
+        max_results = MAX_SEARCH_RESULTS
+        max_iterations = MAX_AI_ITERATIONS
+        logger.info(f"Running in 'fast' mode: {max_queries} queries, {max_results} results, {max_iterations} iterations.")
 
     # Initial state for the workflow
     initial_state = {
@@ -122,6 +141,10 @@ async def run_workflow(initial_query: str, prompt_type: str, session_id: str):
         "approval_iteration_count": 0,
         "search_iteration_count": 0,
         "report_type": None,
+        # Dynamic configuration based on search_mode
+        "max_search_queries": max_queries,
+        "max_search_results": max_results,
+        "max_ai_iterations": max_iterations,
     }
 
     try:
@@ -138,7 +161,7 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
         research_sessions[session_id]["current_step"] = "Starting research pipeline..."
         research_sessions[session_id]["progress"] = 5
 
-        result = await run_workflow(request.query, request.prompt_type, session_id)
+        result = await run_workflow(request.query, request.prompt_type, request.search_mode, session_id)
         logging.info(f"[run_research_pipeline] Workflow result: {result}")
 
         if result:
