@@ -1,7 +1,7 @@
 import os
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 
@@ -290,6 +290,31 @@ async def delete_research_session(session_id: str):
                 logger.warning(f"Failed to delete file {filename} from Firestore: {e}")
 
     return APIResponse(success=True, message="Research session deleted successfully")
+
+# --- File Download Endpoint ---
+@app.get("/api/download/{filename}")
+async def download_file_from_firestore(filename: str):
+    """
+    Downloads a report file directly from Firestore.
+    """
+    if not db:
+        raise HTTPException(status_code=503, detail="Firestore client not available")
+    
+    try:
+        doc_ref = db.collection("report_files").document(filename)
+        doc = doc_ref.get()
+        
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail="File not found in Firestore")
+            
+        file_content = doc.to_dict().get("content")
+        
+        return Response(content=file_content, media_type="text/plain", headers={
+            'Content-Disposition': f'attachment; filename="{filename}"'
+        })
+    except Exception as e:
+        logger.error(f"Error retrieving file {filename} from Firestore: {e}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving file from Firestore: {str(e)}")
 
 # --- Health & Debug Endpoints ---
 @app.get("/api/health")
