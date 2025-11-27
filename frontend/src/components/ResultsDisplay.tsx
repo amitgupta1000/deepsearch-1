@@ -16,48 +16,8 @@ const ResultsDisplay: React.FC = () => {
   const { state, clearResults } = useResearch();
   const { isLoading, result, error } = state;
 
-  // Downloads content already present in the React state
-  const downloadReport = async (contentType: 'analysis' | 'appendix') => {
-    setIsDownloading(contentType);
-
-    if (!result) {
-      alert('Result not available, cannot download file.');
-      setIsDownloading(null);
-      return;
-    }
-
-    const content = contentType === 'analysis' ? result.analysis_content : result.appendix_content;
-    // Use correct property names for filenames, e.g. analysis_file_name and appendix_file_name
-    const filename = contentType === 'analysis' ? result.analysis_filename : result.appendix_filename;
-
-    if (!content || !filename) {
-      alert(`The ${contentType} report content or filename is not available for download.`);
-      setIsDownloading(null);
-      return;
-    }
-
-    try {
-      // Create a Blob from the content that's already in the state
-      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      console.log(`Successfully downloaded ${contentType} file: ${filename}`);
-    } catch (err) {
-      console.error(`Error creating download for ${contentType} file:`, err);
-      alert(`Failed to create download. Please try again.`);
-    } finally {
-      setIsDownloading(null);
-    }
-  };
-
   // Downloads content by fetching it from the Firestore via the backend
-  const downloadReportFromDb = async (contentType: 'analysis' | 'appendix') => {
+  const downloadReport = async (contentType: 'analysis' | 'appendix') => {
     const downloadKey = `${contentType}-db`;
     setIsDownloading(downloadKey);
 
@@ -76,16 +36,23 @@ const ResultsDisplay: React.FC = () => {
     }
 
     try {
-      // The backend endpoint /api/download/{filename} will handle fetching and streaming the file
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/download/${filename}`);
-      if (!response.ok) {
-        throw new Error(`Failed to download file: ${response.statusText}`);
+      const apiUrl = import.meta.env.VITE_API_URL;
+      if (!apiUrl) {
+          throw new Error("API URL is not configured.");
       }
-      // The browser will handle the download automatically due to Content-Disposition header
-      window.location.href = `${process.env.REACT_APP_API_URL}/api/download/${filename}`;
-    } catch (err) {
-      console.error(`Error downloading ${contentType} file from DB:`, err);
-      alert(`Failed to download from database. Please try again.`);
+      
+      const downloadUrl = `${apiUrl}/api/download/${filename}`;
+      
+      // Directly navigating to the download URL. 
+      // If the server responds with an error (e.g., 404 or 500), 
+      // the browser will display the error response, which is more informative
+      // than a generic alert.
+      window.location.href = downloadUrl;
+
+    } catch (err: any) {
+      console.error(`Error preparing download for ${contentType} file from DB:`, err);
+      // Display a more specific error if possible
+      alert(`Failed to initiate download: ${err.message || 'Please try again.'}`);
     } finally {
       setIsDownloading(null);
     }
@@ -150,36 +117,16 @@ const ResultsDisplay: React.FC = () => {
                   className="btn-secondary flex items-center space-x-2"
                   disabled={!!isDownloading}
                 >
-                  {isDownloading === 'analysis' ? (
-                    <ArrowPathIcon className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <ArrowDownTrayIcon className="w-5 h-5" />
-                  )}
-                  <span>{isDownloading === 'analysis' ? 'Downloading...' : 'Download Analysis'}</span>
-                </button>
-                <button
-                  onClick={() => downloadReportFromDb('analysis')}
-                  className="btn-secondary flex items-center space-x-2"
-                  disabled={!!isDownloading}
-                >
                   {isDownloading === 'analysis-db' ? <ArrowPathIcon className="w-5 h-5 animate-spin" /> : <ArrowDownTrayIcon className="w-5 h-5" />}
-                  <span>{isDownloading === 'analysis-db' ? 'Downloading...' : 'Download Analysis (DB)'}</span>
+                  <span>{isDownloading === 'analysis-db' ? 'Downloading...' : 'Download Analysis'}</span>
                 </button>
                 <button
                   onClick={() => downloadReport('appendix')}
                   className="btn-secondary flex items-center space-x-2"
                   disabled={!!isDownloading}
                 >
-                  {isDownloading === 'appendix' ? <ArrowPathIcon className="w-5 h-5 animate-spin" /> : <ArrowDownTrayIcon className="w-5 h-5" />}
-                  <span>{isDownloading === 'appendix' ? 'Downloading...' : 'Download Appendix'}</span>
-                </button>
-                <button
-                  onClick={() => downloadReportFromDb('appendix')}
-                  className="btn-secondary flex items-center space-x-2"
-                  disabled={!!isDownloading}
-                >
                   {isDownloading === 'appendix-db' ? <ArrowPathIcon className="w-5 h-5 animate-spin" /> : <ArrowDownTrayIcon className="w-5 h-5" />}
-                  <span>{isDownloading === 'appendix-db' ? 'Downloading...' : 'Download Appendix (DB)'}</span>
+                  <span>{isDownloading === 'appendix-db' ? 'Downloading...' : 'Download Appendix'}</span>
                 </button>
                 <button onClick={clearResults} className="btn-primary">
                   New Research

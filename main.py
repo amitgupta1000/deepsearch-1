@@ -37,7 +37,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="INTELLISEARCH API",
+    title="CRYSTAL DEEPSEARCH API",
     description="AI-powered research pipeline with web interface",
     version="1.0.0",
     docs_url="/api/docs",
@@ -51,7 +51,6 @@ app.add_middleware(
         "http://localhost:5173",
         "http://localhost:8000",
         "https://deepsearch-56755551-95627.web.app",
-        "*",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -172,7 +171,6 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
                 "progress": 100,
                 "current_step": "Research completed",
                 "updated_at": datetime.now(),
-                # The workflow already saved the reports and returned the filenames.
                 "analysis_filename": result.get("analysis_filename"),
                 "appendix_filename": result.get("appendix_filename"),
             })
