@@ -1,7 +1,7 @@
 export interface ResearchRequest {
   query: string;
   promptType?: string;
-  search_mode?: 'fast' | 'ultra';
+  search_mode?: 'Fast' | 'Ultra';
 }
 
 export interface ResearchResult {
