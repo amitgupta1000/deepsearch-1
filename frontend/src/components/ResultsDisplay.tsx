@@ -10,6 +10,7 @@ import { ArrowPathIcon } from '@heroicons/react/24/solid';
 import { useResearch } from '../context/ResearchContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import ResearchInProgress from './ResearchInProgress';
 
 const ResultsDisplay: React.FC = () => {
   const [isDownloading, setIsDownloading] = React.useState<string | null>(null);
@@ -59,15 +60,7 @@ const ResultsDisplay: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="card p-8 shadow-lg">
-        <div className="flex flex-col items-center space-y-4">
-          <ArrowPathIcon className="w-12 h-12 text-primary-600 animate-spin" />
-          <h3 className="text-xl font-semibold text-gray-900">Research in Progress</h3>
-          <p className="text-gray-600">Our AI is analyzing sources and generating your report...</p>
-        </div>
-      </div>
-    );
+    return <ResearchInProgress />;
   }
 
   if (error) {
