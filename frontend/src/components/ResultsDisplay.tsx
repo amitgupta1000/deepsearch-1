@@ -143,7 +143,7 @@ const ResultsDisplay: React.FC = () => {
             <DocumentTextIcon className="w-6 h-6 text-primary-600" />
             <span>Analysis Report</span>
           </h3>
-          <div className="prose prose-lg max-w-none">
+          <div className="prose prose-lg max-w-none max-h-[70vh] overflow-y-auto">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
@@ -165,7 +165,7 @@ const ResultsDisplay: React.FC = () => {
             <DocumentTextIcon className="w-6 h-6 text-blue-600" />
             <span>Appendix</span>
           </h3>
-          <div className="prose max-w-none">
+          <div className="prose max-w-none max-h-[60vh] overflow-y-auto">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
