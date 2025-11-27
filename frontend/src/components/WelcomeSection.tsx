@@ -6,7 +6,7 @@ const WelcomeSection: React.FC = () => {
     {
       icon: <CpuChipIcon className="w-6 h-6" />,
       title: "AI-Powered Research",
-      description: "Advanced Google Gemini AI analyzes and synthesizes information"
+      description: "Advanced Web-enabled Crystal AI analyzes and synthesizes information"
     },
     {
       icon: <BoltIcon className="w-6 h-6" />,
@@ -20,8 +20,8 @@ const WelcomeSection: React.FC = () => {
     },
     {
       icon: <GlobeAltIcon className="w-6 h-6" />,
-      title: "Web-Wide Search",
-      description: "Searches across millions of web sources for relevant information"
+      title: "Customisable Search",
+      description: "Select between Fast and Ultra scans to suit your needs"
     }
   ];
 

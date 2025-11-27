@@ -9,6 +9,7 @@ import hashlib
 import logging
 import re
 import time
+from datetime import datetime
 from typing import List, Tuple, Optional, Dict, Any
 from difflib import SequenceMatcher
 
@@ -40,7 +41,9 @@ except ImportError:
         LLM_DEDUP_DETAILED_ONLY
     )
     from llm_utils import llm_call_async
-    from prompt import get_current_date
+
+def get_current_date():
+    return datetime.now().strftime("%B %d, %Y")
 
 # Simple in-memory cache for deduplication results
 _deduplication_cache: Dict[str, Tuple[str, float]] = {}
