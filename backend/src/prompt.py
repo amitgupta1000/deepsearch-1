@@ -74,7 +74,7 @@ You are an expert research assistant generating search queries for legal and fin
 **CURRENT DATE: {current_date}. Prioritize recent developments from 2024-2025.**
 
 Generate {number_queries} targeted search queries covering:
-
+- Priority domains such as: "https://indiankanoon.org/", "https://www.casemine.com", "https://airrlaw.com/", "https://nclt.gov.in/", "https://sat.gov.in/", "https://sebi.gov.in/", "https://nseindia.com", "https://bseindia.com", "https://mca.gov.in/"
 - Regulatory actions (SEBI, MCA, NCLT, SAT)
 - Litigation and legal disputes  
 - Financial irregularities and audit issues
@@ -121,11 +121,12 @@ query_writer_instructions_macro = """You are a global macro research assistant a
 **CURRENT DATE CONTEXT: Today is {current_date}. PRIORITIZE the most recent information available, particularly developments from the start of the current year. Always search for the latest updates and current developments.**
 
 Generate {number_queries} commodity research queries using:
-    - Focus each query on a specific dimension of the commodity's macro landscape.
-    - Use authoritative filters or context signals (e.g., site:eia.gov, site:bloomberg.com).
-    - Employ terms like “price outlook”, “supply risk”, “demand forecast”, “inventory buildup”, “producer sentiment”, “OPEC decision”.
-    - Aim for queries that reveal near-term and medium-term implications.
-    - Include at least one query that asks the opposite or questions a common assumption about the topic.
+- Priority domains such as: "https://www.investing.com/", "https://finance.yahoo.com/", "https://www.reuters.com/", "https://www.bloomberg.com/", "https://seekingalpha.com/", "https://www.iea.org/"
+- Focus each query on a specific dimension of the commodity's macro landscape.
+- Use authoritative filters or context signals (e.g., site:eia.gov, site:bloomberg.com).
+- Employ terms like “price outlook”, “supply risk”, “demand forecast”, “inventory buildup”, “producer sentiment”, “OPEC decision”.
+- Aim for queries that reveal near-term and medium-term implications.
+- Include at least one query that asks the opposite or questions a common assumption about the topic.
 
 Format:
 - Format your response as a JSON object with this key:
@@ -158,6 +159,8 @@ query_writer_instructions_general = """You are a research assistant exploring: {
 **CURRENT DATE: {current_date}. Prioritize developments from the start of the current year.**
 
 Generate {number_queries} search queries covering key aspects:
+- Priority domains such as: "https://www.wikipedia.org/", "https://www.reddit.com/", "https://www.bbc.com/news", "https://www.nature.com/", "https://www.sciencedirect.com/", "https://www.noaa.gov/"
+- Foundational information and definitions
 - Historical context and background
 - Recent developments and news
 - Expert perspectives and analysis
@@ -316,6 +319,7 @@ You are an investment research assistant generating search queries for: {topic}
 **CURRENT DATE: {current_date}. Prioritize 2024-2025 developments.**
 
 Generate {number_queries} investment research queries covering:
+- Priority domains such as: "https://www.investing.com/", "https://www.moneycontrol.com/", "https://www.valueresearchonline.com/", "https://www.economictimes.indiatimes.com/", "https://finance.yahoo.com/", "https://www.livemint.com/"
 - Financial performance and metrics
 - Business fundamentals and competitive position
 - Growth prospects and market opportunities
