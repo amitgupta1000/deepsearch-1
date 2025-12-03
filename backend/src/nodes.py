@@ -1451,7 +1451,7 @@ async def write_report(state: AgentState) -> AgentState:
             - Provide a direct, analytical answer to the user's original question
             - Synthesize insights from all the research data
             - Focus on creating a cohesive, analytical response
-            - Target 500-1000 words for this response
+            - Target 500-2000 words for this response
             - Use clear, professional language with proper markdown formatting
             - Include key insights and implications
             - Do not repeat the individual Q&A pairs (they will be in the appendix)
