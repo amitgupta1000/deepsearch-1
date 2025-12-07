@@ -274,7 +274,6 @@ try:
         query_writer_instructions_person_search,
         query_writer_instructions_investment,
         web_search_validation_instructions,
-        reflection_instructions_modified,
     ) 
 except ImportError:
     logging.error("Could not import prompt instructions from prompt.py. LLM nodes will not function.")
@@ -286,7 +285,6 @@ except ImportError:
     query_writer_instructions_person_search = ""
     query_writer_instructions_investment = ""
     web_search_validation_instructions = ""
-    reflection_instructions_modified = ""
     
 
 # Import LangChain components used in nodes
@@ -347,7 +345,6 @@ class AgentState(TypedDict):
     evaluation_response: Optional[str]
     suggested_follow_up_queries: Optional[List[str]]
     prompt_type: Optional[str]
-    approval_iteration_count: Optional[int]
     search_iteration_count: Optional[int]
     snippet_state: Optional[Dict[str, str]]
     analysis_content: Optional[str]
@@ -519,139 +516,7 @@ async def create_queries(state: AgentState) -> AgentState:
 
     return state
 
-async def user_approval_for_queries(state: AgentState) -> AgentState:
-    """
-    Displays the generated rationale and search queries to the user and asks for approval to proceed.
-    Supports non-interactive operation via state flags:
-      - state['non_interactive'] = True : run without blocking input()
-      - state['auto_approve'] = True : automatically approve generated queries
-      - state['approval_choice'] = 'yes'|'no' : simulated user response
-    """
-
-
-    rationale = state.get('rationale', 'No rationale provided.')
-    search_queries = state.get('search_queries', [])
-    current_error = state.get('error')
-
-    # Non-interactive shortcuts
-    non_interactive = state.get('non_interactive', False)
-    auto_approve = state.get('auto_approve', False)
-    approval_choice = state.get('approval_choice', None)  # 'yes' or 'no'
-
-    if current_error:
-        logging.error("Error from previous step: %s", current_error)
-
-    logging.info("Generated Search Queries for Approval")
-    logging.debug("Rationale: %s", rationale)
-    logging.debug("Search Queries: %s", search_queries)
-
-    # Increment approval iteration count
-    state['approval_iteration_count'] = state.get('approval_iteration_count', 0) + 1
-
-    # Handle non-interactive / automated approval
-    if non_interactive:
-        if approval_choice is not None:
-            choice = approval_choice.strip().lower()
-            logging.info("Non-interactive approval choice provided: %s", choice)
-            if choice in ['yes', 'y']:
-                state['proceed'] = True
-                state['error'] = None
-                return state
-            else:
-                # Simulate user entering a new query via state['new_query_override'] if provided
-                new_query = state.get('new_query_override') or state.get('new_query')
-                logging.info("Non-interactive approval: choice is no; new_query set to %s", new_query)
-                state['proceed'] = False
-                state['new_query'] = new_query
-                state['search_queries'] = []
-                state['data'] = []
-                state['relevant_contexts'] = {}
-                state['visited_urls'] = []
-                state['iteration_count'] = 0
-                state['approval_iteration_count'] = 0
-                state['error'] = None
-                state['suggested_follow_up_queries'] = []
-                state['prompt_type'] = state.get('prompt_type', 'general')
-                return state
-        elif auto_approve:
-            logging.info("Non-interactive auto-approve enabled. Proceeding.")
-            state['proceed'] = True
-            state['error'] = None
-            return state
-        else:
-            # Default for non_interactive with no explicit choice: do not proceed
-            logging.warning("Non-interactive mode with no approval flags set. Defaulting to no.")
-            state['proceed'] = False
-            return state
-
-    # Interactive mode: preserve existing behavior but with logging
-    if search_queries:
-        for i, query in enumerate(search_queries, 1):
-            logging.info("%d. %s", i, query)
-        logging.debug("--- end queries ---")
-
-        for _ in range(5):  # Limit invalid attempts
-            user_input = input("Approve queries and proceed? (yes/no): ").lower().strip()
-            if user_input in ['yes', 'y']:
-                state['proceed'] = True
-                state['error'] = None
-                return state
-            elif user_input in ['no', 'n']:
-                new_query = input("Please enter your initial query: ")
-                logging.info("New query received: %s", new_query)
-
-                # Reset state
-                state['proceed'] = False
-                state['new_query'] = new_query
-                state['search_queries'] = []
-                state['data'] = []
-                state['relevant_contexts'] = {}
-                state['visited_urls'] = []
-                state['iteration_count'] = 0
-                state['approval_iteration_count'] = 0
-                state['error'] = None
-                state['suggested_follow_up_queries'] = []
-                state['prompt_type'] = state.get('prompt_type', 'general')
-                return state
-            else:
-                logging.warning("Invalid input received for approval prompt.")
-
-        logging.warning("Too many invalid attempts at approval prompt. Defaulting to no.")
-        state['proceed'] = False
-        return state
-
-    else:
-        logging.warning("No search queries were generated.")
-        new_query = input("No queries were generated. Please enter a new initial query: ")
-        logging.info("New query received: %s", new_query)
-
-        # Reset state
-        state['proceed'] = False
-        state['new_query'] = new_query
-        state['search_queries'] = []
-        state['data'] = []
-        state['relevant_contexts'] = {}
-        state['visited_urls'] = []
-        state['iteration_count'] = 0
-        state['approval_iteration_count'] = 0
-        state['error'] = None
-        state['suggested_follow_up_queries'] = []
-        state['prompt_type'] = state.get('prompt_type', 'general')
-
-        return state
-
-
-async def choose_report_type(state: AgentState) -> AgentState:
-    """
-    Sets unified report type. No user selection needed since we now use a single
-    500-2000 word report format with query-answer structure.
-    Maintains compatibility with existing automation flags.
-    """
-    
-    # Set unified report type - no user interaction needed
-    state['report_type'] = 'unified'
-    logging.info("Using unified report format (500-2000 words)")
-    return state
+    # user_approval_for_queries and choose_report_type functions removed as requested
 
 
 # Consolidated helper and evaluation implementation
@@ -1099,7 +964,6 @@ async def embed_and_retrieve(state: AgentState) -> AgentState:
     new_error = (str(current_error_state or '') + "\n" + "\n".join(errors)).strip() if errors else (current_error_state.strip() if current_error_state is not None else None)
     state['error'] = None if new_error is None or new_error == "" else new_error
     state["relevant_chunks"] = []
-
 
 
 async def create_qa_pairs(state: AgentState) -> AgentState:
