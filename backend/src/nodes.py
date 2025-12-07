@@ -112,6 +112,14 @@ except ImportError:
     logging.warning("Could not import hybrid retriever. Using fallback retrieval.")
     create_hybrid_retriever = None
 
+
+# FSS retriever import with fallback
+from typing import Any
+try:
+    from backend.src.fss_retriever import GeminiFileSearchRetriever, delete_gemini_file_search_store
+except ImportError as e:
+    logging.error(f"Failed to import GeminiFileSearchRetriever: {e}")
+    GeminiFileSearchRetriever = None
 try:
     from .utils import (
         safe_format, 
@@ -517,7 +525,7 @@ async def create_queries(state: AgentState) -> AgentState:
     return state
 
     # user_approval_for_queries and choose_report_type functions removed as requested
-
+#=============================================================================================
 
 # Consolidated helper and evaluation implementation
 import hashlib
@@ -657,6 +665,7 @@ async def evaluate_search_results(state: AgentState) -> AgentState:
     print(f"Final URLs for extraction (first 5): {final_urls[:5]}")
     logging.info(f"evaluate_search_results: Final data size: {len(final_data)}")
     return state
+#=============================================================================================
 
 
 async def extract_content(state: AgentState) -> AgentState:
@@ -879,7 +888,7 @@ async def extract_content(state: AgentState) -> AgentState:
 
 
     return state
-
+#=============================================================================================
 
 async def embed_and_retrieve(state: AgentState) -> AgentState:
     """
@@ -965,6 +974,49 @@ async def embed_and_retrieve(state: AgentState) -> AgentState:
     state['error'] = None if new_error is None or new_error == "" else new_error
     state["relevant_chunks"] = []
 
+#=============================================================================================
+async def fss_retrieve(state: dict) -> dict:
+    """
+    Creates a Gemini File Search Store, uploads the relevant contexts,
+    generates an answer using the store, and then cleans up the store.
+    The generated answer is stored in 'analysis_content'.
+    """
+    contexts_to_use = state.get("relevant_contexts", {})
+    new_query = state.get("new_query", "")
+    session_id = state.get("session_id", "default-session")
+
+    print("[DEBUG] Entering fss_retrieve")
+    logging.info(f"[FSS Node] Called for query: '{new_query}'. Contexts: {len(contexts_to_use)}")
+
+    try:
+        if not contexts_to_use:
+            logging.warning("[FSS Node] No relevant contexts available. Skipping FSS creation.")
+            state["analysis_content"] = "No content was available to search for an answer."
+            return state
+
+        if not GeminiFileSearchRetriever:
+            logging.error("[FSS Node] GeminiFileSearchRetriever class not available.")
+            raise RuntimeError("GeminiFileSearchRetriever not available.")
+
+        # The retriever now handles creation, querying, and deletion internally.
+        retriever = GeminiFileSearchRetriever(display_name_prefix=f"crystal-{session_id}")
+        answer = await retriever.answer_question(new_query, contexts_to_use)
+
+        # The answer from the file search is the main analysis content.
+        state["analysis_content"] = answer
+        # No need to store file_store_name as it's now temporary and cleaned up.
+        state["file_store_name"] = None
+        # For FSS, the appendix is not generated in the same way.
+        state["appendix_content"] = "Appendix not generated for File Search method. All content is synthesized in the main response."
+        logging.info(f"[FSS Node] Generated answer and stored it in 'analysis_content'.")
+
+    except Exception as e:
+        error_msg = f"[FSS Node] failed: {e}"
+        logging.error(error_msg, exc_info=True)
+        state["error"] = error_msg
+        state["file_store_name"] = None
+    return state
+#=======================================================================================
 
 async def create_qa_pairs(state: AgentState) -> AgentState:
     """
@@ -1152,8 +1204,6 @@ async def AI_evaluate(state: AgentState) -> AgentState:
     }}
     """
 
-    from .prompt import reflection_instructions_modified
-
     messages = [
         SystemMessage(content="You are an expert research analyst evaluating whether Q&A pairs provide sufficient coverage for answering a user's original query."),
         HumanMessage(content=evaluation_prompt)
@@ -1228,7 +1278,7 @@ unified_report_instruction = (
     "\n\n Use clear markdown formatting with proper headings."
 )
 #=============================================================================================
-
+#=============================================================================================
 def deduplicate_content(text: str) -> str:
     """
     Remove duplicate sentences and similar content from the report to reduce repetition.
@@ -1266,17 +1316,17 @@ def deduplicate_content(text: str) -> str:
     
     return ' '.join(unique_sentences)
 
+#=============================================================================================
 async def write_report(state: AgentState) -> AgentState:
     """
     Generates the final report using the new three-part structure:
     1) Original User Query
-    2) IntelliSearch Response (LLM analysis)
-    3) Appendix with Q&A pairs and citations
-    """
-    GREEN = '\033[92m'
-    ENDC = '\033[0m'
+    2) IntelliSearch Response (LLM analysis based on qa_pairs or file_search)
+    3) Appendix with Q&A pairs and citations (only for hybrid method)
+    """    
     errors: List[str] = []
     research_topic = state.get('new_query', 'the topic')
+    relevant_contexts = state.get('relevant_contexts', {})
     qa_pairs = state.get('qa_pairs', [])
     full_session_id = state.get('session_id', 'unknown_session')  # Get session_id from state
     short_session_id = full_session_id.split('-')[0] # Use the first 8 characters of the UUID
@@ -1285,23 +1335,41 @@ async def write_report(state: AgentState) -> AgentState:
     analysis_filename = None
     appendix_filename = None
 
-    logging.info(f"Generating report for session '{full_session_id}' on topic: '{research_topic}'")
+    retrieval_method = state.get("retrieval_method")
+    prompt_type = state.get("prompt_type")
+    file_store_name = state.get("file_store_name")
+    print("[DEBUG] Entering write_report")
+    logging.info(f"--- Entering write_report node for session '{short_session_id}' ---")
 
-    if not qa_pairs:
-        logging.warning(f"No Q&A pairs found for topic: '{research_topic}'. Generating empty report.")
+    #==============#=============================
+    # PART 1: Original User Query (common for both methods)
+    part1_query = f"# Research Report\n\n## 1. Original User Query\n\n**{research_topic}**\n\n---\n"
+
+    #==============#=============================
+        # PART 2: Generate IntelliSearch Response
+    if retrieval_method == "fss_retriever" and file_store_name:
+        # The analysis content is already generated by the fss_retrieve node.
+        # We just need to format it into the final report structure.
+        logging.info("Report Method: Using pre-generated response from File Search.")
+        intellisearch_response = state.get("analysis_content", "Analysis from File Search was not found.")
+        part2_response = f"## 2. IntelliSearch Response\n\n{intellisearch_response}\n\n---\n"
+        analysis_content = part1_query + part2_response
+        appendix_content = state.get("appendix_content", "Appendix not applicable for this method.")
+
+    elif not relevant_contexts:
+        logging.warning(f"No relevant contexts found for topic: '{research_topic}'. Generating empty report.")
         analysis_content = f"Could not generate a report. No Q&A pairs were created for the topic: '{research_topic}'."
         appendix_content = "No appendix available."
         errors.append(analysis_content)
-    else:
-        try:
-            # PART 1: Original User Query
-            part1_query = f"# Research Report\n\n## 1. Original User Query\n\n**{research_topic}**\n\n---\n"
 
-            # PART 2: Generate IntelliSearch Response using LLM analysis
-            logging.info("Generating IntelliSearch Response (Part 2)...")
+    else: # Hybrid Retriever with Q&A pairs
+        logging.info(f"Report Method: Generating response using {len(qa_pairs)} Q&A pairs.")
+        try:
+            # PART 2: Generate IntelliSearch Response using LLM analysis on QA Pairs
+            logging.info("Synthesizing main analysis from Q&A pairs...")
             qa_context = "Based on the following Q&A analysis:\n\n"
             for i, qa in enumerate(qa_pairs):
-                qa_context += f"Q{i+1}: {qa['question']}\nA{i+1}: {qa['answer'][:3000]}...\n\n"
+                qa_context += f"Q{i+1}: {qa['question']}\nA{i+1}: {qa['answer'][:2500]}...\n\n"
 
             intellisearch_prompt = f"""
             You are an expert research analyst. Provide a comprehensive, analytical response to the user's query by synthesizing information from the collected research data.
@@ -1312,17 +1380,17 @@ async def write_report(state: AgentState) -> AgentState:
             {qa_context}
 
             INSTRUCTIONS:
-            - Provide a direct, analytical answer to the user's original question
-            - Synthesize insights from all the research data
-            - Focus on creating a cohesive, analytical response
-            - Target 500-3000 words for this response
-            - Use clear, professional language with proper markdown formatting
-            - Include key insights and implications
-            - Do not repeat the individual Q&A pairs (they will be in the appendix)
-            - Focus on answering the user's question comprehensively
-            - Use bullet points, subheadings, or numbered lists where appropriate
+            - You have access to research data in the form of detailed Q&A pairs derived from extensive research on the topic.
+            - Your task is to analyze this data and produce a well-structured research report that directly answers the user's query with clarity and full depth.
+            - You must directly answer the user's query by extracting relevant data and insights from the provided data.
+            - You must provide clear quantitative answers if that is required.
+            - The report should be well-structured, using markdown for headings, subheadings, and bullet points where appropriate.
+            - Present your conclusion in a clearly separated section at the end marked "Conclusion".
+            - Target 500-3000 words for this response.
+            - Use clear, professional language with proper markdown formatting.
+            - Do not repeat the individual Q&A pairs (they will be provided in a separate document).
 
-            Generate the IntelliSearch Response:
+            Generate the report keeping these instructions in mind:
             """
 
             messages = [
@@ -1335,7 +1403,7 @@ async def write_report(state: AgentState) -> AgentState:
             part2_response = f"## 2. IntelliSearch Response\n\n{intellisearch_response}\n\n---\n"
 
             # PART 3: Appendix with Q&A pairs and citations
-            logging.info("Generating Appendix (Part 3)...")
+            logging.info("Generating appendix with detailed Q&A and sources...")
             part3_appendix = "#3. Appendix: Research Q&A and Sources\n\n# Research Questions and Detailed Answers\n"
             all_citations = []
             citation_counter = 1
@@ -1362,7 +1430,7 @@ async def write_report(state: AgentState) -> AgentState:
                         citation_counter += 1
 
             # Deduplicate and format final content
-            deduped_part2 = await enhanced_deduplicate_content(part2_response) if USE_LLM_DEDUPLICATION else deduplicate_content(part2_response)
+            deduped_part2 = deduplicate_content(part2_response)
 
             # Format both analysis and appendix content for consistent markdown and enhanced conclusion
             raw_analysis = part1_query + deduped_part2
@@ -1373,7 +1441,7 @@ async def write_report(state: AgentState) -> AgentState:
             raw_appendix += f"\n---\n*Appendix generated on {get_current_date()}. Powered by INTELLISEARCH Research Platform.*\n"
             appendix_content = format_research_report(raw_appendix)
 
-            logging.info("Three-part report generated successfully.")
+            logging.info("Analysis and appendix content formatted successfully.")
 
         except Exception as e:
             error_msg = f"Error during report generation: {e}"
@@ -1381,7 +1449,8 @@ async def write_report(state: AgentState) -> AgentState:
             errors.append(error_msg)
             analysis_content = f"Failed to generate report: {error_msg}"
             appendix_content = "Not available due to an error."
-
+            
+    #====================================#==================================#================================
     # Save files to Firestore
     db = None
     try:
@@ -1433,3 +1502,4 @@ async def write_report(state: AgentState) -> AgentState:
     return state
 
 logging.info("nodes.py loaded with LangGraph node functions.")
+#=============================================================================================

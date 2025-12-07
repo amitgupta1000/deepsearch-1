@@ -1,0 +1,15 @@
+import asyncio
+from playwright.async_api import async_playwright
+
+import playwright.async_api
+print("Playwright is installed and importable!")
+
+async def run():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page()
+        await page.goto('https://example.com')
+        print(await page.title())
+        await browser.close()
+
+asyncio.run(run())

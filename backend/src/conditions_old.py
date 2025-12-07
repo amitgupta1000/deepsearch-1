@@ -1,5 +1,4 @@
 # conditions.py
-import logging
 
 # --- Search Loop Logic ---
 def should_continue_search(state: dict, max_loops: int = 3) -> bool:
@@ -13,6 +12,33 @@ def should_terminate_search(state: dict, max_loops: int = 3) -> bool:
     Determines if search refinement should end and write report.
     """
     return not state.get("proceed", False) or state.get("search_iteration_count", 0) >= max_loops
+
+# --- Approval Loop Logic ---
+def should_continue_approval(state: dict, max_loops: int = 3) -> bool:
+    """
+    Determines if approval loop should continue.
+    """
+    return state.get("proceed", False) and state.get("approval_iteration_count", 0) < max_loops
+
+def should_terminate_approval(state: dict, max_loops: int = 3) -> bool:
+    """
+    Determines if approval loop should terminate and skip to report.
+    """
+    return not state.get("proceed", False) or state.get("approval_iteration_count", 0) >= max_loops
+
+
+def route_user_approval(state: dict) -> str:
+    """
+    Routes user approval state to the appropriate next node.
+    """
+    max_loops = 3  # You can make this configurable
+
+    if state.get("approval_iteration_count", 0) >= max_loops:
+        return "choose_report_type"
+    elif state.get("proceed", False):
+        return "evaluate_search_results"
+    else:
+        return "create_queries"
 
 def route_ai_evaluate(state: dict) -> str:
     """
@@ -31,22 +57,4 @@ def route_ai_evaluate(state: dict) -> str:
     if state.get("proceed", True):
         return "write_report"
     else:
-        return "create_queries"
-
-
-def route_retrieval_method(state: dict) -> str:
-    """
-    Determines the next node based on the chosen retrieval method.
-
-    Args:
-        state (dict): The current graph state.
-
-    Returns:
-        str: The name of the next node.
-    """
-    retrieval_method = state.get("retrieval_method", "hybrid")
-    logging.info(f"Routing after extract_content, method: '{retrieval_method}'")
-    if retrieval_method in ("fss_retriever", "file_search"):
-        return "fss_retrieve"
-    else: # Default to hybrid path
-        return "embed_and_retrieve"
+        return "evaluate_search_results"

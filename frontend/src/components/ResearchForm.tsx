@@ -8,6 +8,8 @@ const ResearchForm: React.FC = () => {
   const [query, setQuery] = useState('');
   const [promptType, setPromptType] = useState('general');
   const [searchMode, setSearchMode] = useState('fast'); // Add searchMode state
+  const [retrievalMethod, setRetrievalMethod] = useState('hybrid');
+
 
   const promptTypes = [
     { value: 'general', label: 'General Research', description: 'Broad research across multiple topics and sources' },
@@ -25,17 +27,18 @@ const ResearchForm: React.FC = () => {
     const request: ResearchRequest = {
       query: query.trim(),
       promptType,
-      search_mode: searchMode as 'fast' | 'ultra', // Include search_mode
+      search_mode: searchMode as 'fast' | 'ultra',
+      retrieval_method: retrievalMethod,
     };
 
     await startResearch(request);
   };
 
   const exampleQueries = [
-    "Latest developments in artificial intelligence and machine learning",
-    "Impact of climate change on global agriculture",
-    "Cryptocurrency market trends and future predictions",
-    "Benefits and risks of remote work in 2025"
+    "What is the quantum computing impact on crypto markets?",
+    "Tell me about event horizons in black holes",
+    "Were the Stuarts disastrous for Scotland?",
+    "What is the outlook for gold in 2026"
   ];
 
   return (
@@ -123,33 +126,65 @@ const ResearchForm: React.FC = () => {
 
           {/* Search Options & Submit Button */}
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-gray-200">
-            <div className="flex items-center gap-4">
-              <span className="font-medium text-gray-700">Search Depth:</span>
-              <div className="flex items-center rounded-full bg-gray-200 p-1">
-                <button
-                  type="button"
-                  onClick={() => setSearchMode('fast')}
-                  disabled={state.isLoading}
-                  className={`px-4 py-1 text-sm font-semibold rounded-full transition-colors ${
-                    searchMode === 'fast'
-                      ? 'bg-primary-600 text-white shadow'
-                      : 'text-gray-600 hover:bg-gray-300'
-                  }`}
-                >
-                  Fast
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSearchMode('ultra')}
-                  disabled={state.isLoading}
-                  className={`px-4 py-1 text-sm font-semibold rounded-full transition-colors ${
-                    searchMode === 'ultra'
-                      ? 'bg-primary-600 text-white shadow'
-                      : 'text-gray-600 hover:bg-gray-300'
-                  }`}
-                >
-                  Ultra
-                </button>
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-4">
+                <span className="font-medium text-gray-700">Search Depth:</span>
+                <div className="flex items-center rounded-full bg-gray-200 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setSearchMode('fast')}
+                    disabled={state.isLoading}
+                    className={`px-4 py-1 text-sm font-semibold rounded-full transition-colors ${
+                      searchMode === 'fast'
+                        ? 'bg-primary-600 text-white shadow'
+                        : 'text-gray-600 hover:bg-gray-300'
+                    }`}
+                  >
+                    Fast
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSearchMode('ultra')}
+                    disabled={state.isLoading}
+                    className={`px-4 py-1 text-sm font-semibold rounded-full transition-colors ${
+                      searchMode === 'ultra'
+                        ? 'bg-primary-600 text-white shadow'
+                        : 'text-gray-600 hover:bg-gray-300'
+                    }`}
+                  >
+                    Ultra
+                  </button>
+                </div>
+              </div>
+              {/* Retrieval Method Selection */}
+              <div className="flex items-center gap-4">
+                <span className="font-medium text-gray-700">Retrieval Method:</span>
+                <div className="flex items-center rounded-full bg-gray-200 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setRetrievalMethod('hybrid')}
+                    disabled={state.isLoading}
+                    className={`px-4 py-1 text-sm font-semibold rounded-full transition-colors ${
+                      retrievalMethod === 'hybrid'
+                        ? 'bg-primary-600 text-white shadow'
+                        : 'text-gray-600 hover:bg-gray-300'
+                    }`}
+                  >
+                    Hybrid
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRetrievalMethod('file_search')}
+                    disabled={state.isLoading}
+                    className={`px-4 py-1 text-sm font-semibold rounded-full transition-colors ${
+                      retrievalMethod === 'file_search'
+                        ? 'bg-primary-600 text-white shadow'
+                        : 'text-gray-600 hover:bg-gray-300'
+                    }`}
+                  >
+                    File Search
+                  </button>
+                </div>
               </div>
             </div>
 

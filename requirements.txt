@@ -8,6 +8,8 @@ selenium==4.37.0
 beautifulsoup4==4.13.4
 requests-html==0.10.0
 fake-useragent==2.2.0
+brotli==1.2.0
+aiohttp[speedups]==3.12.13
 
 # --- AI, ML, and LangChain ---
 langchain==1.0.3
@@ -37,6 +39,7 @@ requests-toolbelt==1.0.0
 python-dotenv==1.0.1
 orjson==3.10.18
 PyYAML==6.0.2
+
 
 # --- Data, parsing, and misc ---
 numpy==2.2.6

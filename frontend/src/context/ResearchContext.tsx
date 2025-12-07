@@ -103,7 +103,9 @@ export const ResearchProvider: React.FC<{ children: ReactNode }> = ({ children }
         method: 'POST',
         body: JSON.stringify({
           query: request.query,
-          prompt_type: request.promptType || 'general'
+          prompt_type: request.promptType || 'general',
+          search_mode: request.search_mode || 'fast',
+          retrieval_method: request.retrieval_method || 'hybrid'
         }),
         headers: {
           'Content-Type': 'application/json'
