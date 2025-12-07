@@ -72,7 +72,7 @@ SERPER_API_KEY = os.environ.get("SERPER_API_KEY", "")
 # =============================================================================
 
 PRIMARY_LLM_PROVIDER = get_config_value("PRIMARY_LLM_PROVIDER", "google")
-GOOGLE_MODEL = get_config_value("GOOGLE_MODEL", "gemini-2.5-flash-lite")
+GOOGLE_MODEL = get_config_value("GOOGLE_MODEL", "gemini-2.0-flash")
 
 # Embedding Configuration
 EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "google")
@@ -91,12 +91,12 @@ MAX_TOKENS = get_env_int("MAX_TOKENS", 30000)  # High token limit for comprehens
 DEFAULT_LLM_TIMEOUT = get_env_int("DEFAULT_LLM_TIMEOUT", 120)  # Extended timeout for complex queries
 
 # Legacy support for old variable names
-GOOGLE_MODEL = os.getenv("GOOGLE_MODEL", "gemini-2.5-flash-lite")
+GOOGLE_MODEL = os.getenv("GOOGLE_MODEL", "gemini-2.0-flash")
 DEFAULT_GEMINI_MODEL = GOOGLE_MODEL
 gemini_model = GOOGLE_MODEL
 gemini1 = "gemini-2.0-flash-lite"
 gemini2 = "gemini-2.0-flash"
-MAX_TOKENS = get_env_int("MAX_TOKENS", 50000)
+MAX_TOKENS = get_env_int("MAX_TOKENS", 30000)
 LLM_TEMPERATURE = get_env_float("LLM_TEMPERATURE", 0.1)
 DEFAULT_LLM_MODEL_NAME = GOOGLE_MODEL
 DEFAULT_MAX_TOKENS = MAX_TOKENS
@@ -107,13 +107,13 @@ DEFAULT_TEMPERATURE = LLM_TEMPERATURE
 # =============================================================================
 
 # -- Fast Search (Default) Mode Settings --
-MAX_SEARCH_QUERIES = get_env_int("MAX_SEARCH_QUERIES", 5)  # Default for "fast" search
+MAX_SEARCH_QUERIES = get_env_int("MAX_SEARCH_QUERIES", 2)  # Default for "fast" search
 MAX_SEARCH_RESULTS = get_env_int("MAX_SEARCH_RESULTS", 10)  # Balanced between quality and performance
 MAX_AI_ITERATIONS = get_env_int("MAX_AI_ITERATIONS", 1)
 
 # -- Ultra Search Mode Settings --
-ULTRA_MAX_SEARCH_QUERIES = get_env_int("ULTRA_MAX_SEARCH_QUERIES", 16)
-ULTRA_MAX_SEARCH_RESULTS = get_env_int("ULTRA_MAX_SEARCH_RESULTS", 8)
+ULTRA_MAX_SEARCH_QUERIES = get_env_int("ULTRA_MAX_SEARCH_QUERIES", 10)
+ULTRA_MAX_SEARCH_RESULTS = get_env_int("ULTRA_MAX_SEARCH_RESULTS", 10)
 ULTRA_MAX_AI_ITERATIONS = get_env_int("ULTRA_MAX_AI_ITERATIONS", 3)
 
 # Other Search limits
@@ -185,7 +185,8 @@ DEFAULT_REFERER = "https://www.google.com/"
 
 # Blocked domains and extensions
 BLOCKED_DOMAINS = get_env_list("BLOCKED_DOMAINS", [
-    "instagram.com", "youtube.com/watch", "youtu.be", "nsearchives.nseindia.com", 
+    "facebook.com", "twitter.com", "instagram.com", "linkedin.com/posts", 
+    "reddit.com/r/", "youtube.com/watch", "youtu.be", "nsearchives.nseindia.com", 
     "bseindia.com", "sebi.gov.in"
 ])
 SKIP_EXTENSIONS = get_env_list("SKIP_EXTENSIONS", [
