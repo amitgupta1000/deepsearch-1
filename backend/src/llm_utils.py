@@ -66,11 +66,11 @@ try:
     )
 except ImportError:
     logging.error("Could not import config paramters from config.py. LLMs and embeddings may not initialize.")
-    DEFAULT_GEMINI_MODEL = None
-    MAX_RETRIES = None
-    BASE_DELAY = None
-    MAX_CONCURRENT_CALLS = None
-    MAX_CALLS_PER_SECOND = None
+    GOOGLE_MODEL = "gemini-2.0-flash"
+    MAX_RETRIES = 5
+    BASE_DELAY = 1
+    MAX_CONCURRENT_CALLS = 10
+    MAX_CALLS_PER_SECOND = 40
 
 # --- Embedding Model Initialization ---
 
@@ -160,12 +160,6 @@ from google.genai.types import (
     SafetySetting,
     Tool,
 )
-
-
-MAX_RETRIES = 5 # Increased retries for robustness
-BASE_DELAY = 1 # seconds
-MAX_CONCURRENT_CALLS = 10 # Limit the number of concurrent calls
-MAX_CALLS_PER_SECOND = 30 # Define the maximum calls per second (adjusted slightly)
 
 # Create a global semaphore to limit concurrent calls
 semaphore = asyncio.Semaphore(MAX_CONCURRENT_CALLS)

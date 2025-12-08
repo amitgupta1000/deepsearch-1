@@ -1,4 +1,4 @@
-# nodes.py # This file contains the individual nodes (functions) for the LangGraph workflow.
+from .logging_setup import logger
 import logging, json, re, asyncio
 from typing import Dict, Any, List, Optional
 
@@ -18,7 +18,7 @@ try:
     from pydantic import BaseModel, Field, ValidationError, conlist
     PYDANTIC_AVAILABLE = True
 except ImportError:
-    logging.warning("pydantic not available. Using basic classes instead.")
+    logger.warning("pydantic not available. Using basic classes instead.")
     # Create fallback classes
     class BaseModel:
         pass
@@ -31,7 +31,7 @@ try:
     from langchain_core.documents import Document
     LANGCHAIN_DOCS_AVAILABLE = True
 except ImportError:
-    logging.warning("langchain_core.documents not available. Using basic Document class.")
+    logger.warning("langchain_core.documents not available. Using basic Document class.")
     class Document:
         def __init__(self, page_content="", metadata=None):
             self.page_content = page_content
@@ -42,7 +42,7 @@ try:
     from langchain_community.document_loaders import RecursiveUrlLoader, CSVLoader
     LANGCHAIN_LOADERS_AVAILABLE = True
 except ImportError:
-    logging.warning("langchain_community.document_loaders not available. Some features may be limited.")
+    logger.warning("langchain_community.document_loaders not available. Some features may be limited.")
     RecursiveUrlLoader = CSVLoader = None
     LANGCHAIN_LOADERS_AVAILABLE = False
 
@@ -53,7 +53,7 @@ try:
     )
     LANGCHAIN_MESSAGES_AVAILABLE = True
 except ImportError:
-    logging.warning("langchain_core.messages not available. Using basic message classes.")
+    logger.warning("langchain_core.messages not available. Using basic message classes.")
     
     # Create proper fallback message classes with content attribute
     class BaseMessage:
@@ -75,13 +75,13 @@ except ImportError:
 try:
     from .llm_utils import llm_call_async, embeddings
 except ImportError:
-    logging.error("Could not import LLM/Embeddings from llm_utils. Some nodes may not function.")
+    logger.error("Could not import LLM/Embeddings from llm_utils. Some nodes may not function.")
     print("Could not import LLM/Embeddings from llm_utils. Some nodes may not function.")   
     llm_call_async, embeddings = None, None
 try:
     from .search import UnifiedSearcher, SearchResult # Assuming SearchResult and UnifiedSearcher are in search.py
 except ImportError:
-    logging.error("Could not import search components from search.py. Search node will not function.")
+    logger.error("Could not import search components from search.py. Search node will not function.")
     print("Could not import search components from search.py. Search node will not function.")
     UnifiedSearcher, SearchResult = None, None
 
@@ -103,13 +103,13 @@ except NameError:
 try:
     from .scraper import Scraper, ScrapedContent # Assuming Scraper and ScrapedContent are in scraper.py
 except ImportError:
-    logging.error("Could not import scraper components from scraper.py. Extraction node will not function.")
+    logger.error("Could not import scraper components from scraper.py. Extraction node will not function.")
     Scraper, ScrapedContent = None, None
 
 try:
     from backend.src.hybrid_retriever import HybridRetriever, create_hybrid_retriever
 except ImportError:
-    logging.warning("Could not import hybrid retriever. Using fallback retrieval.")
+    logger.warning("Could not import hybrid retriever. Using fallback retrieval.")
     create_hybrid_retriever = None
 
 
@@ -131,7 +131,7 @@ try:
         enhance_report_readability  # Import utility functions
     )
 except ImportError:
-    logging.error("Could not import utility functions from utils.py. Some nodes may be limited.")
+    logger.error("Could not import utility functions from utils.py. Some nodes may be limited.")
     
     print("Could not import utility functions from utils.py. Some nodes may be limited.")
     
@@ -213,7 +213,7 @@ try:
             )
     from .enhanced_deduplication import enhanced_deduplicate_content
 except ImportError:
-    logging.warning("Could not import config settings. Using defaults.")
+    logger.warning("Could not import config settings. Using defaults.")
     
     print("Imports from config and enhanced_deduplication failed. Using defaults.")
     USE_PERSISTENCE = False
@@ -284,7 +284,7 @@ try:
         web_search_validation_instructions,
     ) 
 except ImportError:
-    logging.error("Could not import prompt instructions from prompt.py. LLM nodes will not function.")
+    logger.error("Could not import prompt instructions from prompt.py. LLM nodes will not function.")
     # Define dummy variables to prevent NameError
     query_writer_instructions_legal = ""
     query_writer_instructions_general = ""
@@ -1347,7 +1347,7 @@ async def write_report(state: AgentState) -> AgentState:
 
     #==============#=============================
         # PART 2: Generate IntelliSearch Response
-    if retrieval_method == "fss_retriever" and file_store_name:
+    if retrieval_method == "file_search" and file_store_name:
         # The analysis content is already generated by the fss_retrieve node.
         # We just need to format it into the final report structure.
         logging.info("Report Method: Using pre-generated response from File Search.")

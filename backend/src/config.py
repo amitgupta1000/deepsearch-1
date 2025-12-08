@@ -71,36 +71,16 @@ SERPER_API_KEY = os.environ.get("SERPER_API_KEY", "")
 # LLM CONFIGURATION
 # =============================================================================
 
-PRIMARY_LLM_PROVIDER = get_config_value("PRIMARY_LLM_PROVIDER", "google")
 GOOGLE_MODEL = get_config_value("GOOGLE_MODEL", "gemini-2.5-flash-lite")
 
 # Embedding Configuration
 EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "google")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")  # Updated to latest model
 
-# Enhanced embedding configuration
-EMBEDDING_TASK_TYPE = os.getenv("EMBEDDING_TASK_TYPE", "RETRIEVAL_DOCUMENT")  # Default task type
-EMBEDDING_DIMENSIONALITY = get_env_int("EMBEDDING_DIMENSIONALITY", 768)  # Efficient default
-EMBEDDING_NORMALIZE = get_env_bool("EMBEDDING_NORMALIZE", True)  # Auto-normalize for non-3072 dims
-EMBEDDING_BATCH_SIZE = get_env_int("EMBEDDING_BATCH_SIZE", 100)  # Batch processing
-USE_ENHANCED_EMBEDDINGS = get_env_bool("USE_ENHANCED_EMBEDDINGS", True)  # Use new implementation
-
 # LLM Settings
 LLM_TEMPERATURE = get_env_float("LLM_TEMPERATURE", 0.1)  # Low temperature for factual research
 MAX_TOKENS = get_env_int("MAX_TOKENS", 30000)  # High token limit for comprehensive reports
 DEFAULT_LLM_TIMEOUT = get_env_int("DEFAULT_LLM_TIMEOUT", 120)  # Extended timeout for complex queries
-
-# Legacy support for old variable names
-GOOGLE_MODEL = os.getenv("GOOGLE_MODEL", "gemini-2.5-flash-lite")
-DEFAULT_GEMINI_MODEL = GOOGLE_MODEL
-gemini_model = GOOGLE_MODEL
-gemini1 = "gemini-2.0-flash-lite"
-gemini2 = "gemini-2.0-flash"
-MAX_TOKENS = get_env_int("MAX_TOKENS", 50000)
-LLM_TEMPERATURE = get_env_float("LLM_TEMPERATURE", 0.1)
-DEFAULT_LLM_MODEL_NAME = GOOGLE_MODEL
-DEFAULT_MAX_TOKENS = MAX_TOKENS
-DEFAULT_TEMPERATURE = LLM_TEMPERATURE
 
 # =============================================================================
 # SEARCH AND PROCESSING CONFIGURATION
@@ -119,7 +99,6 @@ ULTRA_MAX_AI_ITERATIONS = get_env_int("ULTRA_MAX_AI_ITERATIONS", 3)
 # Other Search limits
 MAX_CONCURRENT_SCRAPES = get_env_int("MAX_CONCURRENT_SCRAPES", 6)  # Reasonable concurrency for stability
 MAX_SEARCH_RETRIES = get_env_int("MAX_SEARCH_RETRIES", 2)  # Limited retries to prevent hanging
-MAX_USER_QUERY_LOOPS = get_env_int("MAX_USER_QUERY_LOOPS", 2)
 
 # Content processing
 CHUNK_SIZE = get_env_int("CHUNK_SIZE", 1000)  # Optimized for embedding model context
@@ -206,23 +185,13 @@ CACHE_TTL = get_env_int("CACHE_TTL", 86400)  # 24 hours for good balance
 # =============================================================================
 
 # Enable LLM-powered intelligent deduplication
-USE_LLM_DEDUPLICATION = get_env_bool("USE_LLM_DEDUPLICATION", True)
 DEDUPLICATION_CACHE_ENABLED = get_env_bool("DEDUPLICATION_CACHE_ENABLED", True)
 DEDUPLICATION_CACHE_TTL = get_env_int("DEDUPLICATION_CACHE_TTL", 7200)  # 2 hours cache
 
 # Deduplication thresholds
 SIMILARITY_THRESHOLD = get_env_float("SIMILARITY_THRESHOLD", 0.75)  # When to consider content similar
 MIN_SENTENCE_LENGTH = get_env_int("MIN_SENTENCE_LENGTH", 3)  # Minimum words per sentence
-DEDUPLICATION_BATCH_SIZE = get_env_int("DEDUPLICATION_BATCH_SIZE", 10)  # Process sentences in batches
 
-# When to apply LLM deduplication (word thresholds)
-LLM_DEDUP_MIN_WORDS = get_env_int("LLM_DEDUP_MIN_WORDS", 800)  # Apply to reports above this size
-LLM_DEDUP_DETAILED_ONLY = get_env_bool("LLM_DEDUP_DETAILED_ONLY", True)  # Only for detailed reports
-
-# Rate limiting
-MAX_CONCURRENT_CALLS = get_env_int("MAX_CONCURRENT_CALLS", 10)  # Conservative for stability
-MAX_CALLS_PER_SECOND = get_env_int("MAX_CALLS_PER_SECOND", 30)  # Reasonable rate limiting
-BASE_DELAY = get_env_int("BASE_DELAY", 1)  # Small delay between requests
 API_REQUESTS_PER_MINUTE = get_env_int("API_REQUESTS_PER_MINUTE", 30)  # API-friendly limits
 SCRAPING_REQUESTS_PER_MINUTE = get_env_int("SCRAPING_REQUESTS_PER_MINUTE", 30)  # Respectful scraping
 
@@ -299,12 +268,8 @@ __all__ = [
     'GOOGLE_API_KEY', 'SERPER_API_KEY',
     
     # LLM Configuration  
-    'PRIMARY_LLM_PROVIDER', 'GOOGLE_MODEL', 'EMBEDDING_MODEL',
+    'GOOGLE_MODEL', 'EMBEDDING_MODEL',
     'LLM_TEMPERATURE', 'MAX_TOKENS',
-    
-    # Enhanced Embedding Configuration
-    'EMBEDDING_PROVIDER', 'EMBEDDING_TASK_TYPE', 'EMBEDDING_DIMENSIONALITY',
-    'EMBEDDING_NORMALIZE', 'EMBEDDING_BATCH_SIZE', 'USE_ENHANCED_EMBEDDINGS',
     
     # Search and Processing
     'MAX_SEARCH_QUERIES', 'MAX_SEARCH_RESULTS', 'MAX_AI_ITERATIONS',
@@ -334,5 +299,5 @@ __all__ = [
     'RED', 'GREEN', 'BLUE', 'YELLOW', 'ENDC',
     
     # Legacy support
-    'MAX_RESULTS', 'DEFAULT_USER_AGENT', 'DEFAULT_GEMINI_MODEL'
+    'MAX_RESULTS', 'DEFAULT_USER_AGENT'
 ]
