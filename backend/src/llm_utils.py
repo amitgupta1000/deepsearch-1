@@ -111,16 +111,6 @@ except Exception as e:
     
 
 # --- LLM Model Initialization --- 
-
-# NOTE: We no longer use LangChain ChatGoogleGenerativeAI - use llm_call_async instead
-# Removing llm variable to catch any remaining usage of llm.ainvoke
-
-# --- Role-Based Message Serialization ---
-# --- LLM calling with langchain chat client ---
-# DEPRECATED: LangChain chat client removed - use llm_call_async function instead
-logging.info("LangChain ChatGoogleGenerativeAI client disabled - using direct Gemini API via llm_call_async")
-
-#=================================================
 from google import genai
 import asyncio
 import time
@@ -129,23 +119,8 @@ import logging
 
 # Message classes are now defined above - no need to import from LangChain
 
+
 # Configure the generative AI library with the API key
-gemini_api_key = GOOGLE_API_KEY
-if not gemini_api_key:
-    gemini_api_key = GOOGLE_API_KEY  # Fallback to GEMINI_API_KEY if GOOGLE_API_KEY not set
-
-if not gemini_api_key:
-    logging.error("Neither GOOGLE_API_KEY nor GEMINI_API_KEY found in environment.")
-    # Handle this case, perhaps skip Gemini initialization or raise an error
-else:
-    logging.info("Gemini API configured successfully.")
-
-
-## GEMINI Model Calling
-gemini1 = "gemini-2.0-flash-lite"
-gemini2 = "gemini-2.0-flash"
-gemini_model =  GOOGLE_MODEL
-
 from google import genai
 from google.genai import types
 from google.genai.types import (
@@ -160,6 +135,16 @@ from google.genai.types import (
     SafetySetting,
     Tool,
 )
+gemini_model =  GOOGLE_MODEL
+gemini_api_key = GOOGLE_API_KEY
+if not gemini_api_key:
+    gemini_api_key = GOOGLE_API_KEY  # Fallback to GEMINI_API_KEY if GOOGLE_API_KEY not set
+
+if not gemini_api_key:
+    logging.error("Neither GOOGLE_API_KEY nor GEMINI_API_KEY found in environment.")
+    # Handle this case, perhaps skip Gemini initialization or raise an error
+else:
+    logging.info("Gemini API configured successfully.")
 
 # Create a global semaphore to limit concurrent calls
 semaphore = asyncio.Semaphore(MAX_CONCURRENT_CALLS)

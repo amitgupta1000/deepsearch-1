@@ -6,6 +6,8 @@ from typing import Dict, Any, Optional
 import uuid
 import io
 
+from backend.src.config_1 import GOOGLE_MODEL
+
 # Import API keys from api_keys.py
 try:
     from .api_keys import GOOGLE_API_KEY
@@ -13,20 +15,22 @@ except ImportError:
     logging.error("Could not import API keys from api_keys.py. LLMs and embeddings may not initialize.")
     GOOGLE_API_KEY = None
 
+try:
+    from .config import GOOGLE_MODEL
+except ImportError:
+    logging.error("Could not import GOOGLE_MODEL from config.py. Using default model.")
+    GOOGLE_MODEL = "gemini-2.0-flash"
+
 # Configure the generative AI library with the API key
+
 gemini_api_key = GOOGLE_API_KEY
+gemini_model = GOOGLE_MODEL
 
 class GeminiFileSearchRetriever:
     """
     Manages a Gemini File Search Store for a single research session.
     It handles store creation, file uploads from in-memory contexts,
     and deletion of the store after use.
-
-    Usage:
-        retriever = GeminiFileSearchRetriever(display_name_prefix="session-xyz")
-        await retriever.create_and_upload_contexts(relevant_contexts)
-        # ... use retriever.file_store_name in other operations ...
-        await retriever.delete_store()
     """
     def __init__(self, display_name_prefix: str = "crystal-fss"):
         # Generate a unique name for the store for this session
@@ -141,7 +145,7 @@ class GeminiFileSearchRetriever:
             # Generate content using the file search tool
             logging.info(f"[FSS] Answering question '{query}' using store '{file_store_name}'")
             response = await self.async_client.models.generate_content(
-                model="gemini-1.5-flash-latest",  # Use a valid model that supports File Search
+                model="gemini-1.5-flash-latest",  # gemini_model # Use a valid model that supports File Search
                 contents=query,
                 system_instruction=final_instruction,
                 config=types.GenerateContentConfig(

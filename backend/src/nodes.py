@@ -2,17 +2,6 @@ from .logging_setup import logger
 import logging, json, re, asyncio
 from typing import Dict, Any, List, Optional
 
-try:
-    from backend.src.config import *
-except Exception as e:
-    print(f"Failed to import from config.py: {e}")
-
-try:
-    from backend.src.utils import *
-except Exception as e:
-    print(f"Failed to import from utils.py: {e}")
-
-
 # Try to import optional dependencies with fallbacks
 try:
     from pydantic import BaseModel, Field, ValidationError, conlist
@@ -69,7 +58,6 @@ except ImportError:
     class HumanMessage(BaseMessage): pass
     
     LANGCHAIN_MESSAGES_AVAILABLE = False
-
 
 # Import necessary classes and functions from other modules
 try:
@@ -166,7 +154,6 @@ try:
             MAX_CONCURRENT_SCRAPES,
             MAX_SEARCH_RETRIES,
             MAX_AI_ITERATIONS,
-            MAX_USER_QUERY_LOOPS,
             DEFAULT_USER_AGENT,
             DEFAULT_REFERER,
             URL_TIMEOUT,
@@ -207,10 +194,7 @@ try:
             USE_MULTI_QUERY_RETRIEVAL,
             MAX_RETRIEVAL_QUERIES,
             QUERY_CHUNK_DISTRIBUTION,
-            # Enhanced deduplication configuration
-            USE_LLM_DEDUPLICATION,
-            LLM_DEDUP_DETAILED_ONLY
-            )
+    )
     from .enhanced_deduplication import enhanced_deduplicate_content
 except ImportError:
     logger.warning("Could not import config settings. Using defaults.")
@@ -264,13 +248,6 @@ except ImportError:
     RED = '\033[91m'
     GREEN = '\033[92m'
     BLUE = '\033[94m'
-    # Enhanced deduplication fallback defaults
-    USE_LLM_DEDUPLICATION = False
-    LLM_DEDUP_DETAILED_ONLY = True
-    # Import fallback deduplication function
-    def enhanced_deduplicate_content(text: str, report_type: str = "detailed") -> str:
-        return deduplicate_content(text)  # Fallback to basic deduplication
-
 
 # Import prompt instructions
 try:

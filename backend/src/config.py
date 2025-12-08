@@ -77,10 +77,21 @@ GOOGLE_MODEL = get_config_value("GOOGLE_MODEL", "gemini-2.5-flash-lite")
 EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "google")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")  # Updated to latest model
 
+# Enhanced embedding configuration
+EMBEDDING_TASK_TYPE = os.getenv("EMBEDDING_TASK_TYPE", "RETRIEVAL_DOCUMENT")  # Default task type
+EMBEDDING_DIMENSIONALITY = get_env_int("EMBEDDING_DIMENSIONALITY", 768)  # Efficient default
+EMBEDDING_NORMALIZE = get_env_bool("EMBEDDING_NORMALIZE", True)  # Auto-normalize for non-3072 dims
+EMBEDDING_BATCH_SIZE = get_env_int("EMBEDDING_BATCH_SIZE", 100)  # Batch processing
+USE_ENHANCED_EMBEDDINGS = get_env_bool("USE_ENHANCED_EMBEDDINGS", True)  # Use new implementation
+
 # LLM Settings
 LLM_TEMPERATURE = get_env_float("LLM_TEMPERATURE", 0.1)  # Low temperature for factual research
 MAX_TOKENS = get_env_int("MAX_TOKENS", 30000)  # High token limit for comprehensive reports
 DEFAULT_LLM_TIMEOUT = get_env_int("DEFAULT_LLM_TIMEOUT", 120)  # Extended timeout for complex queries
+MAX_RETRIES = get_env_int("MAX_RETRIES", 5) # Increased retries for robustness
+BASE_DELAY = get_env_int("BASE_DELAY", 1) # seconds
+MAX_CONCURRENT_CALLS = get_env_int("MAX_CONCURRENT_CALLS", 10) # Limit the number of concurrent calls
+MAX_CALLS_PER_SECOND = get_env_int("MAX_CALLS_PER_SECOND", 40)
 
 # =============================================================================
 # SEARCH AND PROCESSING CONFIGURATION
@@ -270,6 +281,10 @@ __all__ = [
     # LLM Configuration  
     'GOOGLE_MODEL', 'EMBEDDING_MODEL',
     'LLM_TEMPERATURE', 'MAX_TOKENS',
+
+    # Enhanced Embedding Configuration
+    'EMBEDDING_PROVIDER', 'EMBEDDING_TASK_TYPE', 'EMBEDDING_DIMENSIONALITY',
+    'EMBEDDING_NORMALIZE', 'EMBEDDING_BATCH_SIZE', 'USE_ENHANCED_EMBEDDINGS',
     
     # Search and Processing
     'MAX_SEARCH_QUERIES', 'MAX_SEARCH_RESULTS', 'MAX_AI_ITERATIONS',
