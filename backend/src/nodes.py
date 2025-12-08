@@ -1278,7 +1278,6 @@ unified_report_instruction = (
     "\n\n Use clear markdown formatting with proper headings."
 )
 #=============================================================================================
-#=============================================================================================
 def deduplicate_content(text: str) -> str:
     """
     Remove duplicate sentences and similar content from the report to reduce repetition.
@@ -1334,7 +1333,6 @@ async def write_report(state: AgentState) -> AgentState:
     appendix_content = ""
     analysis_filename = None
     appendix_filename = None
-
     retrieval_method = state.get("retrieval_method")
     prompt_type = state.get("prompt_type")
     file_store_name = state.get("file_store_name")
