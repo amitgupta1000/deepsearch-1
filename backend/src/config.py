@@ -3,6 +3,7 @@
 
 import os
 import logging
+logger = logging.getLogger(__name__)
 from typing import List, Any, Callable
 import sys
 
@@ -40,7 +41,7 @@ def get_env_int(key: str, default: int) -> int:
         try:
             return int(val)
         except ValueError:
-            logging.warning(f"Invalid integer value for {key}, using default: {default}")
+            logger.warning(f"Invalid integer value for {key}, using default: {default}")
             return default
     return get_config_value(key, default, cast_int)
 
@@ -49,7 +50,7 @@ def get_env_float(key: str, default: float) -> float:
         try:
             return float(val)
         except ValueError:
-            logging.warning(f"Invalid float value for {key}, using default: {default}")
+            logger.warning(f"Invalid float value for {key}, using default: {default}")
             return default
     return get_config_value(key, default, cast_float)
 

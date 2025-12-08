@@ -46,13 +46,15 @@ try:
 
     if cache_enabled:
         cache = SimpleCache(ttl=cache_ttl)
-        logging.info(f"Cache initialized with TTL={cache_ttl}s")
+        logger = logging.getLogger(__name__)
+        logger.info(f"Cache initialized with TTL={cache_ttl}s")
     else:
         cache = None # Cache disabled
-        logging.info("Caching is disabled.")
+        logger.info("Caching is disabled.")
 
 except NameError as e:
-    logging.warning(f"Cache related variable not found: {e}. Caching will be disabled.")
+    logger = logging.getLogger(__name__)
+    logger.warning(f"Cache related variable not found: {e}. Caching will be disabled.")
     cache = None
 #=======================================================================================
 # Define dataclass

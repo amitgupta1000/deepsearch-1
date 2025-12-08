@@ -1,5 +1,6 @@
 # nodes.py # This file contains the individual nodes (functions) for the LangGraph workflow.
 import logging, json, re, asyncio
+logger = logging.getLogger(__name__)
 from typing import Dict, Any, List, Optional
 
 try:
@@ -18,7 +19,7 @@ try:
     from pydantic import BaseModel, Field, ValidationError, conlist
     PYDANTIC_AVAILABLE = True
 except ImportError:
-    logging.warning("pydantic not available. Using basic classes instead.")
+    logger.warning("pydantic not available. Using basic classes instead.")
     # Create fallback classes
     class BaseModel:
         pass
@@ -31,7 +32,7 @@ try:
     from langchain_core.documents import Document
     LANGCHAIN_DOCS_AVAILABLE = True
 except ImportError:
-    logging.warning("langchain_core.documents not available. Using basic Document class.")
+    logger.warning("langchain_core.documents not available. Using basic Document class.")
     class Document:
         def __init__(self, page_content="", metadata=None):
             self.page_content = page_content
@@ -42,7 +43,7 @@ try:
     from langchain_community.document_loaders import RecursiveUrlLoader, CSVLoader
     LANGCHAIN_LOADERS_AVAILABLE = True
 except ImportError:
-    logging.warning("langchain_community.document_loaders not available. Some features may be limited.")
+    logger.warning("langchain_community.document_loaders not available. Some features may be limited.")
     RecursiveUrlLoader = CSVLoader = None
     LANGCHAIN_LOADERS_AVAILABLE = False
 
@@ -53,7 +54,7 @@ try:
     )
     LANGCHAIN_MESSAGES_AVAILABLE = True
 except ImportError:
-    logging.warning("langchain_core.messages not available. Using basic message classes.")
+    logger.warning("langchain_core.messages not available. Using basic message classes.")
     
     # Create proper fallback message classes with content attribute
     class BaseMessage:

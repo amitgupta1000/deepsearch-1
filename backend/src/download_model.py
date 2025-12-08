@@ -1,7 +1,6 @@
-import logging
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+import logging
+logger = logging.getLogger(__name__)
 
 def download_cross_encoder_model():
     """
@@ -12,15 +11,15 @@ def download_cross_encoder_model():
         from langchain_community.cross_encoders import HuggingFaceCrossEncoder
         from .config import CROSS_ENCODER_MODEL
 
-        logging.info(f"Downloading cross-encoder model: {CROSS_ENCODER_MODEL}...")
+        logger.info(f"Downloading cross-encoder model: {CROSS_ENCODER_MODEL}...")
         
         # Instantiating the model class will trigger the download
         # to the default cache location (~/.cache/huggingface/hub).
         _ = HuggingFaceCrossEncoder(model_name=CROSS_ENCODER_MODEL)
         
-        logging.info(f"Successfully downloaded and cached {CROSS_ENCODER_MODEL}.")
+        logger.info(f"Successfully downloaded and cached {CROSS_ENCODER_MODEL}.")
     except Exception as e:
-        logging.error(f"Error downloading model {CROSS_ENCODER_MODEL}: {e}", exc_info=True)
+        logger.error(f"Error downloading model {CROSS_ENCODER_MODEL}: {e}", exc_info=True)
         # Exit with a non-zero status code to fail the Docker build if download fails
         exit(1)
 

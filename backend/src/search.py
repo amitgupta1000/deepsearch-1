@@ -49,8 +49,7 @@ except ImportError:
     BaseModel = object
     PYDANTIC_AVAILABLE = False
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(__name__)s - %(levelname)s - %(message)s')
+# Use logger from main entry point
 logger = logging.getLogger(__name__)
 
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))

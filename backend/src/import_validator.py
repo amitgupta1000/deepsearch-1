@@ -2,6 +2,7 @@
 # Comprehensive validation and fallback handling for LangChain/LangGraph imports
 
 import logging
+logger = logging.getLogger(__name__)
 import sys
 from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass
@@ -20,7 +21,7 @@ class LangChainImportValidator:
     
     def __init__(self):
         self.import_status: Dict[str, ImportStatus] = {}
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
         
     def validate_core_imports(self) -> Dict[str, ImportStatus]:
         """Validate all core LangChain/LangGraph imports."""

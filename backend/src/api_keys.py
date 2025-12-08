@@ -7,4 +7,5 @@ from .config import (
 )
 
 import logging
-logging.info("API keys loaded from unified configuration (Google only)")
+logger = logging.getLogger(__name__)
+logger.info("API keys loaded from unified configuration (Google only)")
