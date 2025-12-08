@@ -6,7 +6,9 @@ from typing import Dict, Any, Optional
 import uuid
 import io
 
-from backend.src.config_1 import GOOGLE_MODEL
+from .logging_setup import logger
+from backend.src.fss_capacity_check import get_fss_storage_usage
+from backend.src.config import GOOGLE_MODEL
 
 # Import API keys from api_keys.py
 try:
@@ -39,7 +41,13 @@ class GeminiFileSearchRetriever:
         self.async_client = self.client.aio
         self.file_store_name: Optional[str] = None
         self._file_search_store_obj = None
-        logging.info(f"[FSS] Initialized retriever for store: {self.display_name}")
+        logger.info(f"[FSS] Store created: {self.file_store_name}")
+        try:
+            usage = get_fss_storage_usage(self.file_store_name)
+            logger.info(f"[FSS] Initial usage for store '{self.file_store_name}': {usage}")
+        except Exception as e:
+            logger.error(f"[FSS] Could not get initial usage for store '{self.file_store_name}': {e}")
+
 
     async def create_and_upload_contexts(self, relevant_contexts: Dict[str, Dict[str, Any]]) -> Optional[str]:
         if not relevant_contexts:
@@ -107,7 +115,13 @@ class GeminiFileSearchRetriever:
         """
         Creates a temporary store, uploads contexts, asks a question, and cleans up.
         """
-        file_store_name = None
+        try:
+            usage = get_fss_storage_usage(file_store_name)
+            logger.info(f"[FSS] Usage before answering: {usage}")
+        except Exception as e:
+            logger.error(f"[FSS] Could not get usage before answering: {e}")
+            file_store_name = None
+
         try:
             # Create store and upload files
             file_store_name = await self.create_and_upload_contexts(relevant_contexts)
@@ -176,15 +190,15 @@ class GeminiFileSearchRetriever:
                         logging.info(f"[FSS] Scheduling deletion for file: {file.name}")
                         delete_tasks.append(self.async_client.files.delete(name=file.name))
                 await asyncio.gather(*delete_tasks, return_exceptions=True)
-                logging.info(f"[FSS] All files in store {self.file_store_name} have been deleted.")
-                logging.warning(f"[FSS] Deleting File Search Store: {self.file_store_name}")
+                logger.info(f"[FSS] All files in store {self.file_store_name} have been deleted.")
+                logger.warning(f"[FSS] Deleting File Search Store: {self.file_store_name}")
                 await self.async_client.file_search_stores.delete(name=self.file_store_name)
-                logging.info(f"[FSS] Successfully deleted store: {self.file_store_name}")
+                logger.info(f"[FSS] Successfully deleted store: {self.file_store_name}")
                 self.file_store_name = None
                 self._file_search_store_obj = None
             except Exception as e:
                 # Log error but don't raise, as it's a cleanup step
-                logging.error(
+                logger.error(
                     f"[FSS] Failed to delete store {self.file_store_name}. Manual cleanup may be required. Error: {e}"
                 )
 
@@ -194,19 +208,18 @@ async def delete_gemini_file_search_store(file_store_name: str):
     """
     client = genai.Client()
     try:
-        logging.info(f"[FSS] Listing files in store {file_store_name} for manual deletion.")
+        logger.info(f"[FSS] Listing files in store {file_store_name} for manual deletion.")
         # List and delete all files within the store first.
         all_files_pager = client.files.list(page_size=1000)
         delete_tasks = []
         for file in all_files_pager:
             if hasattr(file, 'file_search_store_name') and file.file_search_store_name == file_store_name:
-                logging.info(f"[FSS] Scheduling deletion for file: {file.name}")
+                logger.info(f"[FSS] Scheduling deletion for file: {file.name}")
                 delete_tasks.append(client.aio.files.delete(name=file.name))
 
         await asyncio.gather(*delete_tasks, return_exceptions=True)
-        logging.info(f"[FSS] All files in store {file_store_name} have been deleted.")
-
+        logger.info(f"[FSS] All files in store {file_store_name} have been deleted.")
         await client.aio.file_search_stores.delete(name=file_store_name)
-        logging.info(f"[FSS] Manually deleted FileSearchStore: {file_store_name}")
+        logger.info(f"[FSS] Manually deleted FileSearchStore: {file_store_name}")
     except Exception as e:
-        logging.error(f"[FSS] Failed to manually delete FileSearchStore {file_store_name}: {e}", exc_info=True)
+        logger.error(f"[FSS] Failed to manually delete FileSearchStore {file_store_name}: {e}", exc_info=True)
