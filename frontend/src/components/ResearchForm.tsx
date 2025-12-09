@@ -126,7 +126,9 @@ const ResearchForm: React.FC = () => {
 
           {/* Search Options & Submit Button */}
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-gray-200">
-            <div className="flex flex-col gap-4">
+            {/* Search Mode and Retrieval Method in a single row */}
+            <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+              {/* Search Depth Toggle */}
               <div className="flex items-center gap-4">
                 <span className="font-medium text-gray-700">Search Depth:</span>
                 <div className="flex items-center rounded-full bg-gray-200 p-1">
@@ -156,7 +158,7 @@ const ResearchForm: React.FC = () => {
                   </button>
                 </div>
               </div>
-              {/* Retrieval Method Selection */}
+              {/* Retrieval Method Toggle */}
               <div className="flex items-center gap-4">
                 <span className="font-medium text-gray-700">Retrieval Method:</span>
                 <div className="flex items-center rounded-full bg-gray-200 p-1">

@@ -1,13 +1,11 @@
 import os
+import uuid
+from datetime import datetime
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
-import sys
-import logging
-import uuid # Added import
-from datetime import datetime # Added import
 
 # Firestore setup
 try:
@@ -119,6 +117,11 @@ async def run_workflow(initial_query: str, prompt_type: str, search_mode: str, r
         max_iterations = MAX_AI_ITERATIONS
         logger.info(f"Running in 'fast' mode: {max_queries} queries, {max_results} results, {max_iterations} iterations.")
 
+    if retrieval_method == "file_search" or retrieval_method == "file_storage":
+        logger.info("Using File Search retrieval method.")
+    else:
+        logger.info("Using Hybrid retrieval method.")
+
     # Initial state for the workflow
     initial_state = {
         "session_id": session_id,
@@ -153,7 +156,7 @@ async def run_workflow(initial_query: str, prompt_type: str, search_mode: str, r
         final_state = await workflow_app.ainvoke(initial_state)
         return final_state
     except Exception as e:
-        logging.exception(f"Workflow execution failed: {e}")
+        logger.exception(f"Workflow execution failed: {e}")
         raise
 #==============
 async def run_research_pipeline(session_id: str, request: ResearchRequest):
@@ -222,14 +225,12 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
             })
 
 #====================
+
 # --- API Endpoints ---
 @app.get("/")
 async def root():
-    return {
-        "message": "CRYSTAL DEEPSEARCH API is running",
-        "status": "active",
-        "timestamp": datetime.now().isoformat(),
-    }
+    """Root endpoint for health check."""
+    return {"message": "CRYSTAL DEEPSEARCH API is running", "status": "active", "timestamp": datetime.now().isoformat()}
 
 @app.post("/api/research")
 async def start_research(request: ResearchRequest, background_tasks: BackgroundTasks):
@@ -319,32 +320,24 @@ async def get_research_result(session_id: str):
 
 @app.get("/api/research/sessions")
 async def list_research_sessions(limit: int = 10, offset: int = 0):
+    """List research sessions with pagination."""
     if not db:
         raise HTTPException(status_code=503, detail="Firestore client not available")
     query = db.collection("research_sessions").order_by("created_at", direction=firestore.Query.DESCENDING).limit(limit).offset(offset)
     sessions = [doc.to_dict() for doc in query.stream()]
-    return {
-        "sessions": sessions[offset : offset + limit],
-        "total": len(sessions),
-        "limit": limit,
-        "offset": offset,
-    }
+    return {"success": True, "data": {"sessions": sessions[offset : offset + limit], "total": len(sessions), "limit": limit, "offset": offset}}
 
 @app.delete("/api/research/{session_id}")
 async def delete_research_session(session_id: str):
+    """Delete a research session and its associated report files."""
     if not db:
         logger.warning("Firestore client not available. Cannot delete report files from Firestore.")
         raise HTTPException(status_code=503, detail="Firestore client not available")
-
     session_ref = db.collection("research_sessions").document(session_id)
     session_doc = session_ref.get()
-
     if not session_doc.exists:
         raise HTTPException(status_code=404, detail="Research session not found")
-
     session = session_doc.to_dict()
-    
-    # Delete associated report files
     for key in ["analysis_filename", "appendix_filename"]:
         filename = session.get(key)
         if filename and db:
@@ -353,30 +346,21 @@ async def delete_research_session(session_id: str):
                 logger.info(f"Deleted report file from Firestore: {filename}")
             except Exception as e:
                 logger.warning(f"Failed to delete file {filename} from Firestore: {e}")
-
-    # Delete the session document itself
     session_ref.delete()
-
-    return APIResponse(success=True, message="Research session deleted successfully")
+    return {"success": True, "message": "Research session deleted successfully"}
 
 # --- File Download Endpoint ---
 @app.get("/api/download/{filename}")
 async def download_file_from_firestore(filename: str):
-    """
-    Downloads a report file directly from Firestore.
-    """
+    """Download a report file directly from Firestore."""
     if not db:
         raise HTTPException(status_code=503, detail="Firestore client not available")
-    
     try:
         doc_ref = db.collection("report_files").document(filename)
         doc = doc_ref.get()
-        
         if not doc.exists:
             raise HTTPException(status_code=404, detail="File not found in Firestore")
-            
         file_content = doc.to_dict().get("content")
-        
         return Response(content=file_content, media_type="text/plain", headers={
             'Content-Disposition': f'attachment; filename="{filename}"'
         })
@@ -384,9 +368,10 @@ async def download_file_from_firestore(filename: str):
         logger.error(f"Error retrieving file {filename} from Firestore: {e}")
         raise HTTPException(status_code=500, detail=f"Error retrieving file from Firestore: {str(e)}")
 
-# --- Health & Debug Endpoints ---
+# --- Health Endpoint ---
 @app.get("/api/health")
 async def health_check():
+    """Health check endpoint."""
     return {
         "status": "healthy",
         "timestamp": get_current_date(),
@@ -397,19 +382,12 @@ async def health_check():
         },
     }
 
-@app.get("/api/debug")
-async def debug_info():
-    return {
-        "google_api_key_set": bool(GOOGLE_API_KEY),
-        "serper_api_key_set": bool(SERPER_API_KEY),
-        "environment": os.getenv("ENVIRONMENT", "development"),
-        "python_path": sys.path[-3:],
-    }
 
 
-# Existing config info endpoint
+# Config endpoint (merged)
 @app.get("/api/config")
 async def get_config():
+    """Get config info and sources."""
     return {
         "prompt_types": ["general", "legal", "macro", "deepsearch", "person_search", "investment"],
         "limits": {
@@ -417,32 +395,11 @@ async def get_config():
             "max_words": 2000,
             "max_query_length": 500,
         },
+        "sources": CONFIG_SOURCES,
     }
 
-# New endpoint: config values and sources
-@app.get("/api/config/values")
-async def get_config_values():
-    """
-    Returns all config keys, their values, and source (env or default).
-    """
-    return CONFIG_SOURCES
 
 
-# --- Firestore Retrieval Endpoint ---
-@app.get("/api/research/{session_id}/firestore_result")
-async def get_firestore_result(session_id: str):
-    if not db:
-        raise HTTPException(status_code=503, detail="Firestore client not available")
-    try:
-        doc_ref = db.collection("research_reports").document(session_id)
-        doc = doc_ref.get()
-        if doc.exists:
-            return doc.to_dict()
-        else:
-            raise HTTPException(status_code=404, detail="Report not found in Firestore")
-    except Exception as e:
-        logger.error(f"Error retrieving report from Firestore: {e}")
-        raise HTTPException(status_code=500, detail="Error retrieving report from Firestore")
 
 #=======================================
 
