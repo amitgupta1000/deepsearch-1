@@ -552,6 +552,15 @@ async def fast_search_results_to_final_urls(state: AgentState) -> AgentState:
     """
     Go straight from search results to deduplication and save results in final_urls (no LLM evaluation).
     """
+    # Normalize retrieval_method
+    retrieval_method = state.get("retrieval_method", "hybrid")
+    if retrieval_method in ["file_storage", "fss", "fss_retriever"]:
+        retrieval_method = "file_search"
+    elif retrieval_method not in ["hybrid", "file_search"]:
+        retrieval_method = "hybrid"
+    state["retrieval_method"] = retrieval_method
+    logger.info(f"[fast_search_results_to_final_urls] retrieval_method: {retrieval_method}")
+
     search_queries = state.get("search_queries", []) or []
     existing_data = state.get("data", []) or []
     visited_urls = set(state.get("visited_urls", []) or [])
@@ -612,9 +621,10 @@ async def fast_search_results_to_final_urls(state: AgentState) -> AgentState:
         "data": final_data,
         "visited_urls": list(visited_urls),
         "final_urls": final_urls,
+        "retrieval_method": retrieval_method,
         "error": "\n".join(errors) if errors else None
     })
-    logger.info(f"fast_search_results_to_final_urls: Final URLs count: {len(final_urls)}")
+    logger.info(f"fast_search_results_to_final_urls: Final URLs count: {len(final_urls)} | retrieval_method: {retrieval_method}")
     return state
 #=============================================================================================
 async def extract_content(state: AgentState) -> AgentState:
@@ -1277,7 +1287,13 @@ async def write_report(state: AgentState) -> AgentState:
     appendix_content = ""
     analysis_filename = None
     appendix_filename = None
-    retrieval_method = state.get("retrieval_method")
+    retrieval_method = state.get("retrieval_method", "hybrid")
+    if retrieval_method in ["file_storage", "fss", "fss_retriever"]:
+        retrieval_method = "file_search"
+    else:
+        retrieval_method = "hybrid"
+    state["retrieval_method"] = retrieval_method
+    logger.info(f"[write_report] retrieval_method: {retrieval_method}")
     prompt_type = state.get("prompt_type")
     file_store_name = state.get("file_store_name")
     print("[DEBUG] Entering write_report")
