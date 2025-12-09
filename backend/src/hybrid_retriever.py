@@ -5,7 +5,7 @@ This version uses standard LangChain components for ensemble retrieval and reran
 making it more maintainable and easier to understand.
 """
 
-import logging
+from .logging_setup import logger
 from typing import List, Dict, Optional, Tuple, Any
 
 # Type definitions and fallbacks
@@ -18,7 +18,7 @@ try:
     from langchain_classic.retrievers import ContextualCompressionRetriever
     from langchain_classic.retrievers.document_compressors import CrossEncoderReranker
 except ImportError as e:
-    logging.warning(f"LangChain imports failed: {e}. Using fallback types.")
+    logger.warning(f"LangChain imports failed: {e}. Using fallback types.")
     class Document:
         def __init__(self, page_content="", metadata=None):
             self.page_content = page_content
@@ -33,7 +33,7 @@ try:
     from langchain_community.cross_encoders import HuggingFaceCrossEncoder
     CROSS_ENCODER_AVAILABLE = True
 except ImportError:
-    logging.warning("HuggingFaceCrossEncoder not available. Reranking will be disabled.")
+    logger.warning("HuggingFaceCrossEncoder not available. Reranking will be disabled.")
     HuggingFaceCrossEncoder = None
     CROSS_ENCODER_AVAILABLE = False
 
@@ -52,7 +52,7 @@ try:
         RERANK_TOP_K
     )
 except ImportError:
-    logging.warning("Could not import from config. Using default values for retriever.")
+    logger.warning("Could not import from config. Using default values for retriever.")
     RETRIEVAL_TOP_K = 20
     HYBRID_VECTOR_WEIGHT = 0.6
     HYBRID_BM25_WEIGHT = 0.4
@@ -85,7 +85,8 @@ class HybridRetriever:
         self.bm25_retriever = None
         self.final_retriever = None
         self.documents = []
-        self.logger = logging.getLogger(self.__class__.__name__)
+        from .logging_setup import logger
+        self.logger = logger
 
     def build_index(self, relevant_contexts: Dict[str, Dict[str, str]]) -> bool:
         """
@@ -281,4 +282,4 @@ def create_hybrid_retriever(embeddings=None) -> HybridRetriever:
     return HybridRetriever(embeddings=embeddings)
 
 
-logging.info("hybrid_retriever.py loaded successfully")
+logger.info("hybrid_retriever.py loaded successfully")

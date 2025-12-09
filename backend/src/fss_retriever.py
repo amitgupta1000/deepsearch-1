@@ -1,7 +1,7 @@
 from google import genai
 from google.genai import types
 import asyncio
-import logging
+from .logging_setup import logger
 from typing import Dict, Any, Optional
 import uuid
 import io
@@ -14,13 +14,13 @@ from backend.src.config import GOOGLE_MODEL
 try:
     from .api_keys import GOOGLE_API_KEY
 except ImportError:
-    logging.error("Could not import API keys from api_keys.py. LLMs and embeddings may not initialize.")
+    logger.error("Could not import API keys from api_keys.py. LLMs and embeddings may not initialize.")
     GOOGLE_API_KEY = None
 
 try:
     from .config import GOOGLE_MODEL
 except ImportError:
-    logging.error("Could not import GOOGLE_MODEL from config.py. Using default model.")
+    logger.error("Could not import GOOGLE_MODEL from config.py. Using default model.")
     GOOGLE_MODEL = "gemini-2.0-flash"
 
 # Configure the generative AI library with the API key
@@ -51,17 +51,17 @@ class GeminiFileSearchRetriever:
 
     async def create_and_upload_contexts(self, relevant_contexts: Dict[str, Dict[str, Any]]) -> Optional[str]:
         if not relevant_contexts:
-            logging.warning("[FSS] No relevant contexts provided to upload.")
+            logger.warning("[FSS] No relevant contexts provided to upload.")
             return None
 
         try:
             # 1. Create the Store
-            logging.info(f"[FSS] Creating File Search Store: '{self.display_name}'")
+            logger.info(f"[FSS] Creating File Search Store: '{self.display_name}'")
             self._file_search_store_obj = await self.async_client.file_search_stores.create(
                 config=types.CreateFileSearchStoreConfig(display_name=self.display_name)
             )
             self.file_store_name = self._file_search_store_obj.name
-            logging.info(f"[FSS] Store created successfully: {self.file_store_name}")
+            logger.info(f"[FSS] Store created successfully: {self.file_store_name}")
 
             upload_ops = []
 
@@ -74,7 +74,7 @@ class GeminiFileSearchRetriever:
                 file_stream = io.BytesIO(content_text.encode("utf-8"))
                 clean_name = url[-128:] if len(url) > 128 else url # Truncate long URLs for display name
 
-                logging.info(f"[FSS] Uploading in-memory stream for: {url}")
+                logger.info(f"[FSS] Uploading in-memory stream for: {url}")
                 op = await self.async_client.file_search_stores.upload_to_file_search_store(
                     file=file_stream,
                     file_search_store_name=self.file_store_name, # Corrected parameter name
@@ -86,12 +86,12 @@ class GeminiFileSearchRetriever:
                 upload_ops.append(op)
 
             if not upload_ops:
-                logging.warning("[FSS] No valid content to upload after filtering. Deleting empty store.")
+                logger.warning("[FSS] No valid content to upload after filtering. Deleting empty store.")
                 await self.delete_store()
                 return None
 
             # 3. Wait for indexing to finish
-            logging.info(f"[FSS] Waiting for remote indexing of {len(upload_ops)} files...")
+            logger.info(f"[FSS] Waiting for remote indexing of {len(upload_ops)} files...")
             for op in upload_ops:
                 op_name = op.name
                 current_op = op
@@ -101,11 +101,11 @@ class GeminiFileSearchRetriever:
                 if current_op.error:
                     raise Exception(f"File upload and indexing failed for operation {op.name}: {op.error.message}")
 
-            logging.info(f"[FSS] All {len(upload_ops)} memory contents indexed successfully in store {self.file_store_name}.")
+            logger.info(f"[FSS] All {len(upload_ops)} memory contents indexed successfully in store {self.file_store_name}.")
             return self.file_store_name # Return the store name on success
 
         except Exception as e:
-            logging.error(f"[FSS] Error during store creation or upload: {e}", exc_info=True)
+            logger.error(f"[FSS] Error during store creation or upload: {e}", exc_info=True)
             # Attempt to clean up if the store was created
             if self.file_store_name:
                 await self.delete_store()
@@ -157,7 +157,7 @@ class GeminiFileSearchRetriever:
             final_instruction = system_instruction if system_instruction else intellisearch_prompt
 
             # Generate content using the file search tool
-            logging.info(f"[FSS] Answering question '{query}' using store '{file_store_name}'")
+            logger.info(f"[FSS] Answering question '{query}' using store '{file_store_name}'")
             response = await self.async_client.models.generate_content(
                 model="gemini-1.5-flash-latest",  # gemini_model # Use a valid model that supports File Search
                 contents=query,
@@ -171,7 +171,7 @@ class GeminiFileSearchRetriever:
             return response.text
 
         except Exception as e:
-            logging.error(f"[FSS] Error in answer_question: {e}", exc_info=True)
+            logger.error(f"[FSS] Error in answer_question: {e}", exc_info=True)
             raise
         finally:
             await self.delete_store()
@@ -180,14 +180,14 @@ class GeminiFileSearchRetriever:
         """Deletes the File Search Store associated with this instance."""
         if self.file_store_name:
             try:
-                logging.info(f"[FSS] Listing files in store {self.file_store_name} for deletion.")
+                logger.info(f"[FSS] Listing files in store {self.file_store_name} for deletion.")
                 # List all files in the store to delete them first.
                 # The API has changed: list all files and filter by store name.
                 all_files_pager = self.client.files.list(page_size=1000)
                 delete_tasks = []
                 for file in all_files_pager:
                     if hasattr(file, 'file_search_store_name') and file.file_search_store_name == self.file_store_name:
-                        logging.info(f"[FSS] Scheduling deletion for file: {file.name}")
+                        logger.info(f"[FSS] Scheduling deletion for file: {file.name}")
                         delete_tasks.append(self.async_client.files.delete(name=file.name))
                 await asyncio.gather(*delete_tasks, return_exceptions=True)
                 logger.info(f"[FSS] All files in store {self.file_store_name} have been deleted.")

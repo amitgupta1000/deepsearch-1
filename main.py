@@ -15,7 +15,7 @@ try:
     db = firestore.Client()
 except ImportError:
     db = None
-    logging.warning("google-cloud-firestore not installed. Firestore features will be disabled.")
+    logger.warning("google-cloud-firestore not installed. Firestore features will be disabled.")
 from backend.src.config import CONFIG_SOURCES
 
 import uvicorn
@@ -33,14 +33,8 @@ def get_current_date():
     return datetime.now().strftime("%Y-%m-%d")
 
 
-# Log to file with timestamp, level, and message
-logging.basicConfig(
-    level=logging.INFO,
-    filename="crystal_rag_chatbot.log",
-    filemode="w",  # Use "w" to overwrite each run, "a" to append
-    format="%(asctime)s %(levelname)s %(name)s %(message)s"
-)
-logger = logging.getLogger(__name__)
+# Use the custom logger from logging_setup.py for all logging
+from backend.src.logging_setup import logger  # Reuse existing logger setup
 
 app = FastAPI(
     title="CRYSTAL DEEPSEARCH API",
@@ -173,7 +167,7 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
             })
 
         result = await run_workflow(request.query, request.prompt_type, request.search_mode, request.retrieval_method, session_id)
-        logging.info(f"[run_research_pipeline] Workflow result: {result}")
+        logger.info(f"[run_research_pipeline] Workflow result: {result}")
 
         # --- Workflow Summary Log ---
         if result:
@@ -193,7 +187,7 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
             if error_message:
                 summary_lines.append(f"Workflow Errors:    Yes (see logs for details)")
             summary_lines.append("="*70 + "\n")
-            logging.info('\n'.join(summary_lines))
+            logger.info('\n'.join(summary_lines))
 
         session_update = {}
         if result:
@@ -249,12 +243,16 @@ async def start_research(request: ResearchRequest, background_tasks: BackgroundT
 
     session_id = str(uuid.uuid4())
     now = datetime.now()
+    # Normalize retrieval_method to 'file_search' if user provides 'file_storage'
+    normalized_method = request.retrieval_method
+    if normalized_method == "file_storage":
+        normalized_method = "file_search"
     session_data = {
         # "session_id": session_id, # The document ID is the session_id
         "query": request.query,
         "status": "pending",
         "prompt_type": request.prompt_type,
-        "retrieval_method": request.retrieval_method,  # Save retriever choice
+        "retrieval_method": normalized_method,  # Save retriever choice
         "created_at": now,
         "updated_at": now,
         "progress": 0,
@@ -277,13 +275,13 @@ async def start_research(request: ResearchRequest, background_tasks: BackgroundT
 async def get_research_status(session_id: str):
     if not db:
         raise HTTPException(status_code=503, detail="Firestore client not available")
-    
+
     doc_ref = db.collection("research_sessions").document(session_id)
     doc = doc_ref.get()
 
     if not doc.exists:
         raise HTTPException(status_code=404, detail="Research session not found")
-    
+
     session_data = doc.to_dict()
     return {
         "session_id": session_id,

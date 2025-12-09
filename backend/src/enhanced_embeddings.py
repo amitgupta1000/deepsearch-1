@@ -4,7 +4,7 @@ Enhanced embedding implementation using direct Google AI client with task type s
 Uses the latest gemini-embedding-001 model with proper task configuration.
 """
 
-import logging
+from .logging_setup import logger
 import asyncio
 from typing import List, Dict, Any, Optional, Union
 import numpy as np
@@ -15,7 +15,7 @@ try:
     from langchain_core.embeddings import Embeddings
     LANGCHAIN_EMBEDDINGS_AVAILABLE = True
 except ImportError as e:
-    logging.warning(f"LangChain Embeddings base class not available: {e}")
+    logger.warning(f"LangChain Embeddings base class not available: {e}")
     LANGCHAIN_EMBEDDINGS_AVAILABLE = False
     # Fallback base class
     class Embeddings:
@@ -31,7 +31,7 @@ try:
     from google.genai.types import EmbedContentConfig
     GOOGLE_GENAI_AVAILABLE = True
 except ImportError as e:
-    logging.warning(f"Google GenAI not available: {e}")
+    logger.warning(f"Google GenAI not available: {e}")
     GOOGLE_GENAI_AVAILABLE = False
 
 # Task type configurations for different use cases
@@ -104,15 +104,15 @@ class EnhancedGoogleEmbeddings(Embeddings):
         
         # Validate output dimensionality
         if not (128 <= output_dimensionality <= 3072):
-            logging.warning(f"Output dimensionality {output_dimensionality} may not be optimal. "
+            logger.warning(f"Output dimensionality {output_dimensionality} may not be optimal. "
                           "Recommended: 768, 1536, or 3072")
         
         # Auto-enable normalization for non-3072 dimensions
         if output_dimensionality != 3072 and not normalize_embeddings:
-            logging.info(f"Auto-enabling normalization for {output_dimensionality} dimensions")
+            logger.info(f"Auto-enabling normalization for {output_dimensionality} dimensions")
             self.normalize_embeddings = True
         
-        logging.info(f"Initialized Enhanced Google Embeddings: {model} "
+        logger.info(f"Initialized Enhanced Google Embeddings: {model} "
                     f"(task: {default_task_type}, dim: {output_dimensionality})")
     
     def _create_embed_config(self, task_type: Optional[str] = None) -> EmbedContentConfig:
@@ -133,7 +133,7 @@ class EnhancedGoogleEmbeddings(Embeddings):
         norm = np.linalg.norm(embedding_array)
         
         if norm == 0:
-            logging.warning("Zero norm encountered in embedding normalization")
+            logger.warning("Zero norm encountered in embedding normalization")
             return embedding
         
         return (embedding_array / norm).tolist()
@@ -165,14 +165,14 @@ class EnhancedGoogleEmbeddings(Embeddings):
                 return embeddings
                 
             except Exception as e:
-                logging.warning(f"Embedding attempt {attempt + 1} failed: {e}")
+                logger.warning(f"Embedding attempt {attempt + 1} failed: {e}")
                 if attempt == self.max_retries - 1:
-                    logging.error(f"All embedding attempts failed for task_type={task_type}")
+                    logger.error(f"All embedding attempts failed for task_type={task_type}")
                     raise
                 
                 # Exponential backoff
                 wait_time = 2 ** attempt
-                logging.info(f"Retrying in {wait_time} seconds...")
+                logger.info(f"Retrying in {wait_time} seconds...")
                 import time
                 time.sleep(wait_time)
         
@@ -207,11 +207,11 @@ class EnhancedGoogleEmbeddings(Embeddings):
                 all_embeddings.extend(batch_embeddings)
                 
                 if len(batch_texts) > 1:
-                    logging.info(f"Embedded batch {i//self.batch_size + 1} "
+                    logger.info(f"Embedded batch {i//self.batch_size + 1} "
                                f"({len(batch_texts)} documents) with task_type={task_type}")
                 
             except Exception as e:
-                logging.error(f"Failed to embed batch {i//self.batch_size + 1}: {e}")
+                logger.error(f"Failed to embed batch {i//self.batch_size + 1}: {e}")
                 # Add empty embeddings for failed batch
                 empty_embedding = [0.0] * self.output_dimensionality
                 all_embeddings.extend([empty_embedding] * len(batch_texts))
@@ -241,7 +241,7 @@ class EnhancedGoogleEmbeddings(Embeddings):
             return embeddings[0] if embeddings else [0.0] * self.output_dimensionality
             
         except Exception as e:
-            logging.error(f"Failed to embed query: {e}")
+            logger.error(f"Failed to embed query: {e}")
             return [0.0] * self.output_dimensionality
     
     # LangChain-compatible interface methods (required for FAISS compatibility)
@@ -288,11 +288,11 @@ class EnhancedGoogleEmbeddings(Embeddings):
                 all_embeddings.extend(batch_embeddings)
                 
                 if len(batch_texts) > 1:
-                    logging.info(f"Embedded batch {i//self.batch_size + 1} "
+                    logger.info(f"Embedded batch {i//self.batch_size + 1} "
                                f"({len(batch_texts)} documents) with task_type={task_type}")
                 
             except Exception as e:
-                logging.error(f"Failed to embed batch {i//self.batch_size + 1}: {e}")
+                logger.error(f"Failed to embed batch {i//self.batch_size + 1}: {e}")
                 # Add empty embeddings for failed batch
                 empty_embedding = [0.0] * self.output_dimensionality
                 all_embeddings.extend([empty_embedding] * len(batch_texts))
@@ -322,7 +322,7 @@ class EnhancedGoogleEmbeddings(Embeddings):
             return embeddings[0] if embeddings else [0.0] * self.output_dimensionality
             
         except Exception as e:
-            logging.error(f"Failed to embed query: {e}")
+            logger.error(f"Failed to embed query: {e}")
             return [0.0] * self.output_dimensionality
     
     # Specialized methods for different use cases
@@ -447,4 +447,4 @@ def create_enhanced_embeddings(
     )
 
 
-logging.info("enhanced_embeddings.py loaded successfully")
+logger.info("enhanced_embeddings.py loaded successfully")

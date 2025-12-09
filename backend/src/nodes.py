@@ -1,6 +1,7 @@
-from .logging_setup import logger
 import logging, json, re, asyncio
 from typing import Dict, Any, List, Optional
+from .logging_setup import logger
+from backend.src.fss_capacity_check import get_fss_storage_usage
 
 # Try to import optional dependencies with fallbacks
 try:
@@ -106,7 +107,7 @@ from typing import Any
 try:
     from backend.src.fss_retriever import GeminiFileSearchRetriever, delete_gemini_file_search_store
 except ImportError as e:
-    logging.error(f"Failed to import GeminiFileSearchRetriever: {e}")
+    logger.error(f"Failed to import GeminiFileSearchRetriever: {e}")
     GeminiFileSearchRetriever = None
 try:
     from .utils import (
@@ -214,7 +215,7 @@ except ImportError:
     MAX_AI_ITERATIONS = 1
     MAX_USER_QUERY_LOOPS = 1
     DEFAULT_USER_AGENT = "intellISearch-bot/1.0"
-    DEFAULT_REFERER = "https://example.com"
+    DEFAULT_REFERER = "https://www.google.com"
     URL_TIMEOUT = 45
     SKIP_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mp3', '.zip', '.exe']
     BLOCKED_DOMAINS = []
@@ -279,7 +280,7 @@ try:
     from langchain_community.vectorstores import FAISS # Assuming using FAISS
 
 except ImportError:
-    logging.error("Could not import necessary LangChain components. Embedding and indexing may fail.")
+    logger.error("Could not import necessary LangChain components. Embedding and indexing may fail.")
     
     # Create fallback text splitter
     class RecursiveCharacterTextSplitter:
@@ -342,7 +343,6 @@ class AgentState(TypedDict):
     max_ai_iterations: Optional[int]
 
 
-
 # Pydantic models for LLM output validation (moved from initial cells)
 class SearchQueryResponse(BaseModel):
     """Represents the expected JSON structure from the create_queries LLM call."""
@@ -369,7 +369,7 @@ async def create_queries(state: AgentState) -> AgentState:
 
     # Get prompt type from state
     prompt_type = state.get("prompt_type", "general") # Default to general
-    logging.info(f"Using prompt type '%s' for query generation.", prompt_type)
+    logger.info(f"Using prompt type '%s' for query generation.", prompt_type)
 
     # Select the correct prompt template based on prompt_type
     query_writer_instructions = query_writer_instructions_general # Default
@@ -396,7 +396,7 @@ async def create_queries(state: AgentState) -> AgentState:
     # If there are suggested follow-up queries from a previous AI evaluation and we haven't exceeded max iterations,
     # use them directly instead of asking the LLM to generate new ones based on the original query.
     if suggested_queries and current_iteration < MAX_AI_ITERATIONS and state.get("qa_pairs"):
-         logging.info("Using %d suggested follow-up queries from previous iteration.", len(suggested_queries))
+         logger.info("Using %d suggested follow-up queries from previous iteration.", len(suggested_queries))
          generated_search_queries.update(suggested_queries)
          rationale = f"Refining search based on the previous evaluation's suggested queries ({len(suggested_queries)} queries)."
          # Clear suggested_follow_up_queries after using them
@@ -408,7 +408,7 @@ async def create_queries(state: AgentState) -> AgentState:
 
 
     # Proceed with initial query generation if no suggested queries or max iterations reached
-    logging.info("Generating initial search queries based on user query: %s", new_query)
+    logger.info("Generating initial search queries based on user query: %s", new_query)
 
     # Use dynamic config from state, fallback to global config
     number_queries = state.get("max_search_queries", MAX_SEARCH_QUERIES)
@@ -447,46 +447,46 @@ async def create_queries(state: AgentState) -> AgentState:
 
                         if isinstance(search_queries, list) and all(isinstance(q, str) for q in search_queries):
                             generated_search_queries.update(search_queries)
-                            logging.info("Generated %d search queries.", len(generated_search_queries))
+                            logger.info("Generated %d search queries.", len(generated_search_queries))
                         else:
                             # This case should ideally be caught by Pydantic validation, but keeping as a safeguard
                             error = "LLM response 'query' key is not a valid list of strings after Pydantic parsing."
-                            logging.error(f"{error} Response: {response.content}")
+                            logger.error(f"{error} Response: {response.content}")
 
                     except ValidationError as e:
                         error = f"Pydantic validation error parsing search queries: {e}. JSON String: {cleaned_json_string}"
-                        logging.error(error)
+                        logger.error(error)
                     except json.JSONDecodeError as e:
                         error = f"JSON decoding error parsing search queries: {e}. JSON String: {cleaned_json_string}"
-                        logging.error(error)
+                        logger.error(error)
                     except Exception as e:
                         error = f"An unexpected error occurred parsing search queries: {e}. JSON String: {cleaned_json_string}"
-                        logging.error(error)
+                        logger.error(error)
 
                 else:
                     error = "Could not find JSON block in LLM response for query generation."
-                    logging.error(f"{error} Response: {response}")
+                    logger.error(f"{error} Response: {response}")
 
 
             else:
                 error = "No or invalid response received from LLM for query generation."
-                logging.error(error)
+                logger.error(error)
 
         except Exception as e:
             error = f"An unexpected error occurred during LLM call for query generation: {e}"
-            logging.error(error)
+            logger.error(error)
 
 
     else:
         if not new_query:
             error = "No initial query provided in state."
-            logging.warning(error)
+            logger.warning(error)
         elif not llm_call_async:
              error = "Primary LLM is not initialized. Cannot generate queries."
-             logging.error(error)
+             logger.error(error)
         elif not query_writer_instructions:
              error = f"Prompt instructions for type '{prompt_type}' not loaded. Cannot generate queries."
-             logging.error(error)
+             logger.error(error)
 
 
     state['rationale'] = rationale if rationale else "No rationale generated."
@@ -537,7 +537,7 @@ async def evaluate_search_results(state: AgentState) -> AgentState:
     errors = []
 
     if not search_queries:
-        logging.warning("No search queries found to evaluate.")
+        logger.warning("No search queries found to evaluate.")
         state.update({
             "data": existing_data,
             "visited_urls": list(visited_urls),
@@ -548,7 +548,7 @@ async def evaluate_search_results(state: AgentState) -> AgentState:
 
     if not UnifiedSearcher:
         error_msg = "UnifiedSearcher class not available. Cannot perform search."
-        logging.error(error_msg)
+        logger.error(error_msg)
         state.update({
             "data": [],
             "visited_urls": list(visited_urls),
@@ -597,10 +597,10 @@ async def evaluate_search_results(state: AgentState) -> AgentState:
             answer_l = answer.strip().lower()
             verdict = "yes" if "yes" in answer_l else "no"
             snippet_cache[snippet_hash] = verdict
-            logging.info(f"LLM verdict for {url}: {verdict}")
+            logger.info(f"LLM verdict for {url}: {verdict}")
             return result if verdict == "yes" else None
         except asyncio.TimeoutError:
-            logging.warning(f"Timeout evaluating {url}")
+            logger.warning(f"Timeout evaluating {url}")
             return None
         except Exception as e:
             error_msg = f"Error evaluating {url}: {type(e).__name__} - {e}"
@@ -617,7 +617,7 @@ async def evaluate_search_results(state: AgentState) -> AgentState:
             continue
 
         if not result_set:
-            logging.info(f"No results for query: {query}")
+            logger.info(f"No results for query: {query}")
             errors.append(f"No results returned for query: {query}")
             continue
 
@@ -641,7 +641,7 @@ async def evaluate_search_results(state: AgentState) -> AgentState:
 
     final_urls = [item.url for item in final_data if hasattr(item, 'url')]
     print(f"Final URLs for extraction (first 5): {final_urls[:5]}")
-    logging.info(f"evaluate_search_results: Final data size: {len(final_data)}")
+    logger.info(f"evaluate_search_results: Final data size: {len(final_data)}")
     return state
 #=============================================================================================
 
@@ -672,7 +672,7 @@ async def extract_content(state: AgentState) -> AgentState:
 
     if not Scraper:
          errors.append("Scraper class not available. Cannot extract content.")
-         logging.error(errors[-1])
+         logger.error(errors[-1])
          state["relevant_contexts"] = {} # Ensure relevant_contexts is initialized
          # Append new errors to existing ones in state
          current_error = state.get('error', '') or ''
@@ -682,7 +682,7 @@ async def extract_content(state: AgentState) -> AgentState:
 
     # Check if data is empty
     if not data:
-        logging.info("No data found to extract content from.")
+        logger.info("No data found to extract content from.")
         state["relevant_contexts"] = {} # Ensure relevant_contexts is initialized
         # Append new errors to existing ones in state
         current_error = state.get('error', '') or ''
@@ -694,7 +694,7 @@ async def extract_content(state: AgentState) -> AgentState:
     valid_data = [item for item in data if isinstance(item, SearchResult) and item.url and item.snippet]
 
     if not valid_data:
-         logging.info("No valid data found for ranking.")
+         logger.info("No valid data found for ranking.")
          state["relevant_contexts"] = {}
          # Append new errors to existing ones in state
          current_error = state.get('error', '') or ''
@@ -710,11 +710,11 @@ async def extract_content(state: AgentState) -> AgentState:
         # Use the imported rank_urls
         ranked_urls = rank_urls(ranking_query, [item.url for item in valid_data], context_for_ranking)
     else:
-        logging.info("No query available for ranking URLs. Proceeding without ranking.")
+        logger.info("No query available for ranking URLs. Proceeding without ranking.")
         ranked_urls = [item.url for item in valid_data] # Use original order if no query
 
     urls_to_process = ranked_urls[:30] # limit to top 30 urls
-    logging.info("Relevant and ranked URLs for extraction: %s", urls_to_process)
+    logger.info("Relevant and ranked URLs for extraction: %s", urls_to_process)
 
     # Get the list of previously failed URLs
     failed_urls = state.get('failed_urls', []) or []
@@ -723,7 +723,7 @@ async def extract_content(state: AgentState) -> AgentState:
     urls_to_process = [url for url in urls_to_process if url not in failed_urls]
     if len(ranked_urls[:30]) > len(urls_to_process):
         skipped_count = len(ranked_urls[:30]) - len(urls_to_process)
-        logging.info("Skipped %d previously failed URLs", skipped_count)
+        logger.info("Skipped %d previously failed URLs", skipped_count)
 
     # Initialize the Scraper
     scraper = Scraper()
@@ -738,14 +738,14 @@ async def extract_content(state: AgentState) -> AgentState:
         # Check for blocked domains
         if any(domain in url.lower() for domain in BLOCKED_DOMAINS):
             blocked_domain = next(domain for domain in BLOCKED_DOMAINS if domain in url.lower())
-            logging.info("Skipping blocked domain URL (%s): %s", blocked_domain, url)
+            logger.info("Skipping blocked domain URL (%s): %s", blocked_domain, url)
             continue # Skip blocked domain URLs
 
         # Check for other file extensions to skip
         skipped = False
         for ext in skip_extensions:
             if url.lower().endswith(ext):
-                logging.info("Skipping URL with unsupported extension %s: %s", ext, url)
+                logger.info("Skipping URL with unsupported extension %s: %s", ext, url)
                 skipped = True
                 break
         if skipped:
@@ -766,56 +766,56 @@ async def extract_content(state: AgentState) -> AgentState:
                     extracted_content = scraped_content.text[:10000] if scraped_content.text else "" # Limit to 10k characters
                     extracted_title = scraped_content.title if scraped_content.title else "Untitled"
                     print(f"[EXTRACT SUCCESS] {target_url}")
-                    logging.info("Successfully extracted content from %s", target_url)
+                    logger.info("Successfully extracted content from %s", target_url)
                     return target_url, {"content": extracted_content, "title": extracted_title} # Return URL and content/title dict
                 else:
                     print(f"[EXTRACT FAIL] {target_url} | Error: {scraped_content.error}")
                     # If scraping failed but didn't timeout, log the error and use snippet if available
                     error_msg = f"Scraping failed for {target_url}: {scraped_content.error}"
-                    logging.error(error_msg)
+                    logger.error(error_msg)
                     # Fallback to snippet if scraping failed for a non-timeout reason
                     original_result = url_to_search_result.get(target_url)
                     if original_result and original_result.snippet:
-                        logging.info("Using snippet as fallback for %s after scraping failure.", target_url)
+                        logger.info("Using snippet as fallback for %s after scraping failure.", target_url)
                         fallback_title = original_result.title if hasattr(original_result, 'title') and original_result.title else "Untitled"
                         return target_url, {"content": original_result.snippet[:10000], "title": fallback_title} # Use truncated snippet with title
                     else:
                         # If no snippet, return None for content
-                        logging.warning("No snippet available for fallback for %s", target_url)
+                        logger.warning("No snippet available for fallback for %s", target_url)
                         return target_url, None
 
             except asyncio.TimeoutError:
                 # Handle timeout: Use snippet as fallback
-                logging.warning(f"Processing timed out for URL: {target_url} after {url_timeout}s.")
+                logger.warning(f"Processing timed out for URL: {target_url} after {url_timeout}s.")
                 # Fallback to snippet if the URL was originally from search results
                 if target_url in url_to_search_result:
                     original_result = url_to_search_result[target_url]
                     if original_result.snippet:
-                        logging.info("Using snippet as fallback for %s after timeout.", target_url)
+                        logger.info("Using snippet as fallback for %s after timeout.", target_url)
                         fallback_title = original_result.title if hasattr(original_result, 'title') and original_result.title else "Untitled"
                         return target_url, {"content": original_result.snippet[:10000], "title": fallback_title}
                     else:
-                        logging.warning("No snippet available for fallback after timeout for %s", target_url)
+                        logger.warning("No snippet available for fallback after timeout for %s", target_url)
                         return target_url, None
                 else:
-                    logging.warning("No snippet fallback available or applicable for %s after timeout.", target_url)
+                    logger.warning("No snippet fallback available or applicable for %s after timeout.", target_url)
                     return target_url, None
 
             except Exception as e:
                 # Handle any other unexpected exceptions during processing
                 error_msg = f"An unexpected error occurred processing {target_url}: {e}"
-                logging.error(error_msg, exc_info=True)
+                logger.error(error_msg, exc_info=True)
                 if target_url in url_to_search_result:
                     original_result = url_to_search_result[target_url]
                     if original_result.snippet:
-                        logging.info("Using snippet as fallback for %s after unexpected error.", target_url)
+                        logger.info("Using snippet as fallback for %s after unexpected error.", target_url)
                         fallback_title = original_result.title if hasattr(original_result, 'title') and original_result.title else "Untitled"
                         return target_url, {"content": original_result.snippet[:10000], "title": fallback_title}
                     else:
-                        logging.warning("No snippet available for fallback after unexpected error for %s", target_url)
+                        logger.warning("No snippet available for fallback after unexpected error for %s", target_url)
                         return target_url, None
                 else:
-                    logging.warning("No snippet fallback available or applicable for %s after unexpected error.", target_url)
+                    logger.warning("No snippet fallback available or applicable for %s after unexpected error.", target_url)
                     return target_url, None
 
         # Add the processing task for this URL
@@ -824,7 +824,7 @@ async def extract_content(state: AgentState) -> AgentState:
     # Run all processing tasks concurrently
     processed_results = await asyncio.gather(*processing_tasks)
 
-    logging.info(f"extract_content: Finished all URL processing tasks. Processing {len(processed_results)} results.")
+    logger.info(f"extract_content: Finished all URL processing tasks. Processing {len(processed_results)} results.")
 
     # Track failed URLs to avoid revisiting them
     new_failed_urls = []
@@ -837,7 +837,7 @@ async def extract_content(state: AgentState) -> AgentState:
              # If content_data is None, it means extraction/fallback failed or was skipped
              # Add this URL to the failed URLs list to avoid revisiting it
              new_failed_urls.append(url)
-             logging.info(f"Adding URL to failed list: {url}")
+             logger.info(f"Adding URL to failed list: {url}")
 
     # Update the failed URLs list in state
     current_failed_urls = state.get('failed_urls', []) or []
@@ -845,7 +845,7 @@ async def extract_content(state: AgentState) -> AgentState:
     state['failed_urls'] = updated_failed_urls
     
     if new_failed_urls:
-        logging.info(f"Added {len(new_failed_urls)} URLs to failed list. Total failed URLs: {len(updated_failed_urls)}")
+        logger.info(f"Added {len(new_failed_urls)} URLs to failed list. Total failed URLs: {len(updated_failed_urls)}")
 
     state["relevant_contexts"] = relevant_contexts
 
@@ -855,14 +855,14 @@ async def extract_content(state: AgentState) -> AgentState:
     if not relevant_contexts and valid_data:
          summary_error = "Failed to extract usable content from any relevant URLs."
          errors.append(summary_error)
-         logging.error(summary_error)
+         logger.error(summary_error)
 
 
     current_error = state.get('error', '') or ''
     state['error'] = (current_error + "\n" + "\n".join(errors)).strip() if errors else current_error.strip()
 
     # Add logging to inspect the final state["relevant_contexts"]
-    logging.info("extract_content: Final state['relevant_contexts'] contains %d items.", len(state.get('relevant_contexts', {})))
+    logger.info("extract_content: Final state['relevant_contexts'] contains %d items.", len(state.get('relevant_contexts', {})))
 
 
     return state
@@ -891,7 +891,7 @@ async def embed_and_retrieve(state: AgentState) -> AgentState:
 
     # Check if we have contexts to process
     if not relevant_contexts:
-        logging.warning("No relevant contexts found for embedding and retrieval.")
+        logger.warning("No relevant contexts found for embedding and retrieval.")
         new_error = (str(current_error_state or '') + "\nNo relevant contexts found for embedding and retrieval.").strip()
         state['error'] = None if new_error == "" else new_error
         return state
@@ -899,7 +899,7 @@ async def embed_and_retrieve(state: AgentState) -> AgentState:
     # Try hybrid retriever first
     if create_hybrid_retriever and embeddings and USE_HYBRID_RETRIEVAL:
         try:
-            logging.info("Using hybrid retriever (BM25 + Vector Search)")
+            logger.info("Using hybrid retriever (BM25 + Vector Search)")
             # Create hybrid retriever with configuration from config.py
             hybrid_retriever = create_hybrid_retriever(embeddings=embeddings)
             
@@ -912,17 +912,17 @@ async def embed_and_retrieve(state: AgentState) -> AgentState:
                 
                 if search_queries:
                     # Use the specific search queries for better relevance and capture individual responses
-                    logging.info(f"Using {len(search_queries)} specific search queries for retrieval")
+                    logger.info(f"Using {len(search_queries)} specific search queries for retrieval")
                     relevant_chunks, retriever_responses = hybrid_retriever.retrieve_with_query_responses(search_queries)
                     retrieval_method = "multi-query hybrid retrieval with responses"
                 elif original_query:
                     # Fallback to original query if no search queries available
-                    logging.info("Using original query for retrieval (fallback)")
+                    logger.info("Using original query for retrieval (fallback)")
                     relevant_chunks = hybrid_retriever.retrieve(original_query)
                     retriever_responses = {original_query: f"Retrieved {len(relevant_chunks)} documents for original query."}
                     retrieval_method = "single-query hybrid retrieval"
                 else:
-                    logging.warning("No retrieval queries found for hybrid retrieval.")
+                    logger.warning("No retrieval queries found for hybrid retrieval.")
                     relevant_chunks = []
                     retriever_responses = {}
                     retrieval_method = "no queries"
@@ -930,23 +930,23 @@ async def embed_and_retrieve(state: AgentState) -> AgentState:
                 if relevant_chunks:
                     # Log retrieval stats
                     stats = hybrid_retriever.get_stats()
-                    logging.info(f"Hybrid retrieval stats: {stats}")
-                    logging.info(f"Retrieved {len(relevant_chunks)} chunks using {retrieval_method}")
-                    logging.info(f"Captured {len(retriever_responses)} query responses")
+                    logger.info(f"Hybrid retrieval stats: {stats}")
+                    logger.info(f"Retrieved {len(relevant_chunks)} chunks using {retrieval_method}")
+                    logger.info(f"Captured {len(retriever_responses)} query responses")
                     
                     state["relevant_chunks"] = relevant_chunks
                     state["retriever_responses"] = retriever_responses
                     return state
                 else:
-                    logging.warning("No chunks retrieved from hybrid retrieval, falling back to standard approach")
+                    logger.warning("No chunks retrieved from hybrid retrieval, falling back to standard approach")
             else:
-                logging.warning("Failed to build hybrid retriever indices, falling back to standard approach")
+                logger.warning("Failed to build hybrid retriever indices, falling back to standard approach")
                 
         except Exception as e:
-            logging.error(f"Hybrid retriever failed: {e}, falling back to standard approach")
+            logger.error(f"Hybrid retriever failed: {e}, falling back to standard approach")
             errors.append(f"Hybrid retriever error: {str(e)}")
 
-    logging.error("Hybrid retriever failed and no fallback available")
+    logger.error("Hybrid retriever failed and no fallback available")
     errors.append("Hybrid retriever failed to build indices")
     new_error = (str(current_error_state or '') + "\n" + "\n".join(errors)).strip() if errors else (current_error_state.strip() if current_error_state is not None else None)
     state['error'] = None if new_error is None or new_error == "" else new_error
@@ -963,22 +963,22 @@ async def fss_retrieve(state: dict) -> dict:
     new_query = state.get("new_query", "")
     session_id = state.get("session_id", "default-session")
 
-    print("[DEBUG] Entering fss_retrieve")
-    logging.info(f"[FSS Node] Called for query: '{new_query}'. Contexts: {len(contexts_to_use)}")
+    logger.debug(f"[FSS Node] Entering fss_retrieve for query: '{new_query}' with {len(contexts_to_use)} contexts.")
 
     try:
         if not contexts_to_use:
-            logging.warning("[FSS Node] No relevant contexts available. Skipping FSS creation.")
+            logger.warning("[FSS Node] No relevant contexts available. Skipping FSS creation.")
             state["analysis_content"] = "No content was available to search for an answer."
             return state
 
         if not GeminiFileSearchRetriever:
-            logging.error("[FSS Node] GeminiFileSearchRetriever class not available.")
+            logger.error("[FSS Node] GeminiFileSearchRetriever class not available.")
             raise RuntimeError("GeminiFileSearchRetriever not available.")
 
         # The retriever now handles creation, querying, and deletion internally.
         retriever = GeminiFileSearchRetriever(display_name_prefix=f"crystal-{session_id}")
         answer = await retriever.answer_question(new_query, contexts_to_use)
+        logger.debug(f"[FSS Node] FSS response (first 300 chars): {answer[:300]}")
 
         # The answer from the file search is the main analysis content.
         state["analysis_content"] = answer
@@ -986,11 +986,11 @@ async def fss_retrieve(state: dict) -> dict:
         state["file_store_name"] = None
         # For FSS, the appendix is not generated in the same way.
         state["appendix_content"] = "Appendix not generated for File Search method. All content is synthesized in the main response."
-        logging.info(f"[FSS Node] Generated answer and stored it in 'analysis_content'.")
+        logger.info(f"[FSS Node] Generated answer and stored it in 'analysis_content'.")
 
     except Exception as e:
         error_msg = f"[FSS Node] failed: {e}"
-        logging.error(error_msg, exc_info=True)
+        logger.error(error_msg, exc_info=True)
         state["error"] = error_msg
         state["file_store_name"] = None
     return state
@@ -1009,7 +1009,7 @@ async def create_qa_pairs(state: AgentState) -> AgentState:
     # Retrieve current error state safely
     current_error_state = state.get('error')
     
-    logging.info(f"Creating Q&A pairs from {len(relevant_chunks)} chunks for {len(search_queries)} queries.")
+    logger.info(f"Creating Q&A pairs from {len(relevant_chunks)} chunks for {len(search_queries)} queries.")
     
     if not relevant_chunks:
         logging.warning("No relevant chunks available for Q&A creation.")

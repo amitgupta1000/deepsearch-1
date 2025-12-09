@@ -1,7 +1,7 @@
 # utils.py
 import re
 import json
-import logging
+from .logging_setup import logger
 import asyncio
 import time # Added time for cache timestamp
 
@@ -293,10 +293,10 @@ def save_report_to_text(report_content: str, filename: str) -> str:
             "content": report_content,
             "saved_at": __import__('datetime').datetime.now().isoformat()
         })
-        logging.info(f"Report saved to Firestore: {filename}")
+        logger.info(f"Report saved to Firestore: {filename}")
         return filename  # Return filename for reference
     except Exception as e:
-        logging.warning(f"Could not save report to Firestore: {e}")
+        logger.warning(f"Could not save report to Firestore: {e}")
         return ""
 
 
@@ -426,4 +426,4 @@ def enhance_conclusion_section(text: str) -> str:
 # formatted_text = enhance_conclusion_section(generated_text)
 
 
-logging.info("utils.py loaded with utility functions.")
+logger.info("utils.py loaded with utility functions.")
