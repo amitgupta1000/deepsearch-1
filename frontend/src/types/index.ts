@@ -2,6 +2,7 @@ export interface ResearchRequest {
   query: string;
   promptType?: string;
   search_mode?: 'fast' | 'ultra';
+  retrieval_method: 'hybrid' | 'file_search';
 }
 
 export interface ResearchResult {
