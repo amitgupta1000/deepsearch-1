@@ -553,11 +553,9 @@ async def fast_search_results_to_final_urls(state: AgentState) -> AgentState:
     Go straight from search results to deduplication and save results in final_urls (no LLM evaluation).
     """
     # Normalize retrieval_method
-    retrieval_method = state.get("retrieval_method", "hybrid")
-    if retrieval_method in ["file_storage", "fss", "fss_retriever"]:
+    retrieval_method = state.get("retrieval_method", "hybrid").lower()
+    if retrieval_method != "file_search":
         retrieval_method = "file_search"
-    elif retrieval_method not in ["hybrid", "file_search"]:
-        retrieval_method = "hybrid"
     state["retrieval_method"] = retrieval_method
     logger.info(f"[fast_search_results_to_final_urls] retrieval_method: {retrieval_method}")
 
@@ -1288,11 +1286,9 @@ async def write_report(state: AgentState) -> AgentState:
     analysis_filename = None
     appendix_filename = None
     retrieval_method = state.get("retrieval_method", "hybrid")
-    if retrieval_method in ["file_storage", "fss", "fss_retriever"]:
-        retrieval_method = "file_search"
-    else:
+    if retrieval_method != "file_search":
         retrieval_method = "hybrid"
-    state["retrieval_method"] = retrieval_method
+
     logger.info(f"[write_report] retrieval_method: {retrieval_method}")
     prompt_type = state.get("prompt_type")
     file_store_name = state.get("file_store_name")

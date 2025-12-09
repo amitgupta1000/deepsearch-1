@@ -1,24 +1,23 @@
 import os
 import uuid
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+# --- Third-party imports ---
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
 from backend.src.logging_setup import logger
-from backend.src.fss_capacity_check import get_fss_storage_usage
+import uvicorn
 
-# Firestore setup
+# --- Firestore and LangChain Setup ---
 try:
     from google.cloud import firestore
     db = firestore.Client()
 except ImportError:
     db = None
     logger.warning("google-cloud-firestore not installed. Firestore features will be disabled.")
-from backend.src.config import CONFIG_SOURCES
-
-import uvicorn
 
 try:
     from langchain_core.runnables import RunnableConfig
@@ -115,7 +114,7 @@ async def run_workflow(initial_query: str, prompt_type: str, search_mode: str, r
         max_iterations = MAX_AI_ITERATIONS
         logger.info(f"Running in 'fast' mode: {max_queries} queries, {max_results} results, {max_iterations} iterations.")
 
-    if retrieval_method == "file_search" or retrieval_method == "file_storage":
+    if retrieval_method == "file_search":
         logger.info("Using File Search retrieval method.")
     else:
         logger.info("Using Hybrid retrieval method.")
@@ -156,7 +155,7 @@ async def run_workflow(initial_query: str, prompt_type: str, search_mode: str, r
     except Exception as e:
         logger.exception(f"Workflow execution failed: {e}")
         raise
-#==============
+
 async def run_research_pipeline(session_id: str, request: ResearchRequest):
     try:
         if db:
@@ -172,7 +171,7 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
 
         # --- Workflow Summary Log ---
         if result:
-            retrieval_method = result.get("retrieval_method", "unknown")
+            retrieval_method = result.get("retrieval_method", "file_search")
             search_mode = "ultra" if result.get("max_search_queries", 0) > 10 else "fast"
             num_qa_pairs = len(result.get("qa_pairs", []))
             error_message = result.get("error")
@@ -222,8 +221,6 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
                 "status": "failed", "error_message": str(e), "current_step": f"Error: {str(e)}", "updated_at": datetime.now()
             })
 
-#====================
-
 # --- API Endpoints ---
 @app.get("/")
 async def root():
@@ -242,16 +239,13 @@ async def start_research(request: ResearchRequest, background_tasks: BackgroundT
 
     session_id = str(uuid.uuid4())
     now = datetime.now()
-    # Normalize retrieval_method to 'file_search' if user provides 'file_storage'
-    normalized_method = request.retrieval_method
-    if normalized_method == "file_storage":
-        normalized_method = "file_search"
+
     session_data = {
         # "session_id": session_id, # The document ID is the session_id
         "query": request.query,
         "status": "pending",
         "prompt_type": request.prompt_type,
-        "retrieval_method": normalized_method,  # Save retriever choice
+        "retrieval_method": request.retrieval_method,  # Save retriever choice
         "created_at": now,
         "updated_at": now,
         "progress": 0,
@@ -321,9 +315,9 @@ async def list_research_sessions(limit: int = 10, offset: int = 0):
     """List research sessions with pagination."""
     if not db:
         raise HTTPException(status_code=503, detail="Firestore client not available")
-    query = db.collection("research_sessions").order_by("created_at", direction=firestore.Query.DESCENDING).limit(limit).offset(offset)
+    query = db.collection("research_sessions").order_by("created_at", direction=firestore.Query.DESCENDING).offset(offset).limit(limit)
     sessions = [doc.to_dict() for doc in query.stream()]
-    return {"success": True, "data": {"sessions": sessions[offset : offset + limit], "total": len(sessions), "limit": limit, "offset": offset}}
+    return {"success": True, "data": {"sessions": sessions, "total": len(sessions), "limit": limit, "offset": offset}}
 
 @app.delete("/api/research/{session_id}")
 async def delete_research_session(session_id: str):
@@ -380,8 +374,7 @@ async def health_check():
         },
     }
 
-
-
+from backend.src.config import CONFIG_SOURCES
 # Config endpoint (merged)
 @app.get("/api/config")
 async def get_config():
@@ -396,13 +389,7 @@ async def get_config():
         "sources": CONFIG_SOURCES,
     }
 
-
-
-
-#=======================================
-
 if __name__ == "__main__":
-
     port = int(os.getenv("PORT", 8000))
     reload = os.getenv("ENVIRONMENT") != "production"
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=reload, loop="asyncio")

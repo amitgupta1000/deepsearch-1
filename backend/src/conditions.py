@@ -46,7 +46,7 @@ def route_retrieval_method(state: dict) -> str:
     """
     retrieval_method = state.get("retrieval_method", "hybrid")
     logging.info(f"Routing after extract_content, method: '{retrieval_method}'")
-    if retrieval_method in ("fss_retriever", "file_search", "file_storage", "fss"):
+    if retrieval_method == "file_search":
         return "fss_retrieve"
     else: # Default to hybrid path
         return "embed_and_retrieve"
