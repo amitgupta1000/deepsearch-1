@@ -167,11 +167,11 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
             })
 
         result = await run_workflow(request.query, request.prompt_type, request.search_mode, request.retrieval_method, session_id)
-        logger.info(f"[run_research_pipeline] Workflow result: {result}")
+        #logger.info(f"[run_research_pipeline] Workflow result: {result}")
 
         # --- Workflow Summary Log ---
         if result:
-            retrieval_method = result.get("retrieval_method", "file_search")
+            retrieval_method = result.get("retrieval_method", "unknown")
             search_mode = "ultra" if result.get("max_search_queries", 0) > 10 else "fast"
             num_qa_pairs = len(result.get("qa_pairs", []))
             error_message = result.get("error")
@@ -240,28 +240,31 @@ async def start_research(request: ResearchRequest, background_tasks: BackgroundT
     session_id = str(uuid.uuid4())
     now = datetime.now()
 
+    logger.info(f"[start_research] Received request: query='{request.query}', prompt_type='{request.prompt_type}', search_mode='{request.search_mode}', retrieval_method='{request.retrieval_method}'")
     session_data = {
-        # "session_id": session_id, # The document ID is the session_id
-        "query": request.query,
-        "status": "pending",
-        "prompt_type": request.prompt_type,
-        "retrieval_method": request.retrieval_method,  # Save retriever choice
-        "created_at": now,
-        "updated_at": now,
-        "progress": 0,
-        "current_step": "Queued",
-        "analysis_content": None,
-        "appendix_content": None,
-        "analysis_filename": None,
-        "appendix_filename": None,
-        "error_message": None,
+    # "session_id": session_id, # The document ID is the session_id
+    "query": request.query,
+    "status": "pending",
+    "prompt_type": request.prompt_type,
+    "retrieval_method": request.retrieval_method,  # Save retriever choice
+    "created_at": now,
+    "updated_at": now,
+    "progress": 0,
+    "current_step": "Queued",
+    "analysis_content": None,
+    "appendix_content": None,
+    "analysis_filename": None,
+    "appendix_filename": None,
+    "error_message": None,
     }
+    logger.info(f"[start_research] Creating session with retrieval_method='{request.retrieval_method}'")
     if db:
-        db.collection("research_sessions").document(session_id).set(session_data)
+        db.collection("research_sessions").document(session_id).set(session_data)   
     else:
         raise HTTPException(status_code=503, detail="Firestore client not available. Cannot start research.")
 
     background_tasks.add_task(run_research_pipeline, session_id, request)
+    logger.info(f"[start_research] Background task started for session_id='{session_id}' with retrieval_method='{request.retrieval_method}'")
     return {"session_id": session_id, "status": "started"}
 
 @app.get("/api/research/{session_id}/status")
@@ -375,7 +378,6 @@ async def health_check():
     }
 
 from backend.src.config import CONFIG_SOURCES
-# Config endpoint (merged)
 @app.get("/api/config")
 async def get_config():
     """Get config info and sources."""
