@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useReducer } from 'react';
 import type { ReactNode } from 'react';
 import type { ResearchState, ResearchRequest, ResearchResult } from '../types';
-// import { useAuthenticatedFetch } from './AuthContext';
+
 
 type ActivityLog = {
   id: string;

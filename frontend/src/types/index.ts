@@ -1,6 +1,6 @@
 export interface ResearchRequest {
   query: string;
-  promptType?: string;
+  prompt_type?: string;
   search_mode?: 'fast' | 'ultra';
   retrieval_method: 'hybrid' | 'file_search';
 }

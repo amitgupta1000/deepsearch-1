@@ -44,9 +44,13 @@ def route_retrieval_method(state: dict) -> str:
     Returns:
         str: The name of the next node.
     """
-    retrieval_method = state.get("retrieval_method", "hybrid")
+    retrieval_method = state.get("retrieval_method", "hybrid").lower() # Ensure case-insensitivity
     logging.info(f"Routing after extract_content, method: '{retrieval_method}'")
     if retrieval_method == "file_search":
-        return "fss_retrieve"
+        route = "fss_retrieve"
+        logging.info(f"Decision: Routing to '{route}' for file-based retrieval.")
+        return route
     else: # Default to hybrid path
-        return "embed_and_retrieve"
+        route = "embed_and_retrieve"
+        logging.info(f"Decision: Routing to '{route}' for hybrid retrieval.")
+        return route

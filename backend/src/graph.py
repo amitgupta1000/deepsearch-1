@@ -74,11 +74,9 @@ if all(node_name in workflow.nodes for node_name in ["create_queries", "fast_sea
     workflow.add_edge(START, "create_queries")
     workflow.add_edge("create_queries", "fast_search_results_to_final_urls")
 
-
 # Add sequential edges
 if "fast_search_results_to_final_urls" in workflow.nodes and "extract_content" in workflow.nodes:
     workflow.add_edge("fast_search_results_to_final_urls", "extract_content")
-
 
 
 workflow.add_conditional_edges(
@@ -107,7 +105,7 @@ if "fss_retrieve" in workflow.nodes and "write_report" in workflow.nodes:
 # After AI_evaluate, route based on proceed and retrieval_method
 workflow.add_conditional_edges(
     "AI_evaluate",
-    lambda state: "write_report" if state.get("proceed", True) else ("fss_retrieve" if state.get("retrieval_method") == "fss_retriever" else "fast_search_results_to_final_urls"),
+    lambda state: "write_report" if state.get("proceed", True) else "fast_search_results_to_final_urls",
     {
         "write_report": "write_report",
         "fss_retrieve": "fss_retrieve",

@@ -553,9 +553,7 @@ async def fast_search_results_to_final_urls(state: AgentState) -> AgentState:
     Go straight from search results to deduplication and save results in final_urls (no LLM evaluation).
     """
     # Normalize retrieval_method
-    retrieval_method = state.get("retrieval_method", "hybrid").lower()
-    if retrieval_method != "file_search":
-        retrieval_method = "file_search"
+    retrieval_method = state.get("retrieval_method", "file_search").lower() # Ensure it's lowercase for consistent comparison
     state["retrieval_method"] = retrieval_method
     logger.info(f"[fast_search_results_to_final_urls] retrieval_method: {retrieval_method}")
 
@@ -623,6 +621,8 @@ async def fast_search_results_to_final_urls(state: AgentState) -> AgentState:
         "error": "\n".join(errors) if errors else None
     })
     logger.info(f"fast_search_results_to_final_urls: Final URLs count: {len(final_urls)} | retrieval_method: {retrieval_method}")
+    
+    
     return state
 #=============================================================================================
 async def extract_content(state: AgentState) -> AgentState:
@@ -640,6 +640,9 @@ async def extract_content(state: AgentState) -> AgentState:
         RED = '\033[91m'
         ENDC = '\033[0m'
         YELLOW = '\033[93m'
+
+    # Preserve retrieval_method at the start of the function
+    original_retrieval_method = state.get("retrieval_method", "hybrid")
 
     from .config import URL_TIMEOUT
     data = state.get('data', []) # Original search results including snippets
@@ -842,8 +845,8 @@ async def extract_content(state: AgentState) -> AgentState:
 
     # Add logger to inspect the final state["relevant_contexts"]
     logger.info("extract_content: Final state['relevant_contexts'] contains %d items.", len(state.get('relevant_contexts', {})))
-
-
+    # Restore the original retrieval_method to prevent it from being lost
+    state["retrieval_method"] = original_retrieval_method
     return state
 #=============================================================================================
 async def embed_and_retrieve(state: AgentState) -> AgentState:
@@ -941,6 +944,7 @@ async def fss_retrieve(state: dict) -> dict:
     new_query = state.get("new_query", "")
     session_id = state.get("session_id", "default-session")
 
+    logger.info(f"[FSS Node] fss_retrieve received retrieval_method: '{state.get('retrieval_method')}'")
     logger.debug(f"[FSS Node] Entering fss_retrieve for query: '{new_query}' with {len(contexts_to_use)} contexts.")
     print (f"[DEBUG][fss_retrieve] contexts_to_use keys: {list(contexts_to_use.keys())[:5]}... (total {len(contexts_to_use)})")
     

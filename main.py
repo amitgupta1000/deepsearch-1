@@ -59,7 +59,7 @@ class ResearchRequest(BaseModel):
     query: str = Field(..., description="Research query or question")
     prompt_type: str = Field(default="general", description="Type of prompt to use for query generation.")
     search_mode: str = Field(default="fast", description="Search mode: 'fast' for quick results or 'ultra' for deep research.")
-    retrieval_method: str = Field(default="hybrid", description="Retrieval method: 'hybrid' or 'file_search'.")
+    retrieval_method: str = Field(description="Retrieval method: 'hybrid' or 'file_search'.")
 
 class ResearchSession(BaseModel):
     session_id: str

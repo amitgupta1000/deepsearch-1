@@ -7,8 +7,9 @@ const ResearchForm: React.FC = () => {
   const { startResearch, state } = useResearch();
   const [query, setQuery] = useState('');
   const [promptType, setPromptType] = useState('general');
-  const [searchMode, setSearchMode] = useState('fast'); // Add searchMode state
-  const [retrievalMethod, setRetrievalMethod] = useState('hybrid');
+  const [searchMode, setSearchMode] = useState<'fast' | 'ultra'>('fast');
+  const [retrievalMethod, setRetrievalMethod] = useState<'file_search' | 'hybrid'>('file_search');
+
 
 
   const promptTypes = [
@@ -26,8 +27,8 @@ const ResearchForm: React.FC = () => {
 
     const request: ResearchRequest = {
       query: query.trim(),
-      promptType,
-      search_mode: searchMode as 'fast' | 'ultra',
+      prompt_type: promptType,
+      search_mode: searchMode, 
       retrieval_method: retrievalMethod,
     };
 
@@ -168,8 +169,8 @@ const ResearchForm: React.FC = () => {
                     disabled={state.isLoading}
                     className={`px-4 py-1 text-sm font-semibold rounded-full transition-colors ${
                       retrievalMethod === 'hybrid'
-                        ? 'bg-primary-600 text-white shadow'
-                        : 'text-gray-600 hover:bg-gray-300'
+                        ? 'bg-primary-600 text-white shadow' // Active style
+                        : 'text-gray-600 hover:bg-gray-300' // Inactive style
                     }`}
                   >
                     Hybrid
