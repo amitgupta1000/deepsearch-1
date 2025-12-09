@@ -2,10 +2,9 @@
 # All configuration values loaded from environment variables (.env file)
 
 import os
-import logging
-logger = logging.getLogger(__name__)
 from typing import List, Any, Callable
 import sys
+from .logging_setup import logger
 
 # Dictionary to track config values and their sources
 CONFIG_SOURCES = {}
@@ -134,7 +133,6 @@ MIN_CHUNK_LENGTH = get_env_int("MIN_CHUNK_LENGTH", 50)
 MIN_WORD_COUNT = get_env_int("MIN_WORD_COUNT", 10)
 USE_MULTI_QUERY_RETRIEVAL = get_env_bool("USE_MULTI_QUERY_RETRIEVAL", True)
 
-import logging
 MAX_RETRIEVAL_QUERIES = get_env_int("MAX_RETRIEVAL_QUERIES", 5)
 QUERY_CHUNK_DISTRIBUTION = get_env_bool("QUERY_CHUNK_DISTRIBUTION", True)
 USE_HYBRID_RETRIEVAL = get_env_bool("USE_HYBRID_RETRIEVAL", True)
@@ -151,7 +149,7 @@ MAX_RESULTS = MAX_SEARCH_RESULTS
 MAX_RETRIES = MAX_SEARCH_RETRIES
 
 # Log cross-encoder reranking config at startup
-logging.info(f"USE_CROSS_ENCODER_RERANKING={USE_CROSS_ENCODER_RERANKING}, CROSS_ENCODER_MODEL={CROSS_ENCODER_MODEL}, CROSS_ENCODER_TOP_K={CROSS_ENCODER_TOP_K}, RERANK_TOP_K={RERANK_TOP_K}, CROSS_ENCODER_BATCH_SIZE={CROSS_ENCODER_BATCH_SIZE}")
+logger.info(f"USE_CROSS_ENCODER_RERANKING={USE_CROSS_ENCODER_RERANKING}, CROSS_ENCODER_MODEL={CROSS_ENCODER_MODEL}, CROSS_ENCODER_TOP_K={CROSS_ENCODER_TOP_K}, RERANK_TOP_K={RERANK_TOP_K}, CROSS_ENCODER_BATCH_SIZE={CROSS_ENCODER_BATCH_SIZE}")
 
 
 # =============================================================================
@@ -262,17 +260,17 @@ def validate_config():
     # Log results
     if errors:
         for error in errors:
-            logging.error(f"Configuration error: {error}")
+            logger.error(f"Configuration error: {error}")
     if warnings:
         for warning in warnings:
-            logging.warning(f"Configuration warning: {warning}")
+            logger.warning(f"Configuration warning: {warning}")
     
     return len(errors) == 0
 
 # Validate configuration on import
 config_valid = validate_config()
 
-logging.info("config.py loaded successfully with unified environment-based configuration")
+logger.info("config.py loaded successfully with unified environment-based configuration")
 
 # Export commonly used values for backward compatibility
 __all__ = [

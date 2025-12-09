@@ -1,14 +1,15 @@
 #scraper.py
-import logging, time, asyncio, os
+import time, asyncio, os
 from urllib.parse import urlparse
 from typing import Dict, Any, List, Optional, Union
 from dataclasses import dataclass, field
-
+from .logging_setup import logger
+from backend.src.fss_capacity_check import get_fss_storage_usage
 # Try to import config with fallback
 try:
     from .config import CACHE_ENABLED, CACHE_TTL
 except ImportError:
-    logging.warning("Could not import config. Using default cache settings.")
+    logger.warning("Could not import config. Using default cache settings.")
     CACHE_ENABLED = True
     CACHE_TTL = 3600
 
@@ -46,14 +47,14 @@ try:
 
     if cache_enabled:
         cache = SimpleCache(ttl=cache_ttl)
-        logger = logging.getLogger(__name__)
+        logger = logger.getLogger(__name__)
         logger.info(f"Cache initialized with TTL={cache_ttl}s")
     else:
         cache = None # Cache disabled
         logger.info("Caching is disabled.")
 
 except NameError as e:
-    logger = logging.getLogger(__name__)
+    logger = logger.getLogger(__name__)
     logger.warning(f"Cache related variable not found: {e}. Caching will be disabled.")
     cache = None
 #=======================================================================================
@@ -141,7 +142,7 @@ class Scraper:
                 try:
                     await session.close()
                 except Exception as e:
-                    logging.debug(f"Error closing session: {e}")
+                    logger.debug(f"Error closing session: {e}")
 
     async def _scrape_with_playwright(self, url: str) -> ScrapedContent:
         from playwright.async_api import async_playwright
@@ -202,7 +203,7 @@ class Scraper:
             return ScrapedContent(url=url, success=False, error=str(e), scrape_time=time.time() - start)
 
     async def scrape_url(self, url: str, dynamic: bool = False) -> ScrapedContent:
-        logging.info(f"Scraping: {url}")
+        logger.info(f"Scraping: {url}")
 
         # Check cache
         if self._cache_enabled and self.cache:
@@ -211,7 +212,7 @@ class Scraper:
                 try:
                     return ScrapedContent(**cached)
                 except Exception as e:
-                    logging.warning(f"Cache load failed: {e}")
+                    logger.warning(f"Cache load failed: {e}")
 
         # Strategy list
         strategies = [
@@ -223,7 +224,7 @@ class Scraper:
         # Execute strategies
         for strategy in strategies:
             result = await strategy(url)
-            logging.debug(f"{strategy.__name__} took {result.scrape_time:.2f}s")
+            logger.debug(f"{strategy.__name__} took {result.scrape_time:.2f}s")
             # Patch: Ensure ScrapedContent always has title and text
             if not getattr(result, "title", None):
                 result.title = url
@@ -234,7 +235,7 @@ class Scraper:
                     self.cache.set(url, result.to_dict())
                 return result
             else:
-                logging.warning(f"{strategy.__name__} failed: {result.error}")
+                logger.warning(f"{strategy.__name__} failed: {result.error}")
 
         # Patch: Always return ScrapedContent with required fields
         return ScrapedContent(url=url, title=url, text="", success=False, error="All strategies failed.")

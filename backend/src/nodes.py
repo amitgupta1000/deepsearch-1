@@ -1,5 +1,4 @@
-import logging, json, re, asyncio
-logger = logging.getLogger(__name__)
+import json, re, asyncio
 from typing import Dict, Any, List, Optional
 from .logging_setup import logger
 from backend.src.fss_capacity_check import get_fss_storage_usage
@@ -569,19 +568,19 @@ async def evaluate_search_results(state: AgentState) -> AgentState:
         url, snippet = getattr(result, 'url', None), getattr(result, 'snippet', None)
         if not url or url in visited_urls or url in failed_urls or not snippet:
             if url in failed_urls:
-                logging.debug(f"Skipping previously failed URL: {url}")
+                logger.debug(f"Skipping previously failed URL: {url}")
             return None
 
         # Check for blocked domains
         if any(domain in url.lower() for domain in BLOCKED_DOMAINS):
             blocked_domain = next(domain for domain in BLOCKED_DOMAINS if domain in url.lower())
-            logging.debug(f"Skipping blocked domain URL (%s): %s", blocked_domain, url)
+            logger.debug(f"Skipping blocked domain URL (%s): %s", blocked_domain, url)
             return None
 
         snippet_hash = hash_snippet(url, snippet)
         cached = snippet_cache.get(snippet_hash)
         if cached:
-            logging.debug(f"Using cached verdict for {url}: {cached}")
+            logger.debug(f"Using cached verdict for {url}: {cached}")
             return result if cached == "yes" else None
 
         messages = [
@@ -605,7 +604,7 @@ async def evaluate_search_results(state: AgentState) -> AgentState:
             return None
         except Exception as e:
             error_msg = f"Error evaluating {url}: {type(e).__name__} - {e}"
-            logging.exception(error_msg)
+            logger.exception(error_msg)
             errors.append(error_msg)
             return None
 
@@ -862,7 +861,7 @@ async def extract_content(state: AgentState) -> AgentState:
     current_error = state.get('error', '') or ''
     state['error'] = (current_error + "\n" + "\n".join(errors)).strip() if errors else current_error.strip()
 
-    # Add logging to inspect the final state["relevant_contexts"]
+    # Add logger to inspect the final state["relevant_contexts"]
     logger.info("extract_content: Final state['relevant_contexts'] contains %d items.", len(state.get('relevant_contexts', {})))
 
 
@@ -1013,7 +1012,7 @@ async def create_qa_pairs(state: AgentState) -> AgentState:
     logger.info(f"Creating Q&A pairs from {len(relevant_chunks)} chunks for {len(search_queries)} queries.")
     
     if not relevant_chunks:
-        logging.warning("No relevant chunks available for Q&A creation.")
+        logger.warning("No relevant chunks available for Q&A creation.")
         state["qa_pairs"] = []
         state["all_citations"] = []
         new_error = (str(current_error_state or '') + "\nNo relevant chunks available for Q&A creation.").strip()
@@ -1024,7 +1023,7 @@ async def create_qa_pairs(state: AgentState) -> AgentState:
         return state
     
     if not search_queries:
-        logging.warning("No search queries available for Q&A creation.")
+        logger.warning("No search queries available for Q&A creation.")
         state["qa_pairs"] = []
         state["all_citations"] = []
         new_error = (str(current_error_state or '') + "\nNo search queries available for Q&A creation.").strip()
@@ -1087,7 +1086,7 @@ async def create_qa_pairs(state: AgentState) -> AgentState:
         # Store Q&A pairs and all citations in state
         state["qa_pairs"] = qa_pairs
         state["all_citations"] = all_citations
-        logging.info(f"Created {len(qa_pairs)} Q&A pairs with {len(all_citations)} total citations.")
+        logger.info(f"Created {len(qa_pairs)} Q&A pairs with {len(all_citations)} total citations.")
         
         # Print sample text from the first 2 QA pairs if available
         qa_pairs = state.get("qa_pairs", [])
@@ -1100,7 +1099,7 @@ async def create_qa_pairs(state: AgentState) -> AgentState:
 
     except Exception as e:
         error_msg = f"Error creating Q&A pairs: {e}"
-        logging.error(error_msg, exc_info=True)
+        logger.error(error_msg, exc_info=True)
         state["qa_pairs"] = []
         state["all_citations"] = []
         new_error = (str(current_error_state or '') + "\n" + error_msg).strip()
@@ -1124,7 +1123,7 @@ async def AI_evaluate(state: AgentState) -> AgentState:
     original_query = state.get("new_query", "")
     search_queries = state.get("search_queries", [])
     
-    logging.info("AI Evaluation started: evaluating %d Q&A pairs for original query coverage.", len(qa_pairs))
+    logger.info("AI Evaluation started: evaluating %d Q&A pairs for original query coverage.", len(qa_pairs))
 
     state["search_iteration_count"] = state.get("search_iteration_count", 0) + 1
     # Use dynamic config from state, fallback to global config
@@ -1135,13 +1134,13 @@ async def AI_evaluate(state: AgentState) -> AgentState:
     if not llm_call_async:
         msg = "LLM not initialized. Skipping AI evaluation."
         errors.append(msg)
-        logging.error(msg)
+        logger.error(msg)
         state['error'] = msg
         return state
 
     if not qa_pairs:
         msg = f"No Q&A pairs available for evaluation ({state['search_iteration_count']}/{max_iterations})."
-        logging.warning(msg)
+        logger.warning(msg)
         if state["search_iteration_count"] < max_iterations:
             state["proceed"] = False
             state['suggested_follow_up_queries'] = []
@@ -1208,18 +1207,18 @@ async def AI_evaluate(state: AgentState) -> AgentState:
                 state["proceed"] = True
                 state["suggested_follow_up_queries"] = []
                 state["knowledge_gap"] = ""
-                logging.info("AI_evaluate: Q&A pairs provide sufficient coverage, proceeding to report.")
+                logger.info("AI_evaluate: Q&A pairs provide sufficient coverage, proceeding to report.")
             else:
                 state["proceed"] = False
                 state["suggested_follow_up_queries"] = eval_result.follow_up_queries
                 state["knowledge_gap"] = eval_result.knowledge_gap
-                logging.info("AI_evaluate: Q&A pairs insufficient, generating follow-up queries.")
+                logger.info("AI_evaluate: Q&A pairs insufficient, generating follow-up queries.")
 
         else:
             raise ValueError("JSON block not found in response.")
 
     except Exception as e:
-        logging.exception("AI_evaluate error: %s", e)
+        logger.exception("AI_evaluate error: %s", e)
         state["proceed"] = True
         state["suggested_follow_up_queries"] = []
         state["knowledge_gap"] = f"Fallback triggered due to error: {e}"
@@ -1227,7 +1226,7 @@ async def AI_evaluate(state: AgentState) -> AgentState:
 
     # Final check for iteration cap
     if not state["proceed"] and state["search_iteration_count"] >= max_iterations:
-        logging.warning("Max iterations reached. Forcing report generation.")
+        logger.warning("Max iterations reached. Forcing report generation.")
         state["proceed"] = True
         state["suggested_follow_up_queries"] = []
         state["knowledge_gap"] = "Max iterations hit. Report generated with available Q&A pairs."
@@ -1316,7 +1315,7 @@ async def write_report(state: AgentState) -> AgentState:
     prompt_type = state.get("prompt_type")
     file_store_name = state.get("file_store_name")
     print("[DEBUG] Entering write_report")
-    logging.info(f"--- Entering write_report node for session '{short_session_id}' ---")
+    logger.info(f"--- Entering write_report node for session '{short_session_id}' ---")
 
     #==============#=============================
     # PART 1: Original User Query (common for both methods)
@@ -1326,7 +1325,7 @@ async def write_report(state: AgentState) -> AgentState:
         # PART 2: Generate IntelliSearch Response
     if retrieval_method == "file_search":
         # Always use FSS answer for main analysis
-        logging.info("Report Method: Using pre-generated response from File Search.")
+        logger.info("Report Method: Using pre-generated response from File Search.")
         intellisearch_response = state.get("analysis_content", "Analysis from File Search was not found.")
         part2_response = f"## 2. IntelliSearch Response\n\n{intellisearch_response}\n\n---\n"
         analysis_content = part1_query + part2_response
@@ -1355,7 +1354,7 @@ async def write_report(state: AgentState) -> AgentState:
                         for citation in all_citations:
                             appendix_content += f"[{citation['number']}] {citation['title']} - {citation['url']}\n"
             except Exception as e:
-                logging.error(f"Error generating appendix with hybrid retriever: {e}")
+                logger.error(f"Error generating appendix with hybrid retriever: {e}")
                 appendix_content = "Appendix could not be generated due to an error."
 
         # Ensure file store is deleted after session closes
@@ -1365,19 +1364,19 @@ async def write_report(state: AgentState) -> AgentState:
                     delete_gemini_file_search_store(state["file_store_name"])
                 state["file_store_name"] = None
         except Exception as e:
-            logging.error(f"Error deleting file store: {e}")
+            logger.error(f"Error deleting file store: {e}")
 
     elif not relevant_contexts:
-        logging.warning(f"No relevant contexts found for topic: '{research_topic}'. Generating empty report.")
+        logger.warning(f"No relevant contexts found for topic: '{research_topic}'. Generating empty report.")
         analysis_content = f"Could not generate a report. No Q&A pairs were created for the topic: '{research_topic}'."
         appendix_content = "No appendix available."
         errors.append(analysis_content)
 
     else: # Hybrid Retriever with Q&A pairs
-        logging.info(f"Report Method: Generating response using {len(qa_pairs)} Q&A pairs.")
+        logger.info(f"Report Method: Generating response using {len(qa_pairs)} Q&A pairs.")
         try:
             # PART 2: Generate IntelliSearch Response using LLM analysis on QA Pairs
-            logging.info("Synthesizing main analysis from Q&A pairs...")
+            logger.info("Synthesizing main analysis from Q&A pairs...")
             qa_context = "Based on the following Q&A analysis:\n\n"
             for i, qa in enumerate(qa_pairs):
                 qa_context += f"Q{i+1}: {qa['question']}\nA{i+1}: {qa['answer'][:2500]}...\n\n"
@@ -1414,7 +1413,7 @@ async def write_report(state: AgentState) -> AgentState:
             part2_response = f"## 2. IntelliSearch Response\n\n{intellisearch_response}\n\n---\n"
 
             # PART 3: Appendix with Q&A pairs and citations
-            logging.info("Generating appendix with detailed Q&A and sources...")
+            logger.info("Generating appendix with detailed Q&A and sources...")
             part3_appendix = "#3. Appendix: Research Q&A and Sources\n\n# Research Questions and Detailed Answers\n"
             all_citations = []
             citation_counter = 1
@@ -1452,11 +1451,11 @@ async def write_report(state: AgentState) -> AgentState:
             raw_appendix += f"\n---\n*Appendix generated on {get_current_date()}. Powered by INTELLISEARCH Research Platform.*\n"
             appendix_content = format_research_report(raw_appendix)
 
-            logging.info("Analysis and appendix content formatted successfully.")
+            logger.info("Analysis and appendix content formatted successfully.")
 
         except Exception as e:
             error_msg = f"Error during report generation: {e}"
-            logging.error(error_msg, exc_info=True)
+            logger.error(error_msg, exc_info=True)
             errors.append(error_msg)
             analysis_content = f"Failed to generate report: {error_msg}"
             appendix_content = "Not available due to an error."
@@ -1475,7 +1474,7 @@ async def write_report(state: AgentState) -> AgentState:
             analysis_filename = f"{short_session_id}_analysis.txt"
             try:
                 db.collection("report_files").document(analysis_filename).set({"content": analysis_content})
-                logging.info(f"Successfully saved analysis report to Firestore: {analysis_filename}")
+                logger.info(f"Successfully saved analysis report to Firestore: {analysis_filename}")
             except Exception as e:
                 errors.append(f"Failed to save analysis to Firestore: {e}")
 
@@ -1483,7 +1482,7 @@ async def write_report(state: AgentState) -> AgentState:
             appendix_filename = f"{short_session_id}_appendix.txt"
             try:
                 db.collection("report_files").document(appendix_filename).set({"content": appendix_content})
-                logging.info(f"Successfully saved appendix report to Firestore: {appendix_filename}")
+                logger.info(f"Successfully saved appendix report to Firestore: {appendix_filename}")
             except Exception as e:
                 errors.append(f"Failed to save appendix to Firestore: {e}")
 
@@ -1509,8 +1508,8 @@ async def write_report(state: AgentState) -> AgentState:
         'rationale': "",
         'iteration_count': 0,
     })
-    logging.info("Report generation completed. State updated.")
+    logger.info("Report generation completed. State updated.")
     return state
 
-logging.info("nodes.py loaded with LangGraph node functions.")
+logger.info("nodes.py loaded with LangGraph node functions.")
 #=============================================================================================

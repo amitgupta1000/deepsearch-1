@@ -6,6 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
+from backend.src.logging_setup import logger
+from backend.src.fss_capacity_check import get_fss_storage_usage
 
 # Firestore setup
 try:
@@ -29,10 +31,6 @@ SERPER_API_KEY = os.getenv("SERPER_API_KEY", "")
 
 def get_current_date():
     return datetime.now().strftime("%Y-%m-%d")
-
-
-# Use the custom logger from logging_setup.py for all logging
-from backend.src.logging_setup import logger  # Reuse existing logger setup
 
 app = FastAPI(
     title="CRYSTAL DEEPSEARCH API",

@@ -5,8 +5,6 @@ from .logging_setup import logger
 from typing import Dict, Any, Optional
 import uuid
 import io
-
-from .logging_setup import logger
 from backend.src.fss_capacity_check import get_fss_storage_usage
 from backend.src.config import GOOGLE_MODEL
 

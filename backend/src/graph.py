@@ -1,7 +1,7 @@
 # graph.py
 # This file defines the LangGraph workflow.
-
-import logging
+from .logging_setup import logger
+from backend.src.fss_capacity_check import get_fss_storage_usage
 
 # Try to import LangGraph; provide a minimal fallback for static linting/runtime without the package
 try:
@@ -22,7 +22,7 @@ except (ImportError, Exception):
         def add_conditional_edges(self, node, route_fn, mapping):
             pass
         def compile(self):
-            logging.info("Fallback StateGraph.compile() called — no-op.")
+            logger.info("Fallback StateGraph.compile() called — no-op.")
             return None
 
 from typing import TypedDict, Optional, List, Dict, Any # Import necessary types
@@ -45,7 +45,7 @@ try:
     )
 except ImportError as e:
     import logging
-    logging.exception("Error importing nodes: %s. Cannot define graph.", e)
+    logger.exception("Error importing nodes: %s. Cannot define graph.", e)
     
 # Initialize StateGraph
 workflow = StateGraph(AgentState)
@@ -121,7 +121,7 @@ if "write_report" in workflow.nodes:
 # Compile the workflow if nodes were successfully added
 try:
     app = workflow.compile()
-    logging.info("LangGraph workflow compiled successfully.")
+    logger.info("LangGraph workflow compiled successfully.")
 except Exception as e:
-    logging.exception("Error compiling LangGraph workflow: %s", e)
+    logger.exception("Error compiling LangGraph workflow: %s", e)
     app = None # Set app to None if compilation fails
