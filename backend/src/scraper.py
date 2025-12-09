@@ -47,7 +47,6 @@ try:
 
     if cache_enabled:
         cache = SimpleCache(ttl=cache_ttl)
-        logger = logger.getLogger(__name__)
         logger.info(f"Cache initialized with TTL={cache_ttl}s")
     else:
         cache = None # Cache disabled

@@ -512,28 +512,50 @@ from typing import List
 def hash_snippet(url: str, snippet: str) -> str:
     return hashlib.sha256(f"{url}|{snippet}".encode()).hexdigest()
 
-async def evaluate_search_results(state: AgentState) -> AgentState:
-    """
-    Consolidated and robust evaluate_search_results implementation.
-    - Uses UnifiedSearcher to run concurrent searches
-    - Uses an LLM to validate snippets with timeout handling
-    - Caches snippet verdicts in state['snippet_cache']
-    - Deduplicates results and preserves previous data
-    """
-    import hashlib
-    def hash_snippet(url: str, snippet: str) -> str:
-        return hashlib.sha256(f"{url}|{snippet}".encode()).hexdigest()
 
-    try:
-            from .config import RED, ENDC, YELLOW
-    except ImportError:
-        RED, ENDC, YELLOW = '\033[91m', '\033[0m', '\033[93m'
+# --- LLM Evaluation Function (Preserved for Future Use) ---
+async def llm_evaluate_snippets(state: AgentState, search_results: list, visited_urls: set, failed_urls: set, snippet_cache: dict) -> list:
+    """
+    Evaluate search result snippets using LLM. Returns a filtered list of results deemed relevant by the LLM.
+    """
+    async def evaluate_snippet(result, query: str):
+        url, snippet = getattr(result, 'url', None), getattr(result, 'snippet', None)
+        if not url or url in visited_urls or url in failed_urls or not snippet:
+            return None
+        if any(domain in url.lower() for domain in BLOCKED_DOMAINS):
+            return None
+        snippet_hash = hash_snippet(url, snippet)
+        cached = snippet_cache.get(snippet_hash)
+        if cached:
+            return result if cached == "yes" else None
+        messages = [
+            SystemMessage(content=web_search_validation_instructions.format(
+                query=query,
+                current_date=get_current_date()
+            )),
+            HumanMessage(content=f"Snippet: {snippet}")
+        ]
+        try:
+            response = await asyncio.wait_for(llm_call_async(messages), timeout=15)
+            answer = response if isinstance(response, str) else getattr(response, 'content', '') or ''
+            answer_l = answer.strip().lower()
+            verdict = "yes" if "yes" in answer_l else "no"
+            snippet_cache[snippet_hash] = verdict
+            return result if verdict == "yes" else None
+        except Exception:
+            return None
+    # This function is not used in the main workflow for now.
+    return []
 
+# --- Fast Search Results to Deduplication Workflow ---
+async def fast_search_results_to_final_urls(state: AgentState) -> AgentState:
+    """
+    Go straight from search results to deduplication and save results in final_urls (no LLM evaluation).
+    """
     search_queries = state.get("search_queries", []) or []
     existing_data = state.get("data", []) or []
     visited_urls = set(state.get("visited_urls", []) or [])
-    failed_urls = set(state.get("failed_urls", []) or [])  # Get failed URLs
-    snippet_cache = state.get("snippet_cache", {}) or {}
+    failed_urls = set(state.get("failed_urls", []) or [])
     errors = []
 
     if not search_queries:
@@ -542,7 +564,6 @@ async def evaluate_search_results(state: AgentState) -> AgentState:
             "data": existing_data,
             "visited_urls": list(visited_urls),
             "error": state.get('error'),
-            "snippet_cache": snippet_cache
         })
         return state
 
@@ -553,7 +574,6 @@ async def evaluate_search_results(state: AgentState) -> AgentState:
             "data": [],
             "visited_urls": list(visited_urls),
             "error": error_msg,
-            "snippet_cache": snippet_cache
         })
         return state
 
@@ -564,88 +584,39 @@ async def evaluate_search_results(state: AgentState) -> AgentState:
     search_tasks = [search_engine.search(q) for q in search_queries]
     search_results_list = await asyncio.gather(*search_tasks, return_exceptions=True)
 
-    async def evaluate_snippet(result, query: str):
-        url, snippet = getattr(result, 'url', None), getattr(result, 'snippet', None)
-        if not url or url in visited_urls or url in failed_urls or not snippet:
-            if url in failed_urls:
-                logger.debug(f"Skipping previously failed URL: {url}")
-            return None
-
-        # Check for blocked domains
-        if any(domain in url.lower() for domain in BLOCKED_DOMAINS):
-            blocked_domain = next(domain for domain in BLOCKED_DOMAINS if domain in url.lower())
-            logger.debug(f"Skipping blocked domain URL (%s): %s", blocked_domain, url)
-            return None
-
-        snippet_hash = hash_snippet(url, snippet)
-        cached = snippet_cache.get(snippet_hash)
-        if cached:
-            logger.debug(f"Using cached verdict for {url}: {cached}")
-            return result if cached == "yes" else None
-
-        messages = [
-            SystemMessage(content=web_search_validation_instructions.format(
-                query=query,
-                current_date=get_current_date()
-            )),
-            HumanMessage(content=f"Snippet: {snippet}")
-        ]
-
-        try:
-            response = await asyncio.wait_for(llm_call_async(messages), timeout=15)
-            answer = response if isinstance(response, str) else getattr(response, 'content', '') or ''
-            answer_l = answer.strip().lower()
-            verdict = "yes" if "yes" in answer_l else "no"
-            snippet_cache[snippet_hash] = verdict
-            logger.info(f"LLM verdict for {url}: {verdict}")
-            return result if verdict == "yes" else None
-        except asyncio.TimeoutError:
-            logger.warning(f"Timeout evaluating {url}")
-            return None
-        except Exception as e:
-            error_msg = f"Error evaluating {url}: {type(e).__name__} - {e}"
-            logger.exception(error_msg)
-            errors.append(error_msg)
-            return None
-
-    evaluated_results = []
+    all_results = []
     for i, result_set in enumerate(search_results_list):
         query = search_queries[i] if i < len(search_queries) else f"<unknown_{i}>"
-
         if isinstance(result_set, Exception):
             errors.append(f"Search failed for query '{query}': {result_set}")
             continue
-
         if not result_set:
             logger.info(f"No results for query: {query}")
             errors.append(f"No results returned for query: {query}")
             continue
+        for r in result_set:
+            url = getattr(r, 'url', None)
+            # Filter out blocked domains
+            if url and url not in visited_urls and url not in failed_urls:
+                if any(domain in url.lower() for domain in BLOCKED_DOMAINS):
+                    logger.info(f"Skipping blocked domain URL: {url}")
+                    continue
+                all_results.append(r)
+                visited_urls.add(url)
 
-        tasks = [evaluate_snippet(r, query) for r in result_set]
-        results = await asyncio.gather(*tasks)
-        for r in results:
-            if r:
-                evaluated_results.append(r)
-                visited_urls.add(r.url)
-
-    # Merge and deduplicate with previous data
-    deduplicated = {item.url: item for item in existing_data + evaluated_results}
+    # Deduplicate by URL
+    deduplicated = {item.url: item for item in existing_data + all_results if hasattr(item, 'url') and not any(domain in item.url.lower() for domain in BLOCKED_DOMAINS)}
     final_data = list(deduplicated.values())
-
+    final_urls = [item.url for item in final_data if hasattr(item, 'url')]
     state.update({
         "data": final_data,
         "visited_urls": list(visited_urls),
-        "snippet_cache": snippet_cache,
+        "final_urls": final_urls,
         "error": "\n".join(errors) if errors else None
     })
-
-    final_urls = [item.url for item in final_data if hasattr(item, 'url')]
-    print(f"Final URLs for extraction (first 5): {final_urls[:5]}")
-    logger.info(f"evaluate_search_results: Final data size: {len(final_data)}")
+    logger.info(f"fast_search_results_to_final_urls: Final URLs count: {len(final_urls)}")
     return state
 #=============================================================================================
-
-
 async def extract_content(state: AgentState) -> AgentState:
     """
     Uses the Scraper to extract content from relevant URLs.
@@ -867,7 +838,6 @@ async def extract_content(state: AgentState) -> AgentState:
 
     return state
 #=============================================================================================
-
 async def embed_and_retrieve(state: AgentState) -> AgentState:
     """
     Enhanced embedding, indexing, and retrieval using hybrid approach.
@@ -964,7 +934,8 @@ async def fss_retrieve(state: dict) -> dict:
     session_id = state.get("session_id", "default-session")
 
     logger.debug(f"[FSS Node] Entering fss_retrieve for query: '{new_query}' with {len(contexts_to_use)} contexts.")
-
+    print (f"[DEBUG][fss_retrieve] contexts_to_use keys: {list(contexts_to_use.keys())[:5]}... (total {len(contexts_to_use)})")
+    
     try:
         if not contexts_to_use:
             logger.warning("[FSS Node] No relevant contexts available. Skipping FSS creation.")
@@ -994,8 +965,8 @@ async def fss_retrieve(state: dict) -> dict:
         state["error"] = error_msg
         state["file_store_name"] = None
     return state
-#=======================================================================================
 
+#=======================================================================================
 async def create_qa_pairs(state: AgentState) -> AgentState:
     """
     Creates Q&A pairs with citations from relevant chunks for each search query.
@@ -1008,7 +979,6 @@ async def create_qa_pairs(state: AgentState) -> AgentState:
     
     # Retrieve current error state safely
     current_error_state = state.get('error')
-    
     logger.info(f"Creating Q&A pairs from {len(relevant_chunks)} chunks for {len(search_queries)} queries.")
     
     if not relevant_chunks:
@@ -1017,9 +987,7 @@ async def create_qa_pairs(state: AgentState) -> AgentState:
         state["all_citations"] = []
         new_error = (str(current_error_state or '') + "\nNo relevant chunks available for Q&A creation.").strip()
         state['error'] = None if new_error == "" else new_error
-        print(f"[DEBUG][create_qa_pairs] state['qa_pairs'] length: {len(state['qa_pairs'])}")
-        if state['qa_pairs']:
-            print(f"[DEBUG][create_qa_pairs] First QA: {state['qa_pairs'][0]}")
+        logger.info(f"Created {len(state['qa_pairs'])} Q&A pairs.")
         return state
     
     if not search_queries:
@@ -1088,14 +1056,12 @@ async def create_qa_pairs(state: AgentState) -> AgentState:
         state["all_citations"] = all_citations
         logger.info(f"Created {len(qa_pairs)} Q&A pairs with {len(all_citations)} total citations.")
         
-        # Print sample text from the first 2 QA pairs if available
+
+        # Print a summary of the appendix state instead of full content
         qa_pairs = state.get("qa_pairs", [])
-        print("\n--- QA Pair Samples (first 2) ---")
-        for i, qa in enumerate(qa_pairs[:2], 1):
-            question = qa.get("question", "")
-            answer = qa.get("answer", "")
-            print(f"[{i}] Q: {question}\nA: {answer[:300]}\n---")
-        return state
+        all_citations = state.get("all_citations", [])
+        if qa_pairs:
+            print(f"[APPENDIX SUMMARY] Q&A pairs: {len(qa_pairs)}, Citations: {len(all_citations)}")
 
     except Exception as e:
         error_msg = f"Error creating Q&A pairs: {e}"

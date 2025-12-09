@@ -2,7 +2,6 @@ import os
 from google import genai
 from google.genai import types
 from .logging_setup import logger
-from backend.src.fss_capacity_check import get_fss_storage_usage
 # Set your FileSearchStore name here
 FILE_SEARCH_STORE_NAME = os.environ.get("FSS_STORE_NAME", "<YOUR_FILE_SEARCH_STORE_NAME>")
 

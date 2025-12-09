@@ -35,7 +35,7 @@ try:
     from .nodes import (
         AgentState,
         create_queries,
-        evaluate_search_results,
+        fast_search_results_to_final_urls,
         extract_content,
         embed_and_retrieve,
         fss_retrieve,
@@ -54,8 +54,8 @@ workflow = StateGraph(AgentState)
 # Assuming all imported node functions are async
 if 'create_queries' in locals():
     workflow.add_node("create_queries", create_queries)
-if 'evaluate_search_results' in locals():
-    workflow.add_node("evaluate_search_results", evaluate_search_results)
+if 'fast_search_results_to_final_urls' in locals():
+    workflow.add_node("fast_search_results_to_final_urls", fast_search_results_to_final_urls)
 if 'extract_content' in locals():
     workflow.add_node("extract_content", extract_content)
 if 'embed_and_retrieve' in locals():
@@ -70,13 +70,15 @@ if 'write_report' in locals():
     workflow.add_node("write_report", write_report)
 
 # Add edges - check if nodes were successfully added before adding edges
-if all(node_name in workflow.nodes for node_name in ["create_queries", "evaluate_search_results"]):
+if all(node_name in workflow.nodes for node_name in ["create_queries", "fast_search_results_to_final_urls"]):
     workflow.add_edge(START, "create_queries")
-    workflow.add_edge("create_queries", "evaluate_search_results")
+    workflow.add_edge("create_queries", "fast_search_results_to_final_urls")
+
 
 # Add sequential edges
-if "evaluate_search_results" in workflow.nodes and "extract_content" in workflow.nodes:
-    workflow.add_edge("evaluate_search_results", "extract_content")
+if "fast_search_results_to_final_urls" in workflow.nodes and "extract_content" in workflow.nodes:
+    workflow.add_edge("fast_search_results_to_final_urls", "extract_content")
+
 
 
 workflow.add_conditional_edges(
@@ -105,11 +107,11 @@ if "fss_retrieve" in workflow.nodes and "write_report" in workflow.nodes:
 # After AI_evaluate, route based on proceed and retrieval_method
 workflow.add_conditional_edges(
     "AI_evaluate",
-    lambda state: "write_report" if state.get("proceed", True) else ("fss_retrieve" if state.get("retrieval_method") == "fss_retriever" else "evaluate_search_results"),
+    lambda state: "write_report" if state.get("proceed", True) else ("fss_retrieve" if state.get("retrieval_method") == "fss_retriever" else "fast_search_results_to_final_urls"),
     {
         "write_report": "write_report",
         "fss_retrieve": "fss_retrieve",
-        "evaluate_search_results": "evaluate_search_results"
+        "fast_search_results_to_final_urls": "fast_search_results_to_final_urls"
     }
 )
 

@@ -16,4 +16,3 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger('deepsearch')
-logger.info("Test log message: logging setup is working.")
