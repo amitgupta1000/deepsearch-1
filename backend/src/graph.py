@@ -25,10 +25,6 @@ except (ImportError, Exception):
             return None
 
 from typing import TypedDict, Optional, List, Dict, Any # Import necessary types
-from .conditions import (
-    route_ai_evaluate,
-    route_retrieval_method # Import the new router
-)
 # Import nodes and AgentState from nodes.py
 try:
     from .nodes import (
@@ -36,10 +32,7 @@ try:
         create_queries,
         fast_search_results_to_final_urls,
         extract_content,
-        embed_and_retrieve,
         fss_retrieve,
-        create_qa_pairs,
-        AI_evaluate,
         write_report,
     )
 except ImportError as e:
@@ -57,20 +50,14 @@ if 'fast_search_results_to_final_urls' in locals():
     workflow.add_node("fast_search_results_to_final_urls", fast_search_results_to_final_urls)
 if 'extract_content' in locals():
     workflow.add_node("extract_content", extract_content)
-if 'embed_and_retrieve' in locals():
-    workflow.add_node("embed_and_retrieve", embed_and_retrieve)
 if 'fss_retrieve' in locals():
     workflow.add_node("fss_retrieve", fss_retrieve)
-if 'create_qa_pairs' in locals():
-    workflow.add_node("create_qa_pairs", create_qa_pairs)
-if 'AI_evaluate' in locals():
-    workflow.add_node("AI_evaluate", AI_evaluate)
 if 'write_report' in locals():
     workflow.add_node("write_report", write_report)
 
 # Add edges - check if nodes were successfully added before adding edges
 
-# FSS-only workflow: create_queries -> fast_search_results_to_final_urls -> extract_content -> fss_retrieve -> write_report -> END
+# Define the workflow logic
 if all(node_name in workflow.nodes for node_name in ["create_queries", "fast_search_results_to_final_urls", "extract_content", "fss_retrieve", "write_report"]):
     workflow.add_edge(START, "create_queries")
     workflow.add_edge("create_queries", "fast_search_results_to_final_urls")

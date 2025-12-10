@@ -941,41 +941,33 @@ async def fss_retrieve(state: dict) -> dict:
     The generated answer is stored in 'analysis_content'.
     """
     contexts_to_use = state.get("relevant_contexts", {})
-    new_query = state.get("new_query", "")
+    query = state.get("new_query", "")
     session_id = state.get("session_id", "default-session")
 
-    logger.info(f"[FSS Node] fss_retrieve received retrieval_method: '{state.get('retrieval_method')}'")
-    logger.debug(f"[FSS Node] Entering fss_retrieve for query: '{new_query}' with {len(contexts_to_use)} contexts.")
-    print (f"[DEBUG][fss_retrieve] contexts_to_use keys: {list(contexts_to_use.keys())[:5]}... (total {len(contexts_to_use)})")
-    
+    logger.info(f"Entering for query: '{query}' with {len(contexts_to_use)} contexts.")
+
     try:
         if not contexts_to_use:
             logger.warning("[FSS Node] No relevant contexts available. Skipping FSS creation.")
             state["analysis_content"] = "No content was available to search for an answer."
+            state["appendix_content"] = "Appendix not generated as no content was processed."
             return state
 
         if not GeminiFileSearchRetriever:
-            logger.error("[FSS Node] GeminiFileSearchRetriever class not available.")
             raise RuntimeError("GeminiFileSearchRetriever not available.")
 
-        # The retriever now handles creation, querying, and deletion internally.
+        # The retriever handles the entire lifecycle: creation, upload, query, and deletion.
         retriever = GeminiFileSearchRetriever(display_name_prefix=f"crystal-{session_id}")
-        answer = await retriever.answer_question(new_query, contexts_to_use)
-        logger.debug(f"[FSS Node] FSS response (first 300 chars): {answer[:300]}")
+        answer = await retriever.answer_question(query, contexts_to_use)
 
-        # The answer from the file search is the main analysis content.
         state["analysis_content"] = answer
-        # No need to store file_store_name as it's now temporary and cleaned up.
-        state["file_store_name"] = None
-        # For FSS, the appendix is not generated in the same way.
         state["appendix_content"] = "Appendix not generated for File Search method. All content is synthesized in the main response."
-        logger.info(f"[FSS Node] Generated answer and stored it in 'analysis_content'.")
+        logger.info("Generated answer and stored it in 'analysis_content'.")
 
     except Exception as e:
-        error_msg = f"[FSS Node] failed: {e}"
+        error_msg = f"fss_retrieve failed: {e}"
         logger.error(error_msg, exc_info=True)
         state["error"] = error_msg
-        state["file_store_name"] = None
     return state
 
 #=======================================================================================
@@ -1289,14 +1281,10 @@ async def write_report(state: AgentState) -> AgentState:
     appendix_content = ""
     analysis_filename = None
     appendix_filename = None
-    retrieval_method = state.get("retrieval_method", "hybrid")
-    if retrieval_method != "file_search":
-        retrieval_method = "hybrid"
 
-    logger.info(f"[write_report] retrieval_method: {retrieval_method}")
-    prompt_type = state.get("prompt_type")
-    file_store_name = state.get("file_store_name")
-    print("[DEBUG] Entering write_report")
+    prompt_type = state.get("prompt_type", "N/A")
+    file_store_name = state.get("file_store_name", "N/A")
+    logger.debug("Entering write_report node")
     logger.info(f"--- Entering write_report node for session '{short_session_id}' ---")
 
     #==============#=============================
@@ -1304,87 +1292,51 @@ async def write_report(state: AgentState) -> AgentState:
     part1_query = f"# Research Report\n\n## 1. Original User Query\n\n**{research_topic}**\n\n---\n"
 
     #==============#=============================
-        # PART 2: Generate IntelliSearch Response
-    if retrieval_method == "file_search":
-        # Always use FSS answer for main analysis
-        logger.info("Report Method: Using pre-generated response from File Search.")
-        intellisearch_response = state.get("analysis_content", "Analysis from File Search was not found.")
-        part2_response = f"## 2. IntelliSearch Response\n\n{intellisearch_response}\n\n---\n"
-        analysis_content = part1_query + part2_response
+    # PART 2: Generate IntelliSearch Response
+    # Always use FSS answer for main analysis
+    logger.info("Report Method: Using pre-generated response from File Search.")
+    intellisearch_response = state.get("analysis_content")
+    if not intellisearch_response or not intellisearch_response.strip():
+        intellisearch_response = "Analysis from File Search failed or returned no content. Please check the logs for errors."
+        logger.warning("Analysis content from fss_retrieve was empty. Using fallback message for report.")
+    part2_response = f"## 2. IntelliSearch Response\n\n{intellisearch_response}\n\n---\n"
+    analysis_content = part1_query + part2_response
 
-        # If relevant_contexts exist, run hybrid retriever and create Q&A pairs for appendix
-        appendix_content = "Appendix not generated."
+    # If relevant_contexts exist, run hybrid retriever and create Q&A pairs for appendix
+    appendix_content = "Appendix not generated."
 
-        # Ensure file store is deleted after session closes
-        try:
-            if "file_store_name" in state and state["file_store_name"]:
-                if 'delete_gemini_file_search_store' in globals():
-                    delete_gemini_file_search_store(state["file_store_name"])
-                state["file_store_name"] = None
-        except Exception as e:
-            logger.error(f"Error deleting file store: {e}")
+    # Ensure file store is deleted after session closes
+    try:
+        if "file_store_name" in state and state["file_store_name"]:
+            if 'delete_gemini_file_search_store' in globals():
+                delete_gemini_file_search_store(state["file_store_name"])
+            state["file_store_name"] = None
+    except Exception as e:
+        logger.error(f"Error deleting file store: {e}")
 
-    elif not relevant_contexts:
+    if not relevant_contexts:
         logger.warning(f"No relevant contexts found for topic: '{research_topic}'. Generating empty report.")
         analysis_content = f"Could not generate a report. No Q&A pairs were created for the topic: '{research_topic}'."
         appendix_content = "No appendix available."
         errors.append(analysis_content)
 
-    else: # Hybrid Retriever with Q&A pairs
-        # ...existing code...
-        try:
-            intellisearch_response = intellisearch_response or "LLM analysis returned no content."
+    try: # Deduplicate and format final content
+        deduped_part2 = deduplicate_content(part2_response)
 
-            part2_response = f"## 2. IntelliSearch Response\n\n{intellisearch_response}\n\n---\n"
+        # Format both analysis and appendix content for consistent markdown and enhanced conclusion
+        raw_analysis = part1_query + deduped_part2
+        raw_analysis += f"\n---\n*Analysis generated on {get_current_date()}. Powered by INTELLISEARCH Research Platform.*\n"
+        analysis_content = format_research_report(raw_analysis)
 
-            # PART 3: Appendix with Q&A pairs and citations
-            logger.info("Generating appendix with detailed Q&A and sources...")
-            part3_appendix = "#3. Appendix: Research Q&A and Sources\n\n# Research Questions and Detailed Answers\n"
-            all_citations = []
-            citation_counter = 1
-            for i, qa in enumerate(qa_pairs):
-                part3_appendix += f"### Q{i+1}: {qa['question']}\n"
-                answer = qa['answer'].strip()
-                answer = re.sub(r'\n{2,}', '\n\n', answer)
-                part3_appendix += f"**Answer:**\n{answer}\n"
-                if qa.get('citations'):
-                    part3_appendix += "Sources:\n"
-                    for citation in qa['citations']:
-                        old_ref = f"[{citation['number']}]"
-                        new_ref = f"[{citation_counter}]"
-                        answer = answer.replace(old_ref, new_ref)
-                        part3_appendix += (
-                            f"- [{citation_counter}] {citation.get('title', 'Untitled')} ({citation['source']}) - [Link]({citation['url']})\n"
-                        )
-                        all_citations.append({
-                            'number': citation_counter,
-                            'source': citation['source'],
-                            'url': citation.get('url', ''),
-                            'content': citation.get('content', '')
-                        })
-                        citation_counter += 1
+        logger.info("Analysis and appendix content formatted successfully.")
 
-            # Deduplicate and format final content
-            deduped_part2 = deduplicate_content(part2_response)
-
-            # Format both analysis and appendix content for consistent markdown and enhanced conclusion
-            raw_analysis = part1_query + deduped_part2
-            raw_analysis += f"\n---\n*Analysis generated on {get_current_date()}. Powered by INTELLISEARCH Research Platform.*\n"
-            analysis_content = format_research_report(raw_analysis)
-
-            raw_appendix = part3_appendix
-            raw_appendix += f"\n---\n*Appendix generated on {get_current_date()}. Powered by INTELLISEARCH Research Platform.*\n"
-            appendix_content = format_research_report(raw_appendix)
-
-            logger.info("Analysis and appendix content formatted successfully.")
-
-        except Exception as e:
-            error_msg = f"Error during report generation: {e}"
-            logger.error(error_msg, exc_info=True)
-            errors.append(error_msg)
-            analysis_content = f"Failed to generate report: {error_msg}"
-            appendix_content = "Not available due to an error."
-            
+    except Exception as e:
+        error_msg = f"Error during report generation: {e}"
+        logger.error(error_msg, exc_info=True)
+        errors.append(error_msg)
+        analysis_content = f"Failed to generate report: {error_msg}"
+        appendix_content = "Not available due to an error."
+        
     #====================================#==================================#================================
     # Save files to Firestore
     db = None

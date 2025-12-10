@@ -8,4 +8,4 @@ from .config import (
 
 import logging
 logger = logging.getLogger(__name__)
-logger.info("API keys loaded from unified configuration (Google only)")
+logger.info("API keys loaded from unified configuration")

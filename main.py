@@ -164,7 +164,6 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
             })
 
         result = await run_workflow(request.query, request.prompt_type, request.search_mode, request.retrieval_method, session_id)
-        #logger.info(f"[run_research_pipeline] Workflow result: {result}")
 
         # --- Workflow Summary Log ---
         if result:
