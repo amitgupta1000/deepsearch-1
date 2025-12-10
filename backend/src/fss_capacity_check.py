@@ -2,9 +2,9 @@ import os
 from google import genai
 from google.genai import types
 from .logging_setup import logger
-# Set your FileSearchStore name here
+from .api_keys import GOOGLE_API_KEY
 FILE_SEARCH_STORE_NAME = os.environ.get("FSS_STORE_NAME", "<YOUR_FILE_SEARCH_STORE_NAME>")
-
+api_key = GOOGLE_API_KEY
 client = genai.Client()
 
 def get_fss_storage_usage(store_name):

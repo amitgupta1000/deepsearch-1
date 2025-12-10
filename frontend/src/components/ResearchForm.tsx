@@ -6,9 +6,8 @@ import type { ResearchRequest } from '../types';
 const ResearchForm: React.FC = () => {
   const { startResearch, state } = useResearch();
   const [query, setQuery] = useState('');
-  const [promptType, setPromptType] = useState('general');
+  const [prompt_type, setPromptType] = useState('general');
   const [searchMode, setSearchMode] = useState<'fast' | 'ultra'>('fast');
-  const [retrievalMethod, setRetrievalMethod] = useState<'file_search' | 'hybrid'>('file_search');
 
 
 
@@ -27,9 +26,9 @@ const ResearchForm: React.FC = () => {
 
     const request: ResearchRequest = {
       query: query.trim(),
-      prompt_type: promptType,
-      search_mode: searchMode, 
-      retrieval_method: retrievalMethod,
+      prompt_type,
+      search_mode: searchMode,
+      retrieval_method: 'file_search',
     };
 
     await startResearch(request);
@@ -107,13 +106,13 @@ const ResearchForm: React.FC = () => {
                   <input
                     type="radio"
                     value={type.value}
-                    checked={promptType === type.value}
+                    checked={prompt_type === type.value}
                     onChange={(e) => setPromptType(e.target.value)}
                     className="sr-only"
                     disabled={state.isLoading}
                   />
                   <div className={`p-4 rounded-lg border-2 transition-all duration-200 ${
-                    promptType === type.value
+                    prompt_type === type.value
                       ? 'border-primary-500 bg-primary-50 shadow-md'
                       : 'border-gray-300 bg-white hover:border-gray-400 hover:shadow-sm'
                   }`}>
@@ -127,7 +126,7 @@ const ResearchForm: React.FC = () => {
 
           {/* Search Options & Submit Button */}
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-gray-200">
-            {/* Search Mode and Retrieval Method in a single row */}
+            {/* Search Mode only */}
             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
               {/* Search Depth Toggle */}
               <div className="flex items-center gap-4">
@@ -156,36 +155,6 @@ const ResearchForm: React.FC = () => {
                     }`}
                   >
                     Ultra
-                  </button>
-                </div>
-              </div>
-              {/* Retrieval Method Toggle */}
-              <div className="flex items-center gap-4">
-                <span className="font-medium text-gray-700">Retrieval Method:</span>
-                <div className="flex items-center rounded-full bg-gray-200 p-1">
-                  <button
-                    type="button"
-                    onClick={() => setRetrievalMethod('hybrid')}
-                    disabled={state.isLoading}
-                    className={`px-4 py-1 text-sm font-semibold rounded-full transition-colors ${
-                      retrievalMethod === 'hybrid'
-                        ? 'bg-primary-600 text-white shadow' // Active style
-                        : 'text-gray-600 hover:bg-gray-300' // Inactive style
-                    }`}
-                  >
-                    Hybrid
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRetrievalMethod('file_search')}
-                    disabled={state.isLoading}
-                    className={`px-4 py-1 text-sm font-semibold rounded-full transition-colors ${
-                      retrievalMethod === 'file_search'
-                        ? 'bg-primary-600 text-white shadow'
-                        : 'text-gray-600 hover:bg-gray-300'
-                    }`}
-                  >
-                    File Search
                   </button>
                 </div>
               </div>

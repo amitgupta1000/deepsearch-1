@@ -59,7 +59,7 @@ class ResearchRequest(BaseModel):
     query: str = Field(..., description="Research query or question")
     prompt_type: str = Field(default="general", description="Type of prompt to use for query generation.")
     search_mode: str = Field(default="fast", description="Search mode: 'fast' for quick results or 'ultra' for deep research.")
-    retrieval_method: str = Field(description="Retrieval method: 'hybrid' or 'file_search'.")
+    retrieval_method: str = Field(default="file_search", description="Retrieval method: 'file_search' only.")
 
 class ResearchSession(BaseModel):
     session_id: str
@@ -114,10 +114,7 @@ async def run_workflow(initial_query: str, prompt_type: str, search_mode: str, r
         max_iterations = MAX_AI_ITERATIONS
         logger.info(f"Running in 'fast' mode: {max_queries} queries, {max_results} results, {max_iterations} iterations.")
 
-    if retrieval_method == "file_search":
-        logger.info("Using File Search retrieval method.")
-    else:
-        logger.info("Using Hybrid retrieval method.")
+    logger.info("Using File Search retrieval method.")
 
     # Initial state for the workflow
     initial_state = {
@@ -171,19 +168,16 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
 
         # --- Workflow Summary Log ---
         if result:
-            retrieval_method = result.get("retrieval_method", "unknown")
+            retrieval_method = result.get("retrieval_method", "file_search")
             search_mode = "ultra" if result.get("max_search_queries", 0) > 10 else "fast"
-            num_qa_pairs = len(result.get("qa_pairs", []))
             error_message = result.get("error")
 
             summary_lines = [
                 "\n\n" + "="*25 + " WORKFLOW SUMMARY " + "="*25,
                 f"Session ID:         {session_id}",
                 f"Search Mode:        {search_mode.upper()}",
-                f"Retrieval Method:   {retrieval_method.replace('_', ' ').title()}",
+                f"Retrieval Method:   File Search",
             ]
-            if retrieval_method == "hybrid":
-                summary_lines.append(f"Q&A Pairs Created:  {num_qa_pairs}")
             if error_message:
                 summary_lines.append(f"Workflow Errors:    Yes (see logs for details)")
             summary_lines.append("="*70 + "\n")

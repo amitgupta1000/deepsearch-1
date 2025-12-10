@@ -1,7 +1,7 @@
 import json, re, asyncio
 from typing import Dict, Any, List, Optional
 from .logging_setup import logger
-from backend.src.fss_capacity_check import get_fss_storage_usage
+
 
 # Try to import optional dependencies with fallbacks
 try:
@@ -1314,30 +1314,6 @@ async def write_report(state: AgentState) -> AgentState:
 
         # If relevant_contexts exist, run hybrid retriever and create Q&A pairs for appendix
         appendix_content = "Appendix not generated."
-        if relevant_contexts:
-            try:
-                # Run hybrid retriever and create Q&A pairs
-                if create_hybrid_retriever and embeddings and USE_HYBRID_RETRIEVAL:
-                    hybrid_retriever = create_hybrid_retriever(embeddings=embeddings)
-                    if hybrid_retriever.build_index(relevant_contexts):
-                        search_queries = state.get("search_queries", [])
-                        relevant_chunks, retriever_responses = hybrid_retriever.retrieve_with_query_responses(search_queries)
-                        state["relevant_chunks"] = relevant_chunks
-                        state["retriever_responses"] = retriever_responses
-                        # Generate Q&A pairs
-                        qa_state = await create_qa_pairs(state)
-                        qa_pairs = qa_state.get("qa_pairs", [])
-                        all_citations = qa_state.get("all_citations", [])
-                        # Format appendix
-                        appendix_content = "## Appendix: Q&A Pairs with Citations\n\n"
-                        for i, qa in enumerate(qa_pairs):
-                            appendix_content += f"**Q{i+1}: {qa['question']}**\n**A{i+1}:** {qa['answer']}\n\n"
-                        appendix_content += "\n### Citations\n"
-                        for citation in all_citations:
-                            appendix_content += f"[{citation['number']}] {citation['title']} - {citation['url']}\n"
-            except Exception as e:
-                logger.error(f"Error generating appendix with hybrid retriever: {e}")
-                appendix_content = "Appendix could not be generated due to an error."
 
         # Ensure file store is deleted after session closes
         try:
@@ -1355,41 +1331,8 @@ async def write_report(state: AgentState) -> AgentState:
         errors.append(analysis_content)
 
     else: # Hybrid Retriever with Q&A pairs
-        logger.info(f"Report Method: Generating response using {len(qa_pairs)} Q&A pairs.")
+        # ...existing code...
         try:
-            # PART 2: Generate IntelliSearch Response using LLM analysis on QA Pairs
-            logger.info("Synthesizing main analysis from Q&A pairs...")
-            qa_context = "Based on the following Q&A analysis:\n\n"
-            for i, qa in enumerate(qa_pairs):
-                qa_context += f"Q{i+1}: {qa['question']}\nA{i+1}: {qa['answer'][:2500]}...\n\n"
-
-            intellisearch_prompt = f"""
-            You are an expert research analyst. Provide a comprehensive, analytical response to the user's query by synthesizing information from the collected research data.
-
-            USER QUERY: "{research_topic}"
-
-            RESEARCH DATA:
-            {qa_context}
-
-            INSTRUCTIONS:
-            - You have access to research data in the form of detailed Q&A pairs derived from extensive research on the topic.
-            - Your task is to analyze this data and produce a well-structured research report that directly answers the user's query with clarity and full depth.
-            - You must directly answer the user's query by extracting relevant data and insights from the provided data.
-            - You must provide clear quantitative answers if that is required.
-            - The report should be well-structured, using markdown for headings, subheadings, and bullet points where appropriate.
-            - Present your conclusion in a clearly separated section at the end marked "Conclusion".
-            - Target 500-3000 words for this response.
-            - Use clear, professional language with proper markdown formatting.
-            - Do not repeat the individual Q&A pairs (they will be provided in a separate document).
-
-            Generate the report keeping these instructions in mind:
-            """
-
-            messages = [
-                SystemMessage(content=intellisearch_prompt),
-                HumanMessage(content=f"Analyze and answer: {research_topic}")
-            ]
-            intellisearch_response = await llm_call_async(messages) if llm_call_async else "LLM analysis is unavailable."
             intellisearch_response = intellisearch_response or "LLM analysis returned no content."
 
             part2_response = f"## 2. IntelliSearch Response\n\n{intellisearch_response}\n\n---\n"

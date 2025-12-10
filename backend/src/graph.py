@@ -1,7 +1,6 @@
 # graph.py
 # This file defines the LangGraph workflow.
 from .logging_setup import logger
-from backend.src.fss_capacity_check import get_fss_storage_usage
 
 # Try to import LangGraph; provide a minimal fallback for static linting/runtime without the package
 try:
@@ -70,51 +69,14 @@ if 'write_report' in locals():
     workflow.add_node("write_report", write_report)
 
 # Add edges - check if nodes were successfully added before adding edges
-if all(node_name in workflow.nodes for node_name in ["create_queries", "fast_search_results_to_final_urls"]):
+
+# FSS-only workflow: create_queries -> fast_search_results_to_final_urls -> extract_content -> fss_retrieve -> write_report -> END
+if all(node_name in workflow.nodes for node_name in ["create_queries", "fast_search_results_to_final_urls", "extract_content", "fss_retrieve", "write_report"]):
     workflow.add_edge(START, "create_queries")
     workflow.add_edge("create_queries", "fast_search_results_to_final_urls")
-
-# Add sequential edges
-if "fast_search_results_to_final_urls" in workflow.nodes and "extract_content" in workflow.nodes:
     workflow.add_edge("fast_search_results_to_final_urls", "extract_content")
-
-
-workflow.add_conditional_edges(
-    "extract_content",
-    route_retrieval_method,
-    {
-        "embed_and_retrieve": "embed_and_retrieve",
-        "fss_retrieve": "fss_retrieve"
-    }
-)
-
-# After embed_and_retrieve, go to create_qa_pairs (hybrid path)
-if "embed_and_retrieve" in workflow.nodes and "create_qa_pairs" in workflow.nodes:
-    workflow.add_edge("embed_and_retrieve", "create_qa_pairs")
-
-# After create_qa_pairs, go to AI_evaluate
-if "create_qa_pairs" in workflow.nodes and "AI_evaluate" in workflow.nodes:
-    workflow.add_edge("create_qa_pairs", "AI_evaluate")
-
-
-# After fss_retrieve, go directly to write_report
-if "fss_retrieve" in workflow.nodes and "write_report" in workflow.nodes:
+    workflow.add_edge("extract_content", "fss_retrieve")
     workflow.add_edge("fss_retrieve", "write_report")
-
-
-# After AI_evaluate, route based on proceed and retrieval_method
-workflow.add_conditional_edges(
-    "AI_evaluate",
-    lambda state: "write_report" if state.get("proceed", True) else "fast_search_results_to_final_urls",
-    {
-        "write_report": "write_report",
-        "fss_retrieve": "fss_retrieve",
-        "fast_search_results_to_final_urls": "fast_search_results_to_final_urls"
-    }
-)
-
-# Edge to END from write_report
-if "write_report" in workflow.nodes:
     workflow.add_edge("write_report", END)
 
 
