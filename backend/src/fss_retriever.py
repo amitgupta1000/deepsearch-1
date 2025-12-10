@@ -113,17 +113,21 @@ class GeminiFileSearchRetriever:
                 await self.delete_store()
             return None
 
+
     async def answer_question(self, query: str, relevant_contexts: Dict[str, Dict[str, Any]], system_instruction: Optional[str] = None) -> str:
         """
         Creates a temporary store, uploads contexts, asks a question, and cleans up.
         """
         try:
-            # Create store and upload files
+            # 1. Create store and upload files
+            # Ensure this returns the full resource name: "fileSearchStores/..."
             file_store_name = await self.create_and_upload_contexts(relevant_contexts)
+            
             if not file_store_name:
                 raise Exception("Failed to create and populate the file search store.")
 
-            # Define the file search tool for the LLM call
+            # 2. Define the file search tool
+            # This structure is correct for the google-genai SDK
             tools = [types.Tool(
                 file_search=types.FileSearch(
                     file_search_store_names=[file_store_name]
@@ -148,24 +152,32 @@ class GeminiFileSearchRetriever:
             Generate the report keeping these instructions in mind:
             """
             
-            # Use the provided system_instruction if available, otherwise use the default prompt.
             final_instruction = system_instruction if system_instruction else intellisearch_prompt
             
-            # Generate content using the file search tool
             logger.info(f"[{self.display_name}] Answering question '{query}' using store '{file_store_name}'")
+
+            # 3. Generate content
+            # FIX: Move system_instruction INSIDE GenerateContentConfig
             response = await self.async_client.models.generate_content(
-                model=GOOGLE_MODEL, # Use a valid model that supports File Search
-                contents=[final_instruction, query], # Combine instruction and query into contents
+                model=GOOGLE_MODEL, 
+                contents=[query], # Passing the query as a list of strings is fine
                 config=types.GenerateContentConfig(
                     tools=tools,
-                    temperature=0.1
+                    temperature=0.1,
+                    system_instruction=final_instruction # <--- MOVED HERE
                 )
             )
             
-            # Validate the response
-            if not response or not response.text.strip():
-                logger.error(f"[{self.display_name}] LLM call to Gemini returned an empty response. Full response object: {response}")
-                raise ValueError("The model returned an empty response. This could be due to safety filters or lack of relevant content.")
+            # 4. Better Error Handling & Validation
+            # Validating response.text directly can fail if the model filtered the response.
+            if not response.text:
+                # Check why the response is empty (e.g., safety filters, no relevant content found)
+                finish_reason = "UNKNOWN"
+                if response.candidates and response.candidates[0]:
+                    finish_reason = response.candidates[0].finish_reason
+                
+                logger.error(f"Empty response. Finish reason: {finish_reason}. Full response: {response}")
+                raise ValueError(f"Model returned empty response. Reason: {finish_reason}")
             
             return response.text
 
@@ -174,6 +186,7 @@ class GeminiFileSearchRetriever:
             raise
         finally:
             await self.delete_store()
+
 
     async def delete_store(self):
         """Deletes the File Search Store associated with this instance."""
