@@ -38,49 +38,50 @@ class GeminiFileSearchRetriever:
         self.async_client = self.client.aio
         self.file_store_name: Optional[str] = None
         self._file_search_store_obj = None
+        self.upload_semaphore = asyncio.Semaphore(10)  # Limit to 10 concurrent uploads
         self.created_file_names: List[str] = []  # Track created file names for cleanup
         logger.info(f"[{self.display_name}] Initialized GeminiFileSearchRetriever instance.")
 
-
     async def _upload_single_file(self, url: str, content: str, store_name: str):
-        # 1. Debugging: Check if content is actually empty
         if not content or not content.strip():
             logger.warning(f"[{self.display_name}] SKIPPING {url}: Content is empty.")
             return None
 
         clean_name = url[-128:] if len(url) > 128 else url
         
-        # 2. Use a Temporary File (SDK handles paths much better than streams)
-        # We use delete=False to close it before uploading, then manually remove it
+        # 1. Create a temp file to handle encoding/buffering correctly
         tf = tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix=".txt", encoding='utf-8')
         try:
             tf.write(content)
             tf.flush()
-            tf.close() # Close file so SDK can read it
+            tf.close() # Close the write-handle
 
             async with self.upload_semaphore:
                 try:
-                    logger.debug(f"Starting upload for {clean_name}...")
-                    
-                    # 3. Upload using the physical path
-                    result = await self.async_client.file_search_stores.upload_to_file_search_store(
-                        file=tf.name, # Pass the path, not the stream
-                        file_search_store_name=store_name,
-                        config=types.UploadToFileSearchStoreConfig(
-                            display_name=clean_name,
-                            mime_type="text/plain"
+                    # 2. OPEN the file in Read-Binary mode
+                    # The SDK needs the file object, not the path string
+                    with open(tf.name, "rb") as f:
+                        logger.debug(f"Starting upload for {clean_name}...")
+                        
+                        result = await self.async_client.file_search_stores.upload_to_file_search_store(
+                            file=f, # <--- PASS THE FILE OBJECT, NOT tf.name
+                            file_search_store_name=store_name,
+                            config=types.UploadToFileSearchStoreConfig(
+                                display_name=clean_name,
+                                mime_type="text/plain"
+                            )
                         )
-                    )
+                    
                     return result
                 except Exception as e:
+                    # Catch specific SDK errors to prevent crashing the whole batch
                     logger.error(f"Failed to upload {url}: {e}")
                     return None
         finally:
-            # 4. Cleanup temp file
+            # 3. Clean up the local temp file
             if os.path.exists(tf.name):
                 os.unlink(tf.name)
-
-
+ 
     async def create_and_upload_contexts(self, relevant_contexts: Dict[str, Dict[str, Any]]) -> Optional[str]:
         if not relevant_contexts:
             return None
@@ -106,11 +107,10 @@ class GeminiFileSearchRetriever:
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
             # 4. Collect created file IDs for cleanup later
-            # (Logic depends slightly on what result returns, assuming it has .name or similar)
             for res in results:
-                if isinstance(res, Exception):
+                if isinstance(res, Exception) or not res:
                     continue
-                if res and hasattr(res, 'name'):
+                if hasattr(res, 'name'): # The result of the operation is a File object
                     self.created_file_names.append(res.name) # Capture File Resource Name
                 elif res and hasattr(res, 'file') and hasattr(res.file, 'name'):
                      self.created_file_names.append(res.file.name)
