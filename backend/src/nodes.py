@@ -1,7 +1,7 @@
 import json, re, asyncio
 from typing import Dict, Any, List, Optional
 from .logging_setup import logger
-
+from .api_keys import GOOGLE_API_KEY, SERPER_API_KEY
 
 # Try to import optional dependencies with fallbacks
 try:
@@ -65,13 +65,11 @@ try:
     from .llm_utils import llm_call_async, embeddings
 except ImportError:
     logger.error("Could not import LLM/Embeddings from llm_utils. Some nodes may not function.")
-    print("Could not import LLM/Embeddings from llm_utils. Some nodes may not function.")   
     llm_call_async, embeddings = None, None
 try:
     from .search import UnifiedSearcher, SearchResult # Assuming SearchResult and UnifiedSearcher are in search.py
 except ImportError:
     logger.error("Could not import search components from search.py. Search node will not function.")
-    print("Could not import search components from search.py. Search node will not function.")
     UnifiedSearcher, SearchResult = None, None
 
 # Fallback to lightweight types if SearchResult or Document not available
@@ -121,8 +119,6 @@ try:
     )
 except ImportError:
     logger.error("Could not import utility functions from utils.py. Some nodes may be limited.")
-    
-    print("Could not import utility functions from utils.py. Some nodes may be limited.")
     
     # Fallback formatting functions
     def format_research_report(content: str) -> str:
@@ -357,7 +353,6 @@ class EvaluationResponse(BaseModel):
 
 
 # --- Node Functions ---
-
 async def create_queries(state: AgentState) -> AgentState:
     """
     Uses the user input from the initial state to generate rationale and a list of queries using LLM.
@@ -395,7 +390,7 @@ async def create_queries(state: AgentState) -> AgentState:
 
     # If there are suggested follow-up queries from a previous AI evaluation and we haven't exceeded max iterations,
     # use them directly instead of asking the LLM to generate new ones based on the original query.
-    if suggested_queries and current_iteration < MAX_AI_ITERATIONS and state.get("qa_pairs"):
+    if suggested_queries and current_iteration < MAX_AI_ITERATIONS:
          logger.info("Using %d suggested follow-up queries from previous iteration.", len(suggested_queries))
          generated_search_queries.update(suggested_queries)
          rationale = f"Refining search based on the previous evaluation's suggested queries ({len(suggested_queries)} queries)."
@@ -504,7 +499,6 @@ async def create_queries(state: AgentState) -> AgentState:
 
     # user_approval_for_queries and choose_report_type functions removed as requested
 #=============================================================================================
-
 # Consolidated helper and evaluation implementation
 import hashlib
 from typing import List
@@ -552,11 +546,6 @@ async def fast_search_results_to_final_urls(state: AgentState) -> AgentState:
     """
     Go straight from search results to deduplication and save results in final_urls (no LLM evaluation).
     """
-    # Normalize retrieval_method
-    retrieval_method = state.get("retrieval_method", "file_search").lower() # Ensure it's lowercase for consistent comparison
-    state["retrieval_method"] = retrieval_method
-    logger.info(f"[fast_search_results_to_final_urls] retrieval_method: {retrieval_method}")
-
     search_queries = state.get("search_queries", []) or []
     existing_data = state.get("data", []) or []
     visited_urls = set(state.get("visited_urls", []) or [])
@@ -617,10 +606,9 @@ async def fast_search_results_to_final_urls(state: AgentState) -> AgentState:
         "data": final_data,
         "visited_urls": list(visited_urls),
         "final_urls": final_urls,
-        "retrieval_method": retrieval_method,
         "error": "\n".join(errors) if errors else None
     })
-    logger.info(f"fast_search_results_to_final_urls: Final URLs count: {len(final_urls)} | retrieval_method: {retrieval_method}")
+    logger.info(f"fast_search_results_to_final_urls: Final URLs count: {len(final_urls)}")
     
     
     return state
@@ -640,9 +628,6 @@ async def extract_content(state: AgentState) -> AgentState:
         RED = '\033[91m'
         ENDC = '\033[0m'
         YELLOW = '\033[93m'
-
-    # Preserve retrieval_method at the start of the function
-    original_retrieval_method = state.get("retrieval_method", "hybrid")
 
     from .config import URL_TIMEOUT
     data = state.get('data', []) # Original search results including snippets
@@ -845,8 +830,6 @@ async def extract_content(state: AgentState) -> AgentState:
 
     # Add logger to inspect the final state["relevant_contexts"]
     logger.info("extract_content: Final state['relevant_contexts'] contains %d items.", len(state.get('relevant_contexts', {})))
-    # Restore the original retrieval_method to prevent it from being lost
-    state["retrieval_method"] = original_retrieval_method
     return state
 #=============================================================================================
 async def embed_and_retrieve(state: AgentState) -> AgentState:
@@ -941,33 +924,41 @@ async def fss_retrieve(state: dict) -> dict:
     The generated answer is stored in 'analysis_content'.
     """
     contexts_to_use = state.get("relevant_contexts", {})
-    query = state.get("new_query", "")
+    new_query = state.get("new_query", "")
     session_id = state.get("session_id", "default-session")
 
-    logger.info(f"Entering for query: '{query}' with {len(contexts_to_use)} contexts.")
-
+    logger.info(f"[FSS Node] fss_retrieve received retrieval_method: '{state.get('retrieval_method')}'")
+    logger.debug(f"[FSS Node] Entering fss_retrieve for query: '{new_query}' with {len(contexts_to_use)} contexts.")
+    print (f"[DEBUG][fss_retrieve] contexts_to_use keys: {list(contexts_to_use.keys())[:5]}... (total {len(contexts_to_use)})")
+    
     try:
         if not contexts_to_use:
             logger.warning("[FSS Node] No relevant contexts available. Skipping FSS creation.")
             state["analysis_content"] = "No content was available to search for an answer."
-            state["appendix_content"] = "Appendix not generated as no content was processed."
             return state
 
         if not GeminiFileSearchRetriever:
+            logger.error("[FSS Node] GeminiFileSearchRetriever class not available.")
             raise RuntimeError("GeminiFileSearchRetriever not available.")
 
-        # The retriever handles the entire lifecycle: creation, upload, query, and deletion.
+        # The retriever now handles creation, querying, and deletion internally.
         retriever = GeminiFileSearchRetriever(display_name_prefix=f"crystal-{session_id}")
-        answer = await retriever.answer_question(query, contexts_to_use)
+        answer = await retriever.answer_question(new_query, contexts_to_use)
+        logger.debug(f"[FSS Node] FSS response (first 300 chars): {answer[:300]}")
 
+        # The answer from the file search is the main analysis content.
         state["analysis_content"] = answer
+        # No need to store file_store_name as it's now temporary and cleaned up.
+        state["file_store_name"] = None
+        # For FSS, the appendix is not generated in the same way.
         state["appendix_content"] = "Appendix not generated for File Search method. All content is synthesized in the main response."
-        logger.info("Generated answer and stored it in 'analysis_content'.")
+        logger.info(f"[FSS Node] Generated answer and stored it in 'analysis_content'.")
 
     except Exception as e:
-        error_msg = f"fss_retrieve failed: {e}"
+        error_msg = f"[FSS Node] failed: {e}"
         logger.error(error_msg, exc_info=True)
         state["error"] = error_msg
+        state["file_store_name"] = None
     return state
 
 #=======================================================================================
@@ -1077,6 +1068,7 @@ async def create_qa_pairs(state: AgentState) -> AgentState:
     
     return state
 
+#=============================================================================================
 async def AI_evaluate(state: AgentState) -> AgentState:
     """
     Evaluates the Q&A pairs to determine if they provide sufficient depth to answer the original user query.
@@ -1273,37 +1265,25 @@ async def write_report(state: AgentState) -> AgentState:
     """    
     errors: List[str] = []
     research_topic = state.get('new_query', 'the topic')
-    relevant_contexts = state.get('relevant_contexts', {})
-    qa_pairs = state.get('qa_pairs', [])
-    full_session_id = state.get('session_id', 'unknown_session')  # Get session_id from state
-    short_session_id = full_session_id.split('-')[0] # Use the first 8 characters of the UUID
+    full_session_id = state.get('session_id', 'unknown_session')
+    short_session_id = full_session_id.split('-')[0]
     analysis_content = ""
-    appendix_content = ""
     analysis_filename = None
-    appendix_filename = None
-
-    prompt_type = state.get("prompt_type", "N/A")
-    file_store_name = state.get("file_store_name", "N/A")
-    logger.debug("Entering write_report node")
+    logger.info("[write_report] Only file_search retrieval method is supported.")
+    print("[DEBUG] Entering write_report")
     logger.info(f"--- Entering write_report node for session '{short_session_id}' ---")
 
-    #==============#=============================
-    # PART 1: Original User Query (common for both methods)
+    # PART 1: Original User Query
     part1_query = f"# Research Report\n\n## 1. Original User Query\n\n**{research_topic}**\n\n---\n"
 
-    #==============#=============================
-    # PART 2: Generate IntelliSearch Response
-    # Always use FSS answer for main analysis
-    logger.info("Report Method: Using pre-generated response from File Search.")
-    intellisearch_response = state.get("analysis_content")
-    if not intellisearch_response or not intellisearch_response.strip():
-        intellisearch_response = "Analysis from File Search failed or returned no content. Please check the logs for errors."
-        logger.warning("Analysis content from fss_retrieve was empty. Using fallback message for report.")
+    # PART 2: IntelliSearch Response
+    intellisearch_response = state.get("analysis_content", "Analysis from File Search was not found.")
     part2_response = f"## 2. IntelliSearch Response\n\n{intellisearch_response}\n\n---\n"
     analysis_content = part1_query + part2_response
 
-    # If relevant_contexts exist, run hybrid retriever and create Q&A pairs for appendix
+    # No appendix, no hybrid logic
     appendix_content = "Appendix not generated."
+    appendix_filename = None
 
     # Ensure file store is deleted after session closes
     try:
@@ -1314,31 +1294,7 @@ async def write_report(state: AgentState) -> AgentState:
     except Exception as e:
         logger.error(f"Error deleting file store: {e}")
 
-    if not relevant_contexts:
-        logger.warning(f"No relevant contexts found for topic: '{research_topic}'. Generating empty report.")
-        analysis_content = f"Could not generate a report. No Q&A pairs were created for the topic: '{research_topic}'."
-        appendix_content = "No appendix available."
-        errors.append(analysis_content)
-
-    try: # Deduplicate and format final content
-        deduped_part2 = deduplicate_content(part2_response)
-
-        # Format both analysis and appendix content for consistent markdown and enhanced conclusion
-        raw_analysis = part1_query + deduped_part2
-        raw_analysis += f"\n---\n*Analysis generated on {get_current_date()}. Powered by INTELLISEARCH Research Platform.*\n"
-        analysis_content = format_research_report(raw_analysis)
-
-        logger.info("Analysis and appendix content formatted successfully.")
-
-    except Exception as e:
-        error_msg = f"Error during report generation: {e}"
-        logger.error(error_msg, exc_info=True)
-        errors.append(error_msg)
-        analysis_content = f"Failed to generate report: {error_msg}"
-        appendix_content = "Not available due to an error."
-        
-    #====================================#==================================#================================
-    # Save files to Firestore
+    # Save analysis to Firestore
     db = None
     try:
         from google.cloud import firestore
@@ -1346,29 +1302,19 @@ async def write_report(state: AgentState) -> AgentState:
     except (ImportError, Exception) as e:
         errors.append(f"Firestore client not available: {e}")
 
-    if db:
-        if analysis_content:
-            analysis_filename = f"{short_session_id}_analysis.txt"
-            try:
-                db.collection("report_files").document(analysis_filename).set({"content": analysis_content})
-                logger.info(f"Successfully saved analysis report to Firestore: {analysis_filename}")
-            except Exception as e:
-                errors.append(f"Failed to save analysis to Firestore: {e}")
+    if db and analysis_content:
+        analysis_filename = f"{short_session_id}_analysis.txt"
+        try:
+            db.collection("report_files").document(analysis_filename).set({"content": analysis_content})
+            logger.info(f"Successfully saved analysis report to Firestore: {analysis_filename}")
+        except Exception as e:
+            errors.append(f"Failed to save analysis to Firestore: {e}")
 
-        if appendix_content:
-            appendix_filename = f"{short_session_id}_appendix.txt"
-            try:
-                db.collection("report_files").document(appendix_filename).set({"content": appendix_content})
-                logger.info(f"Successfully saved appendix report to Firestore: {appendix_filename}")
-            except Exception as e:
-                errors.append(f"Failed to save appendix to Firestore: {e}")
-
-    # Common final steps for both cases
+    # Final state update
     current_error = state.get('error', '') or ''
     state['error'] = (current_error + "\n" + "\n".join(errors)).strip() if errors else (current_error.strip() if current_error else None)
     if state['error'] == '': state['error'] = None
 
-    # Update state with final content and clear intermediate data
     state.update({
         "analysis_content": analysis_content,
         "appendix_content": appendix_content,

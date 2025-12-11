@@ -1,7 +1,7 @@
 import os
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 # --- Third-party imports ---
 from fastapi import FastAPI, HTTPException, BackgroundTasks
@@ -9,7 +9,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from backend.src.logging_setup import logger
-import uvicorn
 
 # --- Firestore and LangChain Setup ---
 try:
@@ -71,9 +70,7 @@ class ResearchSession(BaseModel):
     progress: int = 0
     current_step: str = ""
     analysis_content: Optional[str] = None
-    appendix_content: Optional[str] = None
     analysis_filename: Optional[str] = None
-    appendix_filename: Optional[str] = None
     error_message: Optional[str] = None
 
 class ResearchStatus(BaseModel):
@@ -96,19 +93,17 @@ async def run_workflow(initial_query: str, prompt_type: str, search_mode: str, r
     if workflow_app is None:
         raise RuntimeError("Workflow not compiled. LangGraph not available.")
 
-    # Import config values for search modes
     from backend.src.config import (
         MAX_SEARCH_QUERIES, MAX_SEARCH_RESULTS, MAX_AI_ITERATIONS,
         ULTRA_MAX_SEARCH_QUERIES, ULTRA_MAX_SEARCH_RESULTS, ULTRA_MAX_AI_ITERATIONS
     )
 
-    # Determine settings based on search_mode
     if search_mode == "ultra":
         max_queries = ULTRA_MAX_SEARCH_QUERIES
         max_results = ULTRA_MAX_SEARCH_RESULTS
         max_iterations = ULTRA_MAX_AI_ITERATIONS
         logger.info(f"Running in 'ultra' mode: {max_queries} queries, {max_results} results, {max_iterations} iterations.")
-    else: # Default to "fast"
+    else:
         max_queries = MAX_SEARCH_QUERIES
         max_results = MAX_SEARCH_RESULTS
         max_iterations = MAX_AI_ITERATIONS
@@ -116,14 +111,12 @@ async def run_workflow(initial_query: str, prompt_type: str, search_mode: str, r
 
     logger.info("Using File Search retrieval method.")
 
-    # Initial state for the workflow
     initial_state = {
         "session_id": session_id,
         "new_query": initial_query,
         "prompt_type": prompt_type,
         "retrieval_method": retrieval_method,
         "search_queries": [],
-        "rationale": None,
         "data": [],
         "relevant_contexts": {},
         "relevant_chunks": [],
@@ -154,6 +147,8 @@ async def run_workflow(initial_query: str, prompt_type: str, search_mode: str, r
         raise
 
 async def run_research_pipeline(session_id: str, request: ResearchRequest):
+    import time
+    start_time = time.time()
     try:
         if db:
             db.collection("research_sessions").document(session_id).update({
@@ -164,8 +159,11 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
             })
 
         result = await run_workflow(request.query, request.prompt_type, request.search_mode, request.retrieval_method, session_id)
+        #logger.info(f"[run_research_pipeline] Workflow result: {result}")
 
         # --- Workflow Summary Log ---
+        end_time = time.time()
+        total_time_taken = end_time - start_time
         if result:
             retrieval_method = result.get("retrieval_method", "file_search")
             search_mode = "ultra" if result.get("max_search_queries", 0) > 10 else "fast"
@@ -176,11 +174,14 @@ async def run_research_pipeline(session_id: str, request: ResearchRequest):
                 f"Session ID:         {session_id}",
                 f"Search Mode:        {search_mode.upper()}",
                 f"Retrieval Method:   File Search",
+                f"Total Time Taken:   {total_time_taken:.2f} seconds",
             ]
             if error_message:
                 summary_lines.append(f"Workflow Errors:    Yes (see logs for details)")
             summary_lines.append("="*70 + "\n")
             logger.info('\n'.join(summary_lines))
+
+
 
         session_update = {}
         if result:
@@ -370,6 +371,7 @@ async def health_check():
         },
     }
 
+
 from backend.src.config import CONFIG_SOURCES
 @app.get("/api/config")
 async def get_config():
@@ -383,7 +385,7 @@ async def get_config():
         },
         "sources": CONFIG_SOURCES,
     }
-
+import uvicorn, fastapi
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
     reload = os.getenv("ENVIRONMENT") != "production"

@@ -509,98 +509,56 @@ class UnifiedSearcher:
         if isinstance(engines, str):
             engines = [engines]
 
-        # Use a set to get unique engine names and convert to lowercase for consistent lookup.
-        unique_engines = set(engine.lower() for engine in engines)
-        logger.debug(f"Unique engines to search: {unique_engines}")
+        # Only support Serper engine
+        engine = self.default_engine
+        tasks = []
+        # Check cache first unless force_refresh is True.
+        if not force_refresh:
+            cached_results = await self._check_cache(enhanced_query, engine)
+            if cached_results:
+                logger.info(f"Using cached results for '{enhanced_query}' on {engine}")
+                return cached_results
 
-        tasks = [] # List to hold async tasks for each search engine.
-        # Create a task for each unique engine.
-        for engine in unique_engines:
-            # Skip unsupported engines with a warning.
-            if engine not in ["google", "serper"]:
-                logger.warning(f"Skipping unsupported search engine: {engine}")
-                continue
-
-            # Check cache first unless force_refresh is True.
-            if not force_refresh:
-                cached_results = await self._check_cache(enhanced_query, engine)
-                if cached_results:
-                    logger.info(f"Using cached results for '{enhanced_query}' on {engine}")
-                    # If cached results are found, create a completed task that immediately returns them.
-                    # This allows cached results to be included in the asyncio.gather call alongside live searches.
-                    # asyncio.sleep(0, result=...) is a simple way to create an already-completed awaitable.
-                    tasks.append(asyncio.create_task(asyncio.sleep(0, result=cached_results)))
-                    continue # Skip live search if cache hit.
-
-            # If not using cache, add a task to perform a live search for the engine, wrapped in retry logic.
-            logger.debug(f"Adding live search task for engine: {engine}")
-            # Map engine name to the corresponding internal search method.
-            if engine == "google":
-                tasks.append(asyncio.create_task(self._search_with_retry(self._search_google, enhanced_query)))
-            elif engine == "serper":
-                 # Check if Serper API key is available before creating the task.
-                 if not SERPER_API_KEY:
-                      logger.warning(f"Serper API key missing. Skipping Serper search.")
-                 else:
-                    tasks.append(asyncio.create_task(self._search_with_retry(self._search_serper, enhanced_query)))
-
-        # If no valid tasks were created (e.g., all engines unsupported or Serper key missing), return an empty list.
-        if not tasks:
-            logger.warning(f"No valid search engine tasks created for query: '{enhanced_query}'.")
+        # If not using cache, add a task to perform a live search for Serper
+        if not SERPER_API_KEY:
+            logger.warning(f"Serper API key missing. Skipping Serper search.")
             return []
+        tasks.append(asyncio.create_task(self._search_with_retry(self._search_serper, enhanced_query)))
 
-        logger.info(f"Running {len(tasks)} search tasks concurrently for query: '{enhanced_query}'")
+        logger.info(f"Running Serper search task for query: '{enhanced_query}'")
         results_from_gather = await asyncio.gather(*tasks, return_exceptions=True)
         logger.debug(f"Finished asyncio.gather for query: '{query}'. Received {len(results_from_gather)} results/exceptions.")
 
         # Process the results from asyncio.gather.
-        all_results = [] # List to collect all successful SearchResult objects from all engines.
-        # Iterate through the results returned by gather.
+        all_results = []
         for result in results_from_gather:
-            # Check if the result is an exception.
             if isinstance(result, Exception):
-                # Exceptions are logged by the _search_with_retry method.
-                # We just note here that a task failed.
                 logger.error(f"A search task resulted in an exception: {result}")
-                pass # Skip adding results from this failed task.
-            # Check if the result is a list (expected format for successful search results).
+                pass
             elif isinstance(result, list):
-                # Extend the all_results list with the results from this engine.
                 all_results.extend(result)
                 logger.debug(f"Task returned {len(result)} search results.")
             else:
-                 # Log a warning for any unexpected return types from a task.
-                 logger.warning(f"Search task returned unexpected type: {type(result)}. Skipping result.")
+                logger.warning(f"Search task returned unexpected type: {type(result)}. Skipping result.")
 
-        logger.debug(f"Combined raw results before deduplication: {len(all_results)}")
-
-        # Deduplicate results based on URL to ensure uniqueness.
-        unique_urls = set() # Set to keep track of URLs already seen.
-        unique_results = [] # List to store unique SearchResult objects.
+        # Deduplicate results based on URL
+        unique_urls = set()
+        unique_results = []
         for result in all_results:
-            # Ensure the item is a SearchResult object and has a valid URL before attempting to deduplicate.
             if isinstance(result, SearchResult) and result.url and urlparse(result.url).scheme in ['http', 'https']:
-                # If the URL hasn't been seen before, add it to the set and add the result to the unique list.
                 if result.url not in unique_urls:
                     unique_urls.add(result.url)
                     unique_results.append(result)
             else:
-                # Log if a result is skipped during deduplication due to being invalid or malformed.
                 logger.debug(f"Skipping invalid or malformed result during deduplication: {result}")
 
-        logger.debug(f"Results after deduplication: {len(unique_results)}")
-
-        # Shuffle the unique results to mix results from different engines before limiting.
-        # Avoid shuffling an empty list.
         if unique_results:
             random.shuffle(unique_results)
             logger.debug("Shuffled unique search results.")
 
-        # Limit the final list of unique results to the specified maximum number of results.
         final_limited_results = unique_results[:self.max_results]
         logger.info(f"Final search results count (after limit): {len(final_limited_results)}")
-
-        return final_limited_results # Return the final list of unique and limited results.
+        return final_limited_results
 
 
     async def _search_with_retry(
@@ -663,121 +621,10 @@ class UnifiedSearcher:
         return []
 
 
-    # Removed googlesearch dependency and related code
-
-    async def _enrich_google_results(self, results: List[SearchResult], query: str) -> None:
-        """
-        Asynchronously enrich a list of Google SearchResult objects with titles and snippets
-        by scraping the current Google search results page for the given query.
-
-        Modifies the SearchResult objects in the input list in place.
-
-        Args:
-            results: A list of SearchResult objects to enrich (must contain URLs).
-            query: The original search query string.
-        """
-        if not results:
-            logger.debug("No results to enrich for Google.")
-            return # Nothing to do if the input list is empty.
-
-        logger.debug(f"Starting Google results enrichment for query: '{query}' with {len(results)} initial results.")
-        try:
-
-            timeout = aiohttp.ClientTimeout(total=20)
-            session = None
-            try:
-                session = aiohttp.ClientSession(timeout=timeout)
-                enrichment_url = f"https://www.google.com/search?q={quote_plus(query)}&num={self.max_results}"
-                headers = {"User-Agent": self.user_agent}
-                logger.debug(f"Fetching Google search page for enrichment: {enrichment_url}")
-                async with session.get(enrichment_url, headers=headers) as response:
-                    response.raise_for_status()
-                    html = await response.text()
-            finally:
-                if session is not None:
-                    await session.close()
-                    logger.debug("aiohttp.ClientSession closed after enrichment.")
-
-            # Parse the HTML content using BeautifulSoup. This is a blocking operation,
-            # so run it in a thread pool to avoid blocking the event loop.
-            def parse_google_html_sync(html_content):
-                 return BeautifulSoup(html_content, features="lxml") # Use lxml for potentially faster parsing.
-
-            soup = await asyncio.to_thread(parse_google_html_sync, html)
-
-            # Find the main search result elements in the parsed HTML.
-            # Google's HTML structure is prone to change, so the CSS selector 'div.g' might need updates.
-            search_divs = soup.find_all("div", class_="g")
-            logger.debug(f"Found {len(search_divs)} potential result divs on Google search page.")
-
-            enriched_count = 0 # Counter for the number of results successfully enriched.
-            # Iterate through the original list of SearchResult objects.
-            for initial_result in results:
-                # Try to find the HTML element corresponding to the current SearchResult's URL.
-                # This assumes the URL from googlesearch matches an href attribute in the scraped HTML.
-                link_elem = soup.find("a", href=initial_result.url)
-
-                # If a link element with the matching URL is found.
-                if link_elem:
-                    # Try to find the parent element that represents the entire search result block.
-                    # This heuristic depends on Google's HTML structure.
-                    result_div = link_elem.find_parent("div", class_="g")
-
-                    # If the parent result div is found.
-                    if result_div:
-                        # Extract the title from the result div (usually within an h3 tag).
-                        title_elem = result_div.find("h3")
-                        if title_elem:
-                            initial_result.title = title_elem.text.strip()
-
-                        # Extract the snippet from the result div. Look for common snippet container classes.
-                        # The class names ('VwiC3b', 's3gt2') are based on current Google HTML structure and may need updates.
-                        snippet_elem = result_div.find("div", class_=lambda c: c and ("VwiC3b" in c or "s3gt2" in c))
-                        if snippet_elem:
-                            # Get the text content of the snippet element.
-                            initial_result.snippet = snippet_elem.get_text(separator=" ", strip=True)
-                            # Clean up potential extra whitespace/newlines in the snippet.
-                            initial_result.snippet = re.sub(r'\s+', ' ', initial_result.snippet).strip()
-
-                        enriched_count += 1 # Increment the counter.
-                        logger.debug(f"Enriched result for URL: {initial_result.url}")
-                    else:
-                         # Log if the parent result div could not be found for a URL.
-                         logger.debug(f"Could not find parent result div for URL: {initial_result.url}")
-                else:
-                    # Log if the link element for a URL could not be found in the scraped HTML.
-                    logger.debug(f"Could not find link element for URL: {initial_result.url} in enrichment HTML.")
-
-            logger.debug(f"Finished Google results enrichment. Enriched {enriched_count} results.")
-
-        except aiohttp.ClientResponseError as e:
-            # Log HTTP errors during the request (e.g., 404, 500).
-            logger.warning(f"HTTP error during Google enrichment for query '{query}': Status {e.status}, Message: {e.message}")
-        except aiohttp.ClientTimeout as e:
-             # Log timeout errors during the request.
-             logger.warning(f"Timeout during Google enrichment for query '{query}': {e}")
-        except Exception as e:
-            # Catch and log any other unexpected errors during enrichment.
-            logger.error(f"Error during Google results enrichment for query '{query}': {e}", exc_info=True)
-            # Do NOT re-raise here. Enrichment is supplementary, and its failure should not fail the main search result retrieval.
+    # Google/Bing/Wikipedia enrichment and stubs removed. Only Serper is supported.
 
 
-    async def _search_bing(self, query: str) -> List[SearchResult]:
-        """
-        Stub for Bing search. Support removed to simplify the unified searcher.
-        Returns an empty list and logs a warning if called.
-        """
-        logger.warning("Bing search support has been removed. Returning empty result list.")
-        return []
-
-
-    async def _search_wikipedia(self, query: str) -> List[SearchResult]:
-        """
-        Stub for Wikipedia search. Support removed to simplify the unified searcher.
-        Returns an empty list and logs a warning if called.
-        """
-        logger.warning("Wikipedia search support has been removed. Returning empty result list.")
-        return []
+    # Bing and Wikipedia stubs removed. Only Serper is supported.
 
 
     async def _search_serper(self, query: str) -> List[SearchResult]:
