@@ -4,7 +4,7 @@ import asyncio
 from typing import Dict, Any, Optional, List
 import uuid
 from datetime import datetime
-import io
+import io, os, tempfile
 from backend.src.fss_capacity_check import get_fss_storage_usage
 from .logging_setup import logger
 # Import API keys from api_keys.py
@@ -43,35 +43,43 @@ class GeminiFileSearchRetriever:
 
 
     async def _upload_single_file(self, url: str, content: str, store_name: str):
-        """Helper to upload a single file with semaphore protection."""
-        if not content.strip():
+        # 1. Debugging: Check if content is actually empty
+        if not content or not content.strip():
+            logger.warning(f"[{self.display_name}] SKIPPING {url}: Content is empty.")
             return None
 
         clean_name = url[-128:] if len(url) > 128 else url
-        file_stream = io.BytesIO(content.encode("utf-8"))
+        
+        # 2. Use a Temporary File (SDK handles paths much better than streams)
+        # We use delete=False to close it before uploading, then manually remove it
+        tf = tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix=".txt", encoding='utf-8')
+        try:
+            tf.write(content)
+            tf.flush()
+            tf.close() # Close file so SDK can read it
 
-        async with self.upload_semaphore:
-            try:
-                # upload_to_file_search_store handles upload + assigning to store
-                # It generally returns once the upload is accepted.
-                result = await self.async_client.file_search_stores.upload_to_file_search_store(
-                    file=file_stream,
-                    file_search_store_name=store_name,
-                    config=types.UploadToFileSearchStoreConfig(
-                        display_name=clean_name,
-                        mime_type="text/plain"
+            async with self.upload_semaphore:
+                try:
+                    logger.debug(f"Starting upload for {clean_name}...")
+                    
+                    # 3. Upload using the physical path
+                    result = await self.async_client.file_search_stores.upload_to_file_search_store(
+                        file=tf.name, # Pass the path, not the stream
+                        file_search_store_name=store_name,
+                        config=types.UploadToFileSearchStoreConfig(
+                            display_name=clean_name,
+                            mime_type="text/plain"
+                        )
                     )
-                )
-                logger.debug(f"[{self.display_name}] Uploaded: {clean_name}")
-                
-                # Depending on SDK version, result might be an Operation or the File object directly.
-                # If it's the new google-genai SDK, it often wraps this nicely.
-                # We assume we can get the file name from the result or operation.
-                # Note: The SDK return type here can vary, but usually contains the resource name.
-                return result 
-            except Exception as e:
-                logger.error(f"Failed to upload {url}: {e}")
-                return None
+                    return result
+                except Exception as e:
+                    logger.error(f"Failed to upload {url}: {e}")
+                    return None
+        finally:
+            # 4. Cleanup temp file
+            if os.path.exists(tf.name):
+                os.unlink(tf.name)
+
 
     async def create_and_upload_contexts(self, relevant_contexts: Dict[str, Dict[str, Any]]) -> Optional[str]:
         if not relevant_contexts:
