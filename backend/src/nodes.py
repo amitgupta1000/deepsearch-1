@@ -924,35 +924,36 @@ async def fss_retrieve(state: dict) -> dict:
     The generated answer is stored in 'analysis_content'.
     """
     contexts_to_use = state.get("relevant_contexts", {})
-    new_query = state.get("new_query", "")
+    search_queries = state.get("search_queries", [])
     session_id = state.get("session_id", "default-session")
 
     logger.info(f"[FSS Node] fss_retrieve received retrieval_method: '{state.get('retrieval_method')}'")
-    logger.debug(f"[FSS Node] Entering fss_retrieve for query: '{new_query}' with {len(contexts_to_use)} contexts.")
-    print (f"[DEBUG][fss_retrieve] contexts_to_use keys: {list(contexts_to_use.keys())[:5]}... (total {len(contexts_to_use)})")
-    
+    logger.debug(f"[FSS Node] Entering fss_retrieve for {len(search_queries)} queries with {len(contexts_to_use)} contexts.")
+    print(f"[DEBUG][fss_retrieve] queries: {search_queries[:3]}... (total {len(search_queries)}) | contexts: {list(contexts_to_use.keys())[:3]}... (total {len(contexts_to_use)})")
+
     try:
-        if not contexts_to_use:
-            logger.warning("[FSS Node] No relevant contexts available. Skipping FSS creation.")
-            state["analysis_content"] = "No content was available to search for an answer."
+        if not contexts_to_use or not search_queries:
+            logger.warning("[FSS Node] No relevant contexts or queries available. Skipping FSS batch QA.")
+            state["qa_pairs"] = []
             return state
 
         if not GeminiFileSearchRetriever:
             logger.error("[FSS Node] GeminiFileSearchRetriever class not available.")
             raise RuntimeError("GeminiFileSearchRetriever not available.")
 
-        # The retriever now handles creation, querying, and deletion internally.
         retriever = GeminiFileSearchRetriever(display_name_prefix=f"crystal-{session_id}")
-        answer = await retriever.answer_question(new_query, contexts_to_use)
-        logger.debug(f"[FSS Node] FSS response (first 300 chars): {answer[:300]}")
+        qa_dict = await retriever.answer_batch_questions(search_queries, contexts_to_use)
+        logger.debug(f"[FSS Node] Batch QA complete. Got {len(qa_dict)} QA pairs.")
 
-        # The answer from the file search is the main analysis content.
-        state["analysis_content"] = answer
-        # No need to store file_store_name as it's now temporary and cleaned up.
+        # Convert to list of dicts for downstream compatibility
+        qa_pairs = []
+        for q in search_queries:
+            answer = qa_dict.get(q, "No answer generated.")
+            qa_pairs.append({"question": q, "answer": answer, "citations": []})
+
+        state["qa_pairs"] = qa_pairs
         state["file_store_name"] = None
-        # For FSS, the appendix is not generated in the same way.
-        state["appendix_content"] = "Appendix not generated for File Search method. All content is synthesized in the main response."
-        logger.info(f"[FSS Node] Generated answer and stored it in 'analysis_content'.")
+        logger.info(f"[FSS Node] Stored {len(qa_pairs)} QA pairs in state.")
 
     except Exception as e:
         error_msg = f"[FSS Node] failed: {e}"
@@ -1273,16 +1274,45 @@ async def write_report(state: AgentState) -> AgentState:
     print("[DEBUG] Entering write_report")
     logger.info(f"--- Entering write_report node for session '{short_session_id}' ---")
 
+
     # PART 1: Original User Query
     part1_query = f"# Research Report\n\n## 1. Original User Query\n\n**{research_topic}**\n\n---\n"
 
-    # PART 2: IntelliSearch Response
-    intellisearch_response = state.get("analysis_content", "Analysis from File Search was not found.")
+    # PART 2: Synthesize Final Response from QA_pairs
+    qa_pairs = state.get("qa_pairs", [])
+    if not qa_pairs:
+        intellisearch_response = "No Q&A pairs were generated."
+    else:
+        # Synthesize final response using LLM
+        if not llm_call_async:
+            intellisearch_response = "LLM not available to synthesize final response."
+        else:
+            # Prepare a markdown summary of all Q&A pairs
+            qa_md = "\n".join([f"### Q: {qa['question']}\nA: {qa['answer']}" for qa in qa_pairs])
+            synthesis_prompt = f"""
+                You are an expert research analyst. Given the following Q&A pairs from a research process, synthesize a comprehensive, analytical response to the original user query below. Use the Q&A pairs as your main evidence base, but write a unified, well-structured report in markdown, with a clear conclusion section.
+
+                Original User Query: {research_topic}
+
+                Q&A Pairs:
+                {qa_md}
+                """
+            messages = [
+                SystemMessage(content="You are a helpful research analyst."),
+                HumanMessage(content=synthesis_prompt)
+            ]
+            try:
+                intellisearch_response = await llm_call_async(messages)
+            except Exception as e:
+                logger.error(f"Error during LLM synthesis in write_report: {e}")
+                intellisearch_response = "Error synthesizing final response."
+
     part2_response = f"## 2. IntelliSearch Response\n\n{intellisearch_response}\n\n---\n"
     analysis_content = part1_query + part2_response
 
-    # No appendix, no hybrid logic
-    appendix_content = "Appendix not generated."
+    # Appendix: List all QA pairs
+    appendix_md = "\n".join([f"### Q: {qa['question']}\nA: {qa['answer']}" for qa in qa_pairs])
+    appendix_content = f"## Appendix: Q&A Pairs\n\n{appendix_md if appendix_md else 'No Q&A pairs available.'}"
     appendix_filename = None
 
     # Ensure file store is deleted after session closes
@@ -1292,7 +1322,7 @@ async def write_report(state: AgentState) -> AgentState:
                 delete_gemini_file_search_store(state["file_store_name"])
             state["file_store_name"] = None
     except Exception as e:
-        logger.error(f"Error deleting file store: {e}")
+        logger.error(f"Error deleting file store: {e} it might have been already deleted.")
 
     # Save analysis to Firestore
     db = None
