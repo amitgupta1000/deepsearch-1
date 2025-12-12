@@ -1,6 +1,6 @@
 # hybrid_retriever.py
 """
-Simplified Hybrid retriever combining BM25 (sparse) and vector search (dense).
+Hybrid retriever combining BM25 (sparse) and vector search (dense) with contextual compression and reranking.
 This version uses standard LangChain components for ensemble retrieval and reranking,
 making it more maintainable and easier to understand.
 """

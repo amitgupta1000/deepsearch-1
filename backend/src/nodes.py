@@ -359,8 +359,6 @@ async def create_queries(state: AgentState) -> AgentState:
     Uses Pydantic for robust parsing of LLM output and includes error handling.
     Also checks for and uses suggested_follow_up_queries if available.
     """
-    # Use RED color constant from setup if available
-    # Color constants not needed; removed for simplicity
 
     # Get prompt type from state
     prompt_type = state.get("prompt_type", "general") # Default to general
@@ -507,40 +505,6 @@ def hash_snippet(url: str, snippet: str) -> str:
     return hashlib.sha256(f"{url}|{snippet}".encode()).hexdigest()
 
 
-# --- LLM Evaluation Function (Preserved for Future Use) ---
-async def llm_evaluate_snippets(state: AgentState, search_results: list, visited_urls: set, failed_urls: set, snippet_cache: dict) -> list:
-    """
-    Evaluate search result snippets using LLM. Returns a filtered list of results deemed relevant by the LLM.
-    """
-    async def evaluate_snippet(result, query: str):
-        url, snippet = getattr(result, 'url', None), getattr(result, 'snippet', None)
-        if not url or url in visited_urls or url in failed_urls or not snippet:
-            return None
-        if any(domain in url.lower() for domain in BLOCKED_DOMAINS):
-            return None
-        snippet_hash = hash_snippet(url, snippet)
-        cached = snippet_cache.get(snippet_hash)
-        if cached:
-            return result if cached == "yes" else None
-        messages = [
-            SystemMessage(content=web_search_validation_instructions.format(
-                query=query,
-                current_date=get_current_date()
-            )),
-            HumanMessage(content=f"Snippet: {snippet}")
-        ]
-        try:
-            response = await asyncio.wait_for(llm_call_async(messages), timeout=15)
-            answer = response if isinstance(response, str) else getattr(response, 'content', '') or ''
-            answer_l = answer.strip().lower()
-            verdict = "yes" if "yes" in answer_l else "no"
-            snippet_cache[snippet_hash] = verdict
-            return result if verdict == "yes" else None
-        except Exception:
-            return None
-    # This function is not used in the main workflow for now.
-    return []
-
 # --- Fast Search Results to Deduplication Workflow ---
 async def fast_search_results_to_final_urls(state: AgentState) -> AgentState:
     """
@@ -621,13 +585,6 @@ async def extract_content(state: AgentState) -> AgentState:
     Skips common non-HTML file types and YouTube URLs based on config.
     Adds a timeout per URL based on config.
     """
-    # Use color constants from setup if available
-    try:
-           from .config import RED, ENDC
-    except ImportError:
-        RED = '\033[91m'
-        ENDC = '\033[0m'
-        YELLOW = '\033[93m'
 
     from .config import URL_TIMEOUT
     data = state.get('data', []) # Original search results including snippets
@@ -831,90 +788,6 @@ async def extract_content(state: AgentState) -> AgentState:
     # Add logger to inspect the final state["relevant_contexts"]
     logger.info("extract_content: Final state['relevant_contexts'] contains %d items.", len(state.get('relevant_contexts', {})))
     return state
-#=============================================================================================
-async def embed_and_retrieve(state: AgentState) -> AgentState:
-    """
-    Enhanced embedding, indexing, and retrieval using hybrid approach.
-    Combines BM25 (sparse) and vector search (dense) for improved relevance.
-    Focuses only on creating relevant_chunks from relevant_contexts.
-    """
-    # Use color constants from setup if available
-    try:
-           from .config import RED, ENDC
-    except ImportError:
-        RED = '\033[91m'
-        ENDC = '\033[0m'
-
-    relevant_contexts = state.get("relevant_contexts", {})
-    relevant_chunks = [] # Initialize relevant_chunks as a list of Documents
-    errors = []
-    N_CHUNKS = 30 # Increased from 10 to 30 for better context coverage
-
-    # Retrieve current error state safely
-    current_error_state = state.get('error')
-
-    # Check if we have contexts to process
-    if not relevant_contexts:
-        logger.warning("No relevant contexts found for embedding and retrieval.")
-        new_error = (str(current_error_state or '') + "\nNo relevant contexts found for embedding and retrieval.").strip()
-        state['error'] = None if new_error == "" else new_error
-        return state
-
-    # Try hybrid retriever first
-    if create_hybrid_retriever and embeddings and USE_HYBRID_RETRIEVAL:
-        try:
-            logger.info("Using hybrid retriever (BM25 + Vector Search)")
-            # Create hybrid retriever with configuration from config.py
-            hybrid_retriever = create_hybrid_retriever(embeddings=embeddings)
-            
-            # Build indices
-            if hybrid_retriever.build_index(relevant_contexts):
-                # Get retrieval queries - use the specific search queries that were used to find documents
-                search_queries = state.get("search_queries", [])
-                original_query = state.get("new_query")
-                retriever_responses = {}
-                
-                if search_queries:
-                    # Use the specific search queries for better relevance and capture individual responses
-                    logger.info(f"Using {len(search_queries)} specific search queries for retrieval")
-                    relevant_chunks, retriever_responses = hybrid_retriever.retrieve_with_query_responses(search_queries)
-                    retrieval_method = "multi-query hybrid retrieval with responses"
-                elif original_query:
-                    # Fallback to original query if no search queries available
-                    logger.info("Using original query for retrieval (fallback)")
-                    relevant_chunks = hybrid_retriever.retrieve(original_query)
-                    retriever_responses = {original_query: f"Retrieved {len(relevant_chunks)} documents for original query."}
-                    retrieval_method = "single-query hybrid retrieval"
-                else:
-                    logger.warning("No retrieval queries found for hybrid retrieval.")
-                    relevant_chunks = []
-                    retriever_responses = {}
-                    retrieval_method = "no queries"
-                
-                if relevant_chunks:
-                    # Log retrieval stats
-                    stats = hybrid_retriever.get_stats()
-                    logger.info(f"Hybrid retrieval stats: {stats}")
-                    logger.info(f"Retrieved {len(relevant_chunks)} chunks using {retrieval_method}")
-                    logger.info(f"Captured {len(retriever_responses)} query responses")
-                    
-                    state["relevant_chunks"] = relevant_chunks
-                    state["retriever_responses"] = retriever_responses
-                    return state
-                else:
-                    logger.warning("No chunks retrieved from hybrid retrieval, falling back to standard approach")
-            else:
-                logger.warning("Failed to build hybrid retriever indices, falling back to standard approach")
-                
-        except Exception as e:
-            logger.error(f"Hybrid retriever failed: {e}, falling back to standard approach")
-            errors.append(f"Hybrid retriever error: {str(e)}")
-
-    logger.error("Hybrid retriever failed and no fallback available")
-    errors.append("Hybrid retriever failed to build indices")
-    new_error = (str(current_error_state or '') + "\n" + "\n".join(errors)).strip() if errors else (current_error_state.strip() if current_error_state is not None else None)
-    state['error'] = None if new_error is None or new_error == "" else new_error
-    state["relevant_chunks"] = []
 
 #=============================================================================================
 async def fss_retrieve(state: dict) -> dict:
@@ -962,113 +835,63 @@ async def fss_retrieve(state: dict) -> dict:
         state["file_store_name"] = None
     return state
 
-#=======================================================================================
-async def create_qa_pairs(state: AgentState) -> AgentState:
+#=============================================================================================
+async def classic_retrieve(state: dict) -> dict:
     """
-    Creates Q&A pairs with citations from relevant chunks for each search query.
-    Takes relevant_chunks from previous embedding/retrieval step and generates
-    structured Q&A pairs that will be used in the report appendix.
+    Uses the hybrid retriever to answer each query in search_queries using relevant_contexts.
+    Outputs qa_pairs for write_report, mirroring the fss_retrieve batch QA pattern.
     """
-    # Get relevant chunks and search queries from state
-    relevant_chunks = state.get("relevant_chunks", [])
     search_queries = state.get("search_queries", [])
-    
-    # Retrieve current error state safely
-    current_error_state = state.get('error')
-    logger.info(f"Creating Q&A pairs from {len(relevant_chunks)} chunks for {len(search_queries)} queries.")
-    
-    if not relevant_chunks:
-        logger.warning("No relevant chunks available for Q&A creation.")
-        state["qa_pairs"] = []
-        state["all_citations"] = []
-        new_error = (str(current_error_state or '') + "\nNo relevant chunks available for Q&A creation.").strip()
-        state['error'] = None if new_error == "" else new_error
-        logger.info(f"Created {len(state['qa_pairs'])} Q&A pairs.")
-        return state
-    
-    if not search_queries:
-        logger.warning("No search queries available for Q&A creation.")
-        state["qa_pairs"] = []
-        state["all_citations"] = []
-        new_error = (str(current_error_state or '') + "\nNo search queries available for Q&A creation.").strip()
-        state['error'] = None if new_error == "" else new_error
-        return state
-    
-    try:
-        qa_pairs = []
-        all_citations = []
-        citation_counter = 1
-        
-        for i, query in enumerate(search_queries):
-            # Find relevant chunks for this specific query
-            query_words = set(word.lower() for word in query.split() if len(word) > 3)
-            query_chunks = []
-            
-            # Score chunks based on relevance to this query
-            chunk_scores = []
-            for chunk in relevant_chunks:
-                content_words = set(word.lower() for word in chunk.page_content.split())
-                overlap = len(query_words.intersection(content_words))
-                chunk_scores.append((overlap, chunk))
-            
-            # Sort by relevance and take top chunks for this query
-            chunk_scores.sort(key=lambda x: x[0], reverse=True)
-            query_chunks = [chunk for score, chunk in chunk_scores[:3] if score > 0]  # Top 3 relevant chunks
-            
-            if not query_chunks:
-                # Fallback: use some chunks even if no direct word overlap
-                query_chunks = relevant_chunks[i:i+2] if i < len(relevant_chunks) else relevant_chunks[:2]
-            
-            # Create answer with citations for this query
-            answer_parts = []
-            query_citations = []
-            
-            for chunk in query_chunks:
-                # Create citation
-                citation = {
-                    "number": citation_counter,
-                    "source": chunk.metadata.get('source', 'Unknown'),
-                    "title": chunk.metadata.get('title', 'Untitled'),
-                    "url": chunk.metadata.get('source', ''),
-                    "content_preview": chunk.page_content[:200] + "..." if len(chunk.page_content) > 200 else chunk.page_content
-                }
-                all_citations.append(citation)
-                query_citations.append(citation)
-                
-                # Add chunk content with citation reference
-                answer_parts.append(f"{chunk.page_content[:400]}{'...' if len(chunk.page_content) > 400 else ''} [{citation_counter}]")
-                citation_counter += 1
-            
-            # Create the Q&A pair
-            qa_pair = {
-                "question": query,
-                "answer": " ".join(answer_parts) if answer_parts else "No specific information found for this query.",
-                "citations": query_citations
-            }
-            qa_pairs.append(qa_pair)
-        
-        # Store Q&A pairs and all citations in state
-        state["qa_pairs"] = qa_pairs
-        state["all_citations"] = all_citations
-        logger.info(f"Created {len(qa_pairs)} Q&A pairs with {len(all_citations)} total citations.")
-        
+    contexts_to_use = state.get("relevant_contexts", {})
+    session_id = state.get("session_id", "default-session")
 
-        # Print a summary of the appendix state instead of full content
-        qa_pairs = state.get("qa_pairs", [])
-        all_citations = state.get("all_citations", [])
-        if qa_pairs:
-            print(f"[APPENDIX SUMMARY] Q&A pairs: {len(qa_pairs)}, Citations: {len(all_citations)}")
+    # Use EnhancedGoogleEmbeddings from enhanced_embeddings.py
+    try:
+        from backend.src.enhanced_embeddings import EnhancedGoogleEmbeddings
+        from .config import GOOGLE_API_KEY, GOOGLE_MODEL
+        embeddings = EnhancedGoogleEmbeddings(google_api_key=GOOGLE_API_KEY, model=GOOGLE_MODEL)
+    except Exception as e:
+        logger.error(f"[Classic Node] Could not initialize EnhancedGoogleEmbeddings: {e}")
+        embeddings = None
+
+    logger.info(f"[Classic Node] classic_retrieve received {len(search_queries)} queries and {len(contexts_to_use)} contexts.")
+    print(f"[DEBUG][classic_retrieve] queries: {search_queries[:3]}... (total {len(search_queries)}) | contexts: {list(contexts_to_use.keys())[:3]}... (total {len(contexts_to_use)})")
+
+    try:
+        if not contexts_to_use or not search_queries:
+            logger.warning("[Classic Node] No relevant contexts or queries available. Skipping hybrid batch QA.")
+            state["qa_pairs"] = []
+            return state
+
+        if not create_hybrid_retriever or embeddings is None:
+            logger.error("[Classic Node] Hybrid retriever or embeddings not available.")
+            state["qa_pairs"] = []
+            return state
+
+        retriever = create_hybrid_retriever(embeddings=embeddings)
+        if not retriever.build_index(contexts_to_use):
+            logger.error("[Classic Node] Failed to build hybrid retriever index.")
+            state["qa_pairs"] = []
+            return state
+
+        # Use the hybrid retriever to answer each query
+        _, query_responses = retriever.retrieve_with_query_responses(search_queries)
+        logger.info(f"[Classic Node] Batch QA complete. Got {len(query_responses)} QA pairs.")
+
+        # Convert to list of dicts for downstream compatibility
+        qa_pairs = []
+        for q in search_queries:
+            answer = query_responses.get(q, "No answer generated.")
+            qa_pairs.append({"question": q, "answer": answer, "citations": []})
+
+        state["qa_pairs"] = qa_pairs
+        logger.info(f"[Classic Node] Stored {len(qa_pairs)} QA pairs in state.")
 
     except Exception as e:
-        error_msg = f"Error creating Q&A pairs: {e}"
+        error_msg = f"[Classic Node] failed: {e}"
         logger.error(error_msg, exc_info=True)
-        state["qa_pairs"] = []
-        state["all_citations"] = []
-        new_error = (str(current_error_state or '') + "\n" + error_msg).strip()
-        state['error'] = None if new_error == "" else new_error
-    
+        state["error"] = error_msg
     return state
-
 #=============================================================================================
 async def AI_evaluate(state: AgentState) -> AgentState:
     """
@@ -1202,23 +1025,6 @@ async def AI_evaluate(state: AgentState) -> AgentState:
     return state
 
 #=============================================================================================
-unified_report_instruction = (
-    "Generate a comprehensive research report with the following THREE-PART structure: "
-    "\n\n**PART 1: Original User Query**\n"
-    "Present the original user question exactly as submitted."
-    "\n\n**PART 2: IntelliSearch Response**\n"
-    "Provide an LLM-driven analysis that directly answers the user's query by synthesizing information from the Q&A pairs. "
-    "This should be a cohesive, analytical response that covers all search queries without duplication. "
-    "Focus on answering the user's original question comprehensively using insights from the collected data. "
-    "Target 400-1000 words for this main analytical section."
-    "\n\n**PART 3: Appendix - Q&A Pairs with Citations**\n"
-    "Present each search query as a question-answer pair with enclosed citations and sources. "
-    "Format each pair as: **Q: [search query]** followed by **A: [detailed answer with citations [1], [2], etc.]**. "
-    "Include all sources and citations at the end. "
-    "This appendix serves as supporting evidence for the main IntelliSearch response."
-    "\n\n Use clear markdown formatting with proper headings."
-)
-#=============================================================================================
 def deduplicate_content(text: str) -> str:
     """
     Remove duplicate sentences and similar content from the report to reduce repetition.
@@ -1273,7 +1079,15 @@ async def write_report(state: AgentState) -> AgentState:
     logger.info("[write_report] Only file_search retrieval method is supported.")
     print("[DEBUG] Entering write_report")
     logger.info(f"--- Entering write_report node for session '{short_session_id}' ---")
+    
+    unified_report_instruction = (
+    "Generate a comprehensive research report with the following THREE-PART structure: "
+    "\n\n**PART 1: Original User Query**\n"
+    "Present the original user question exactly as submitted."
+    "\n\n**PART 2: IntelliSearch Response**\n"
 
+    "\n\n Use clear markdown formatting with proper headings."
+    )
 
     # PART 1: Original User Query
     part1_query = f"# Research Report\n\n## 1. Original User Query\n\n**{research_topic}**\n\n---\n"
@@ -1290,7 +1104,13 @@ async def write_report(state: AgentState) -> AgentState:
             # Prepare a markdown summary of all Q&A pairs
             qa_md = "\n".join([f"### Q: {qa['question']}\nA: {qa['answer']}" for qa in qa_pairs])
             synthesis_prompt = f"""
-                You are an expert research analyst. Given the following Q&A pairs from a research process, synthesize a comprehensive, analytical response to the original user query below. Use the Q&A pairs as your main evidence base, but write a unified, well-structured report in markdown, with a clear conclusion section.
+                    "You are an expert research analyst."
+                    "Provide an analysis that directly answers the user's query by synthesizing information from the Q&A pairs. "
+                    "This should be a cohesive, analytical response that covers all search queries without duplication. "
+                    "Focus on answering the user's original question comprehensively using insights from the collected data. "
+                    "Target 500-3000 words for this main analytical section."
+                    Given the following Q&A pairs from a research process, synthesize a comprehensive, analytical response to the original user query below. 
+                    Use the Q&A pairs as your main evidence base, but write a unified, well-structured report in markdown, with a clear conclusion section.
 
                 Original User Query: {research_topic}
 

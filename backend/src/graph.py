@@ -32,6 +32,7 @@ try:
         create_queries,
         fast_search_results_to_final_urls,
         extract_content,
+        classic_retrieve,
         fss_retrieve,
         write_report,
     )
@@ -42,28 +43,29 @@ except ImportError as e:
 # Initialize StateGraph
 workflow = StateGraph(AgentState)
 
-# Add nodes
-# Assuming all imported node functions are async
+# Add nodes # Assuming all imported node functions are async
 if 'create_queries' in locals():
     workflow.add_node("create_queries", create_queries)
 if 'fast_search_results_to_final_urls' in locals():
     workflow.add_node("fast_search_results_to_final_urls", fast_search_results_to_final_urls)
 if 'extract_content' in locals():
     workflow.add_node("extract_content", extract_content)
+if 'classic_retrieve' in locals():
+    workflow.add_node("classic_retrieve", classic_retrieve) 
 if 'fss_retrieve' in locals():
     workflow.add_node("fss_retrieve", fss_retrieve)
 if 'write_report' in locals():
     workflow.add_node("write_report", write_report)
-
-# Add edges - check if nodes were successfully added before adding edges
 
 # Define the workflow logic
 if all(node_name in workflow.nodes for node_name in ["create_queries", "fast_search_results_to_final_urls", "extract_content", "fss_retrieve", "write_report"]):
     workflow.add_edge(START, "create_queries")
     workflow.add_edge("create_queries", "fast_search_results_to_final_urls")
     workflow.add_edge("fast_search_results_to_final_urls", "extract_content")
-    workflow.add_edge("extract_content", "fss_retrieve")
-    workflow.add_edge("fss_retrieve", "write_report")
+    workflow.add_edge("extract_content", "classic_retrieve")
+    workflow.add_edge("classic_retrieve", "write_report")
+    #workflow.add_edge("extract_content", "fss_retrieve")
+    #workflow.add_edge("fss_retrieve", "write_report")
     workflow.add_edge("write_report", END)
 
 
