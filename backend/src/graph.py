@@ -62,10 +62,10 @@ if all(node_name in workflow.nodes for node_name in ["create_queries", "fast_sea
     workflow.add_edge(START, "create_queries")
     workflow.add_edge("create_queries", "fast_search_results_to_final_urls")
     workflow.add_edge("fast_search_results_to_final_urls", "extract_content")
-    workflow.add_edge("extract_content", "classic_retrieve")
-    workflow.add_edge("classic_retrieve", "write_report")
-    #workflow.add_edge("extract_content", "fss_retrieve")
-    #workflow.add_edge("fss_retrieve", "write_report")
+    #workflow.add_edge("extract_content", "classic_retrieve")
+    #workflow.add_edge("classic_retrieve", "write_report")
+    workflow.add_edge("extract_content", "fss_retrieve")
+    workflow.add_edge("fss_retrieve", "write_report")
     workflow.add_edge("write_report", END)
 
 

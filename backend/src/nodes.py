@@ -103,7 +103,7 @@ except ImportError:
 # FSS retriever import with fallback
 from typing import Any
 try:
-    from backend.src.fss_retriever import GeminiFileSearchRetriever, delete_gemini_file_search_store
+    from backend.src.fss_retriever import GeminiFileSearchRetriever
 except ImportError as e:
     logger.error(f"Failed to import GeminiFileSearchRetriever: {e}")
     GeminiFileSearchRetriever = None
@@ -157,11 +157,6 @@ try:
             URL_TIMEOUT,
             SKIP_EXTENSIONS,
             BLOCKED_DOMAINS,
-            YELLOW,
-            ENDC,
-            RED,
-            GREEN,
-            BLUE,
             CHUNK_SIZE,
             CHUNK_OVERLAP,
             # Hybrid retrieval configuration
@@ -201,7 +196,7 @@ except ImportError:
     MAX_RESULTS = 5
     CACHE_TTL = 3600
     CACHE_ENABLED = False
-    EMBEDDING_MODEL = "text-embedding-3-small"
+    EMBEDDING_MODEL = "gemini-embedding-001"
     REPORT_FORMAT = "md"
     REPORT_FILENAME_TEXT = "CrystalSearchReport.txt"
     MAX_SEARCH_QUERIES = 5
@@ -240,12 +235,7 @@ except ImportError:
     # Color constants and chunking fallbacks
     CHUNK_SIZE = 1000
     CHUNK_OVERLAP = 100
-    # Simple ANSI color fallbacks
-    YELLOW = '\033[93m'
-    ENDC = '\033[0m'
-    RED = '\033[91m'
-    GREEN = '\033[92m'
-    BLUE = '\033[94m'
+
 
 # Import prompt instructions
 try:
@@ -317,6 +307,7 @@ class AgentState(TypedDict):
     data: Optional[List[Any]]
     relevant_contexts: Optional[Dict[str, Dict[str, str]]]
     relevant_chunks: Optional[List[Document]]
+    retrieval_method: Optional[str]
     retriever_responses: Optional[Dict[str, str]]
     qa_pairs: Optional[List[Dict]]
     all_citations: Optional[List[Dict]]
@@ -503,7 +494,6 @@ from typing import List
 
 def hash_snippet(url: str, snippet: str) -> str:
     return hashlib.sha256(f"{url}|{snippet}".encode()).hexdigest()
-
 
 # --- Fast Search Results to Deduplication Workflow ---
 async def fast_search_results_to_final_urls(state: AgentState) -> AgentState:
@@ -799,6 +789,7 @@ async def fss_retrieve(state: dict) -> dict:
     contexts_to_use = state.get("relevant_contexts", {})
     search_queries = state.get("search_queries", [])
     session_id = state.get("session_id", "default-session")
+    retrieval_method = state.get("retrieval_method", "fss")
 
     logger.info(f"[FSS Node] fss_retrieve received retrieval_method: '{state.get('retrieval_method')}'")
     logger.debug(f"[FSS Node] Entering fss_retrieve for {len(search_queries)} queries with {len(contexts_to_use)} contexts.")
@@ -848,8 +839,8 @@ async def classic_retrieve(state: dict) -> dict:
     # Use EnhancedGoogleEmbeddings from enhanced_embeddings.py
     try:
         from backend.src.enhanced_embeddings import EnhancedGoogleEmbeddings
-        from .config import GOOGLE_API_KEY, GOOGLE_MODEL
-        embeddings = EnhancedGoogleEmbeddings(google_api_key=GOOGLE_API_KEY, model=GOOGLE_MODEL)
+        from .config import GOOGLE_API_KEY, EMBEDDING_MODEL
+        embeddings = EnhancedGoogleEmbeddings(google_api_key=GOOGLE_API_KEY, model=EMBEDDING_MODEL)
     except Exception as e:
         logger.error(f"[Classic Node] Could not initialize EnhancedGoogleEmbeddings: {e}")
         embeddings = None
@@ -1076,19 +1067,8 @@ async def write_report(state: AgentState) -> AgentState:
     short_session_id = full_session_id.split('-')[0]
     analysis_content = ""
     analysis_filename = None
-    logger.info("[write_report] Only file_search retrieval method is supported.")
-    print("[DEBUG] Entering write_report")
     logger.info(f"--- Entering write_report node for session '{short_session_id}' ---")
     
-    unified_report_instruction = (
-    "Generate a comprehensive research report with the following THREE-PART structure: "
-    "\n\n**PART 1: Original User Query**\n"
-    "Present the original user question exactly as submitted."
-    "\n\n**PART 2: IntelliSearch Response**\n"
-
-    "\n\n Use clear markdown formatting with proper headings."
-    )
-
     # PART 1: Original User Query
     part1_query = f"# Research Report\n\n## 1. Original User Query\n\n**{research_topic}**\n\n---\n"
 
@@ -1105,13 +1085,11 @@ async def write_report(state: AgentState) -> AgentState:
             qa_md = "\n".join([f"### Q: {qa['question']}\nA: {qa['answer']}" for qa in qa_pairs])
             synthesis_prompt = f"""
                     "You are an expert research analyst."
-                    "Provide an analysis that directly answers the user's query by synthesizing information from the Q&A pairs. "
+                    "Given the following Q&A pairs from a research process, synthesize a comprehensive, analytical response to the original user query below. 
+                    "Use the Q&A pairs as your main evidence base, but write a unified, well-structured report in markdown, with a clear conclusion section."
                     "This should be a cohesive, analytical response that covers all search queries without duplication. "
-                    "Focus on answering the user's original question comprehensively using insights from the collected data. "
                     "Target 500-3000 words for this main analytical section."
-                    Given the following Q&A pairs from a research process, synthesize a comprehensive, analytical response to the original user query below. 
-                    Use the Q&A pairs as your main evidence base, but write a unified, well-structured report in markdown, with a clear conclusion section.
-
+                                        
                 Original User Query: {research_topic}
 
                 Q&A Pairs:
@@ -1133,16 +1111,6 @@ async def write_report(state: AgentState) -> AgentState:
     # Appendix: List all QA pairs
     appendix_md = "\n".join([f"### Q: {qa['question']}\nA: {qa['answer']}" for qa in qa_pairs])
     appendix_content = f"## Appendix: Q&A Pairs\n\n{appendix_md if appendix_md else 'No Q&A pairs available.'}"
-    appendix_filename = None
-
-    # Ensure file store is deleted after session closes
-    try:
-        if "file_store_name" in state and state["file_store_name"]:
-            if 'delete_gemini_file_search_store' in globals():
-                delete_gemini_file_search_store(state["file_store_name"])
-            state["file_store_name"] = None
-    except Exception as e:
-        logger.error(f"Error deleting file store: {e} it might have been already deleted.")
 
     # Save analysis to Firestore
     db = None
@@ -1159,6 +1127,14 @@ async def write_report(state: AgentState) -> AgentState:
             logger.info(f"Successfully saved analysis report to Firestore: {analysis_filename}")
         except Exception as e:
             errors.append(f"Failed to save analysis to Firestore: {e}")
+
+    if db and appendix_content:
+        appendix_filename = f"{short_session_id}_appendix.txt"
+        try:
+            db.collection("report_files").document(appendix_filename).set({"content": appendix_content})
+            logger.info(f"Successfully saved appendix to Firestore: {appendix_filename}")
+        except Exception as e:
+            errors.append(f"Failed to save appendix to Firestore: {e}")
 
     # Final state update
     current_error = state.get('error', '') or ''

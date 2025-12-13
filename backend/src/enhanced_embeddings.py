@@ -1,3 +1,4 @@
+
 # enhanced_embeddings.py
 """
 Enhanced embedding implementation using direct Google AI client with task type specification.
@@ -53,6 +54,11 @@ class EmbeddingTask:
     CODE_RETRIEVAL_QUERY = "CODE_RETRIEVAL_QUERY" # For code search queries
 
 
+from .config import GOOGLE_API_KEY, EMBEDDING_MODEL
+
+google_api_key = GOOGLE_API_KEY
+embedding_model = EMBEDDING_MODEL
+
 class EnhancedGoogleEmbeddings(Embeddings):
     """
     Enhanced Google Embeddings using direct genai.Client with task type specification.
@@ -62,8 +68,8 @@ class EnhancedGoogleEmbeddings(Embeddings):
     
     def __init__(
         self,
-        google_api_key: str,
-        model: str = "gemini-embedding-001",
+        google_api_key: str = google_api_key,
+        model: str = embedding_model,
         default_task_type: str = "RETRIEVAL_DOCUMENT",
         output_dimensionality: int = 768,  # Default to 768 for efficiency
         normalize_embeddings: bool = True,
