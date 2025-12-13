@@ -105,7 +105,7 @@ export const ResearchProvider: React.FC<{ children: ReactNode }> = ({ children }
           query: request.query,
           prompt_type: request.prompt_type || 'general',
           search_mode: request.search_mode || 'fast',
-          retrieval_method: 'file_search'
+          retrieval_method: request.retrieval_method || 'classic',
         }),
         headers: {
           'Content-Type': 'application/json'

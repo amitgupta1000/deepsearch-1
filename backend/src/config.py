@@ -175,7 +175,7 @@ DEFAULT_REFERER = "https://www.google.com/"
 # Blocked domains and extensions
 BLOCKED_DOMAINS = get_env_list("BLOCKED_DOMAINS", [
     "instagram.com", "youtube.com/watch", "youtu.be", "nsearchives.nseindia.com", 
-    "bseindia.com", "sebi.gov.in"
+    "bseindia.com", 
 ])
 SKIP_EXTENSIONS = get_env_list("SKIP_EXTENSIONS", [
     ".jpg", ".jpeg", ".png", ".gif", ".mp4", ".mp3", ".zip", 
@@ -249,7 +249,7 @@ def validate_config():
     if not GOOGLE_API_KEY:
         errors.append("GOOGLE_API_KEY is required")
     if not SERPER_API_KEY:
-        warnings.append("SERPER_API_KEY not set - search functionality may be limited")
+        errors.append("SERPER_API_KEY not set - search functionality may be limited")
     
     # Check numeric limits
     if MAX_SEARCH_QUERIES <= 0:

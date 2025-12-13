@@ -272,7 +272,7 @@ class GeminiFileSearchRetriever:
             await self.delete_store()
 
     async def delete_store(self):
-        """Optimized deletion: Deletes tracked files directly, then the store."""
+        """Robust deletion: Ensures all files are deleted before deleting the store."""
         if not self.file_store_name:
             return
 
@@ -280,24 +280,51 @@ class GeminiFileSearchRetriever:
         self.file_store_name = None  # Prevent re-entry
 
         try:
-            # 1. Parallel Delete of Files (Faster than listing all)
+            # 1. Attempt to delete all tracked files first
             if self.created_file_names:
-                logger.info(f"[{self.display_name}] Deleting {len(self.created_file_names)} files concurrently...")
-                
+                #logger.info(f"[{self.display_name}] Deleting {len(self.created_file_names)} tracked files concurrently...")
+
                 async def delete_file_safe(name):
                     try:
                         await self.async_client.files.delete(name=name)
-                    except Exception:
-                        pass # Ignore already deleted or not found
+                    except Exception as e:
+                        # Suppress 404 Not Found warnings, log others at debug level
+                        if hasattr(e, 'status') and getattr(e, 'status', None) == 404:
+                            pass
+                        elif '404' in str(e) or 'Not Found' in str(e):
+                            pass
+                        else:
+                            logger.debug(f"[{self.display_name}] Could not delete file {name}: {e}")
 
-                # Batch delete
                 tasks = [delete_file_safe(name) for name in self.created_file_names]
                 await asyncio.gather(*tasks)
                 self.created_file_names = []
 
-            # 2. Delete Store
+            # 2. List any remaining files in the store and attempt to delete them
+            try:
+                file_list_resp = await self.async_client.file_search_stores.files.list(parent=store_to_delete)
+                remaining_files = getattr(file_list_resp, 'files', [])
+                if remaining_files:
+                    logger.info(f"[{self.display_name}] Found {len(remaining_files)} remaining files in store, attempting to delete...")
+                    async def delete_remaining_file(file_obj):
+                        try:
+                            await self.async_client.files.delete(name=file_obj.name)
+                        except Exception as e:
+                            # Suppress 404 Not Found warnings, log others at debug level
+                            if hasattr(e, 'status') and getattr(e, 'status', None) == 404:
+                                pass
+                            elif '404' in str(e) or 'Not Found' in str(e):
+                                pass
+                            else:
+                                logger.debug(f"[{self.display_name}] Could not delete remaining file {file_obj.name}: {e}")
+                    tasks = [delete_remaining_file(f) for f in remaining_files]
+                    await asyncio.gather(*tasks)
+            except Exception as e:
+                logger.warning(f"[{self.display_name}] Could not list or delete remaining files: {e}")
+
+            # 3. Try deleting the store
             logger.info(f"[{self.display_name}] Deleting store: {store_to_delete}")
             await self.async_client.file_search_stores.delete(name=store_to_delete)
-            
+
         except Exception as e:
             logger.error(f"[{self.display_name}] Cleanup error: {e}")

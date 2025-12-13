@@ -58,13 +58,31 @@ if 'write_report' in locals():
     workflow.add_node("write_report", write_report)
 
 # Define the workflow logic
-if all(node_name in workflow.nodes for node_name in ["create_queries", "fast_search_results_to_final_urls", "extract_content", "fss_retrieve", "write_report"]):
+
+if all(node_name in workflow.nodes for node_name in ["create_queries", "fast_search_results_to_final_urls", "extract_content", "classic_retrieve", "fss_retrieve", "write_report"]):
     workflow.add_edge(START, "create_queries")
     workflow.add_edge("create_queries", "fast_search_results_to_final_urls")
     workflow.add_edge("fast_search_results_to_final_urls", "extract_content")
-    #workflow.add_edge("extract_content", "classic_retrieve")
-    #workflow.add_edge("classic_retrieve", "write_report")
-    workflow.add_edge("extract_content", "fss_retrieve")
+    #workflow.add_edge("extract_content", "classic_retrieve")  # Default edge; may be overridden by conditional edge
+    #workflow.add_edge("extract_content", "fss_retrieve")      # Default edge; may be overridden by conditional edge
+
+    # Conditional edge: choose retriever based on retrieval_method
+    def choose_retriever(state):
+        method = state.get("retrieval_method", "fss")
+        if method == "classic":
+            return "classic_retrieve"
+        return "fss_retrieve"
+
+    workflow.add_conditional_edges(
+        "extract_content",
+        choose_retriever,
+        {
+            "classic_retrieve": "classic_retrieve",
+            "fss_retrieve": "fss_retrieve"
+        }
+    )
+    
+    workflow.add_edge("classic_retrieve", "write_report")
     workflow.add_edge("fss_retrieve", "write_report")
     workflow.add_edge("write_report", END)
 

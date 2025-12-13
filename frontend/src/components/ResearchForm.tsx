@@ -6,10 +6,9 @@ import type { ResearchRequest } from '../types';
 const ResearchForm: React.FC = () => {
   const { startResearch, state } = useResearch();
   const [query, setQuery] = useState('');
-  const [prompt_type, setPromptType] = useState('general');
+  const [promptType, setPromptType] = useState('general');
   const [searchMode, setSearchMode] = useState<'fast' | 'ultra'>('fast');
-
-
+  const [retrievalMethod, setRetrievalMethod] = useState<'classic' | 'fss'>('classic');
 
   const promptTypes = [
     { value: 'general', label: 'General Research', description: 'Broad research across multiple topics and sources' },
@@ -26,9 +25,9 @@ const ResearchForm: React.FC = () => {
 
     const request: ResearchRequest = {
       query: query.trim(),
-      prompt_type,
+      prompt_type: promptType,
       search_mode: searchMode,
-      retrieval_method: 'file_search',
+      retrieval_method: retrievalMethod,
     };
 
     await startResearch(request);
@@ -106,13 +105,13 @@ const ResearchForm: React.FC = () => {
                   <input
                     type="radio"
                     value={type.value}
-                    checked={prompt_type === type.value}
+                    checked={promptType === type.value}
                     onChange={(e) => setPromptType(e.target.value)}
                     className="sr-only"
                     disabled={state.isLoading}
                   />
                   <div className={`p-4 rounded-lg border-2 transition-all duration-200 ${
-                    prompt_type === type.value
+                    promptType === type.value
                       ? 'border-primary-500 bg-primary-50 shadow-md'
                       : 'border-gray-300 bg-white hover:border-gray-400 hover:shadow-sm'
                   }`}>
@@ -126,36 +125,62 @@ const ResearchForm: React.FC = () => {
 
           {/* Search Options & Submit Button */}
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-gray-200">
-            {/* Search Mode only */}
+            {/* Search Mode and Retrieval Method */}
             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
               {/* Search Depth Toggle */}
               <div className="flex items-center gap-4">
                 <span className="font-medium text-gray-700">Search Depth:</span>
-                <div className="flex items-center rounded-full bg-gray-200 p-1">
-                  <button
-                    type="button"
-                    onClick={() => setSearchMode('fast')}
-                    disabled={state.isLoading}
-                    className={`px-4 py-1 text-sm font-semibold rounded-full transition-colors ${
-                      searchMode === 'fast'
-                        ? 'bg-primary-600 text-white shadow'
-                        : 'text-gray-600 hover:bg-gray-300'
-                    }`}
-                  >
-                    Fast
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSearchMode('ultra')}
-                    disabled={state.isLoading}
-                    className={`px-4 py-1 text-sm font-semibold rounded-full transition-colors ${
-                      searchMode === 'ultra'
-                        ? 'bg-primary-600 text-white shadow'
-                        : 'text-gray-600 hover:bg-gray-300'
-                    }`}
-                  >
-                    Ultra
-                  </button>
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="search-mode"
+                      value="fast"
+                      checked={searchMode === 'fast'}
+                      onChange={() => setSearchMode('fast')}
+                      disabled={state.isLoading}
+                    />
+                    <span className="text-sm">Fast</span>
+                  </label>
+                  <label className="flex items-center gap-1 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="search-mode"
+                      value="ultra"
+                      checked={searchMode === 'ultra'}
+                      onChange={() => setSearchMode('ultra')}
+                      disabled={state.isLoading}
+                    />
+                    <span className="text-sm">Ultra</span>
+                  </label>
+                </div>
+              </div>
+              {/* Retrieval Method Toggle */}
+              <div className="flex items-center gap-4">
+                <span className="font-medium text-gray-700">Retrieval Method:</span>
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="retrieval-method"
+                      value="classic"
+                      checked={retrievalMethod === 'classic'}
+                      onChange={() => setRetrievalMethod('classic')}
+                      disabled={state.isLoading}
+                    />
+                    <span className="text-sm">Classic</span>
+                  </label>
+                  <label className="flex items-center gap-1 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="retrieval-method"
+                      value="fss"
+                      checked={retrievalMethod === 'fss'}
+                      onChange={() => setRetrievalMethod('fss')}
+                      disabled={state.isLoading}
+                    />
+                    <span className="text-sm">FSS</span>
+                  </label>
                 </div>
               </div>
             </div>
