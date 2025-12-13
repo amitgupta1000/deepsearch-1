@@ -8,7 +8,8 @@ const ResearchForm: React.FC = () => {
   const [query, setQuery] = useState('');
   const [promptType, setPromptType] = useState('general');
   const [searchMode, setSearchMode] = useState<'fast' | 'ultra'>('fast');
-  const [retrievalMethod, setRetrievalMethod] = useState<'classic' | 'fss'>('classic');
+  // Retrieval method is now locked to 'classic'
+  const retrievalMethod: 'classic' = 'classic';
 
   const promptTypes = [
     { value: 'general', label: 'General Research', description: 'Broad research across multiple topics and sources' },
@@ -125,7 +126,7 @@ const ResearchForm: React.FC = () => {
 
           {/* Search Options & Submit Button */}
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-gray-200">
-            {/* Search Mode and Retrieval Method */}
+            {/* Search Mode Only (Retrieval method locked to classic) */}
             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
               {/* Search Depth Toggle */}
               <div className="flex items-center gap-4">
@@ -152,34 +153,6 @@ const ResearchForm: React.FC = () => {
                       disabled={state.isLoading}
                     />
                     <span className="text-sm">Ultra</span>
-                  </label>
-                </div>
-              </div>
-              {/* Retrieval Method Toggle */}
-              <div className="flex items-center gap-4">
-                <span className="font-medium text-gray-700">Retrieval Method:</span>
-                <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-1 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="retrieval-method"
-                      value="classic"
-                      checked={retrievalMethod === 'classic'}
-                      onChange={() => setRetrievalMethod('classic')}
-                      disabled={state.isLoading}
-                    />
-                    <span className="text-sm">Classic</span>
-                  </label>
-                  <label className="flex items-center gap-1 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="retrieval-method"
-                      value="fss"
-                      checked={retrievalMethod === 'fss'}
-                      onChange={() => setRetrievalMethod('fss')}
-                      disabled={state.isLoading}
-                    />
-                    <span className="text-sm">FSS</span>
                   </label>
                 </div>
               </div>

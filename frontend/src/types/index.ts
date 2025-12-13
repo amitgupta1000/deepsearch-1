@@ -2,7 +2,7 @@ export interface ResearchRequest {
   query: string;
   prompt_type?: string;
   search_mode?: 'fast' | 'ultra';
-  retrieval_method?: 'classic' | 'fss';
+  retrieval_method?: 'classic'; // Only classic is supported now
 }
 
 export interface ResearchResult {
